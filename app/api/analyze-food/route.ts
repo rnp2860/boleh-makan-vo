@@ -2,345 +2,204 @@ import { NextRequest, NextResponse } from 'next/server';
 import Groq from 'groq-sdk';
 import { getSupabaseServer } from '@/lib/supabaseClient';
 
-// Fallback mock responses in case API fails
-const getFallbackResponse = () => {
-  const mockResponses = [
-    {
-      ingredients: ['Rice', 'Coconut milk', 'Sambal', 'Anchovies'],
-      macros: {
-        carbs: { value: '65g', status: 'High' },
-        protein: { value: '12g', status: 'Low' },
-        fat: { value: '28g', status: 'High' },
-        calories: { value: '550', status: 'High' }
-      },
-      glycemic_index: 'High',
-      health_score: 45,
-      analysis_points: [
-        'High glycemic index carbohydrates from white rice will cause rapid glucose elevation.',
-        'Coconut milk adds significant saturated fat, increasing cardiovascular risk for diabetics.',
-        'Estimated carbohydrate load exceeds recommended portions for diabetic management.'
-      ],
-      actionable_advice: [
-        'Reduce portion size by 50% to manage carbohydrate intake.',
-        'Pair with lean protein source to slow glucose absorption.',
-        'Monitor blood glucose 2 hours post-meal to assess individual response.'
-      ]
-    },
-    {
-      ingredients: ['Grilled chicken', 'Mixed vegetables', 'Brown rice'],
-      macros: {
-        carbs: { value: '35g', status: 'Moderate' },
-        protein: { value: '28g', status: 'Good' },
-        fat: { value: '12g', status: 'Moderate' },
-        calories: { value: '380', status: 'Moderate' }
-      },
-      glycemic_index: 'Medium',
-      health_score: 75,
-      analysis_points: [
-        'Balanced macronutrient profile with moderate carbohydrate content.',
-        'Fiber from vegetables and whole grain rice supports stable glucose response.',
-        'Adequate protein supports satiety and metabolic health.'
-      ],
-      actionable_advice: [
-        'This meal is appropriate for diabetic management with proper portion control.',
-        'Consume vegetables first, followed by protein, then carbohydrates to optimize glucose response.',
-        'Maintain consistent meal timing to support glycemic stability.'
-      ]
+// User Profile Interface
+interface UserProfile {
+  age: number;
+  gender: 'male' | 'female' | 'other';
+  height: number; // in cm
+  weight: number; // in kg
+  activityLevel: 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active';
+  goal: 'weight_loss' | 'weight_gain' | 'maintenance' | 'diabetes' | 'muscle_gain';
+}
+
+function calculateTDEE(profile: UserProfile): number {
+  let bmr: number;
+  if (profile.gender === 'male') {
+    bmr = 10 * profile.weight + 6.25 * profile.height - 5 * profile.age + 5;
+  } else {
+    bmr = 10 * profile.weight + 6.25 * profile.height - 5 * profile.age - 161;
+  }
+  const activityMultipliers = {
+    sedentary: 1.2, light: 1.375, moderate: 1.55, active: 1.725, very_active: 1.9
+  };
+  return Math.round(bmr * (activityMultipliers[profile.activityLevel] || 1.2));
+}
+
+function calculateStatusBadges(carbs: number, protein: number, calories: number, userProfile?: UserProfile) {
+  const carbsThreshold = userProfile?.goal === 'diabetes' ? 40 : 50;
+  const carbsStatus = carbs > carbsThreshold ? 'High' : carbs > 30 ? 'Moderate' : 'Good';
+  const proteinStatus = protein > 20 ? 'Good' : protein > 10 ? 'Moderate' : 'Moderate';
+  let caloriesStatus: 'High' | 'Moderate' | 'Good';
+  
+  if (userProfile) {
+    const tdee = calculateTDEE(userProfile);
+    const percentage = (calories / tdee) * 100;
+    if (userProfile.goal === 'weight_loss') {
+      caloriesStatus = percentage > 40 ? 'High' : percentage > 25 ? 'Moderate' : 'Good';
+    } else {
+      caloriesStatus = percentage > 50 ? 'High' : percentage > 30 ? 'Moderate' : 'Good';
     }
-  ];
-  return mockResponses[Math.floor(Math.random() * mockResponses.length)];
-};
+  } else {
+    caloriesStatus = calories > 600 ? 'High' : calories > 400 ? 'Moderate' : 'Good';
+  }
+  return { carbs: carbsStatus, protein: proteinStatus, calories: caloriesStatus };
+}
 
 export async function POST(request: NextRequest) {
-  // Log API key confirmation (first 4 characters only)
   const apiKey = process.env.GROQ_API_KEY;
-  if (apiKey) {
-    console.log('🔑 GROQ_API_KEY detected:', apiKey.substring(0, 4) + '...');
-  } else {
-    console.log('🔑 GROQ_API_KEY: NOT FOUND');
-  }
-
+  
   try {
-    const formData = await request.formData();
-    const image = formData.get('image') as File;
-
-    if (!image) {
-      return NextResponse.json(
-        { error: 'No image provided' },
-        { status: 400 }
-      );
-    }
-
-    // Check if Groq API key is configured
-    if (!apiKey) {
-      console.warn('GROQ_API_KEY not found, using fallback response');
-      return NextResponse.json(getFallbackResponse());
-    }
-
-    // Initialize Groq client
-    const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
-
-    // Convert image to base64 for Groq
-    const arrayBuffer = await image.arrayBuffer();
-    const base64Image = Buffer.from(arrayBuffer).toString('base64');
-    const mimeType = image.type || 'image/jpeg';
-
-    // System prompt for Professional Malaysian Clinical Dietitian
-    const systemPrompt = `You are a Professional Malaysian Clinical Dietitian (Dr. Reza style). You are highly educated, a medical authority, but culturally grounded and warm. Your approach is to acknowledge the cultural love for Malaysian food first, then deliver the hard medical truth with empathy.
-
-CRITICAL: You must respond ONLY with valid JSON (no markdown, no code blocks, just pure JSON) in this exact structure:
-{
-  "ingredients": ["Ingredient 1", "Ingredient 2", "Ingredient 3"],
-  "macros": {
-    "carbs": { "value": "45g", "status": "High" },
-    "protein": { "value": "25g", "status": "Good" },
-    "fat": { "value": "15g", "status": "Moderate" },
-    "calories": { "value": "450", "status": "High" }
-  },
-  "glycemic_index": "High",
-  "health_score": 65,
-  "analysis_points": [
-    "Short, punchy bullet point about the food's impact.",
-    "Second point about the ingredients."
-  ],
-  "actionable_advice": [
-    "Specific advice on how to eat this safely.",
-    "Another tip regarding portion control."
-  ]
-}
-
-Rules:
-- ingredients: Array of identifiable food components from the image
-- macros: Each macro (carbs, protein, fat, calories) must have "value" (string with unit) and "status" (one of: "Low", "Moderate", "High", "Good")
-- glycemic_index: Must be exactly "Low", "Medium", or "High" based on carbohydrate type and processing
-- health_score: 0-100 (higher is better, 70+ is good, 50-69 is moderate, below 50 is poor)
-- analysis_points: Array of short, punchy bullet points explaining the food's impact on glucose and health
-- actionable_advice: Array of specific, practical recommendations for diabetic management
-
-Tone and Language:
-- Use Standard Professional English with refined Manglish (e.g., 'kaw', 'potong kaki', 'cheat day') naturally, but NOT crude slang
-- Acknowledge the cultural love for the food first, then deliver the hard medical truth
-- Be warm, empathetic, but authoritative and medically precise
-- Example: "I understand this nasi lemak is sedap kaw, but from a clinical perspective, the white rice and coconut milk combination will spike your glucose significantly. The risk of potong kaki is real if we don't manage this properly."
-
-Return ONLY the JSON object, nothing else.`;
-
-    // Declare analysisResult variable
-    let analysisResult: {
-      ingredients: string[];
-      macros: {
-        carbs: { value: string; status: string };
-        protein: { value: string; status: string };
-        fat: { value: string; status: string };
-        calories: { value: string; status: string };
-      };
-      glycemic_index: 'Low' | 'Medium' | 'High';
-      health_score: number;
-      analysis_points: string[];
-      actionable_advice: string[];
-    };
-
-    try {
-      // Call Groq API with vision model
-      const completion = await groq.chat.completions.create({
-        model: 'meta-llama/llama-4-scout-17b-16e-instruct',
-        messages: [
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: systemPrompt },
-              { 
-                type: 'image_url', 
-                image_url: { 
-                  url: `data:${mimeType};base64,${base64Image}` 
-                } 
-              }
-            ]
-          }
-        ],
-        response_format: { type: 'json_object' },
-        max_tokens: 800,
-      });
-
-      // Parse the response
-      const responseContent = completion.choices[0]?.message?.content;
-      if (!responseContent) {
-        throw new Error('No response from Groq');
-      }
-
-      // Parse the response - might return JSON wrapped in markdown code blocks
-      let cleanedContent = responseContent.trim();
-      
-      // Remove markdown code blocks if present
-      if (cleanedContent.startsWith('```json')) {
-        cleanedContent = cleanedContent.replace(/^```json\s*/, '').replace(/\s*```$/, '');
-      } else if (cleanedContent.startsWith('```')) {
-        cleanedContent = cleanedContent.replace(/^```\s*/, '').replace(/\s*```$/, '');
-      }
-
-      try {
-        analysisResult = JSON.parse(cleanedContent);
-      } catch (parseError) {
-        console.error('Failed to parse Groq response:', parseError);
-        console.error('Raw response:', responseContent);
-        throw new Error('Invalid response format from AI');
-      }
-
-      // Validate the response structure
-      if (
-        !Array.isArray(analysisResult.ingredients) ||
-        typeof analysisResult.macros !== 'object' ||
-        typeof analysisResult.macros.carbs !== 'object' ||
-        typeof analysisResult.macros.carbs.value !== 'string' ||
-        typeof analysisResult.macros.carbs.status !== 'string' ||
-        typeof analysisResult.macros.protein !== 'object' ||
-        typeof analysisResult.macros.protein.value !== 'string' ||
-        typeof analysisResult.macros.protein.status !== 'string' ||
-        typeof analysisResult.macros.fat !== 'object' ||
-        typeof analysisResult.macros.fat.value !== 'string' ||
-        typeof analysisResult.macros.fat.status !== 'string' ||
-        typeof analysisResult.macros.calories !== 'object' ||
-        typeof analysisResult.macros.calories.value !== 'string' ||
-        typeof analysisResult.macros.calories.status !== 'string' ||
-        !['Low', 'Medium', 'High'].includes(analysisResult.glycemic_index) ||
-        typeof analysisResult.health_score !== 'number' ||
-        !Array.isArray(analysisResult.analysis_points) ||
-        !Array.isArray(analysisResult.actionable_advice)
-      ) {
-        console.error('Invalid response structure from Groq:', analysisResult);
-        throw new Error('Invalid response structure from AI');
-      }
-
-      // Ensure health_score is within valid range
-      analysisResult.health_score = Math.max(0, Math.min(100, analysisResult.health_score));
-    } catch (groqError) {
-      console.error('❌ Groq API error:', groqError);
-      if (groqError instanceof Error) {
-        console.error('❌ Error name:', groqError.name);
-        console.error('❌ Error message:', groqError.message);
-        console.error('❌ Error stack:', groqError.stack);
-      }
-      // Re-throw to be caught by outer catch block
-      throw new Error(`Groq API error: ${groqError instanceof Error ? groqError.message : 'Unknown error'}`);
-    }
-
-    // Save to Supabase
-    console.log('=== Starting Supabase Save ===');
+    // 1. Parse Request
+    let imageBase64: string | null = null;
+    let mimeType: string = 'image/jpeg';
+    let userProfile: UserProfile | undefined = undefined;
+    let manualIngredients: string[] | undefined = undefined;
     
-    // Check for Supabase environment variables
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const contentType = request.headers.get('content-type');
     
-    if (!supabaseUrl) {
-      console.error('❌ NEXT_PUBLIC_SUPABASE_URL is missing from environment variables');
-    } else {
-      console.log('✅ NEXT_PUBLIC_SUPABASE_URL is set:', supabaseUrl.substring(0, 20) + '...');
-    }
-    
-    if (!supabaseAnonKey && !supabaseServiceKey) {
-      console.error('❌ Both NEXT_PUBLIC_SUPABASE_ANON_KEY and SUPABASE_SERVICE_ROLE_KEY are missing');
-    } else {
-      console.log('✅ Supabase key is available (using ' + (supabaseServiceKey ? 'service role' : 'anon') + ' key)');
+    if (contentType?.includes('application/json')) {
+      const body = await request.json();
+      imageBase64 = body.image;
+      userProfile = body.userProfile;
+      manualIngredients = body.ingredients; 
     }
 
-    try {
-      const supabase = getSupabaseServer();
-      
-      // Upload image to Supabase Storage
-      let imageUrl: string | null = null;
-      try {
-        console.log('📤 Uploading image to Supabase Storage...');
+    if (!imageBase64) return NextResponse.json({ error: 'No image provided' }, { status: 400 });
+    if (!apiKey) return NextResponse.json({ error: 'API Key missing' }, { status: 500 });
+
+    const groq = new Groq({ apiKey });
+
+    // 2. Build Prompt Context
+    let tdeeContext = '';
+    if (userProfile) {
+      const tdee = calculateTDEE(userProfile);
+      tdeeContext = `\nUSER PROFILE: Goal: ${userProfile.goal}, TDEE: ${tdee} kcal.`;
+    }
+
+    // MANUAL OVERRIDE LOGIC (Intelligent Blindfold)
+    const isManualMode = manualIngredients && manualIngredients.length > 0;
+    let systemPrompt = '';
+
+    if (isManualMode) {
+        // INTELLIGENT TEXT MODE
+        systemPrompt = `You are Dr. Reza, a clinical dietitian.
+        CRITICAL INSTRUCTION: The user has provided a raw list of items: ${JSON.stringify(manualIngredients)}.
         
-        // Generate unique filename
+        TASK:
+        1. CLEAN THE LIST: 
+           - Fix typos (e.g. "chiken" -> "Chicken").
+           - Remove non-food items (e.g. "plate", "table", "nonsense", "asdf").
+           - If the list becomes empty, return 0 for all macros and warn the user.
+        2. Calculate nutrition (Calories, Carbs, Protein, Fat) based ONLY on the CLEANED list.
+        
+        Return valid JSON:
+        {
+          "ingredients": ["Cleaned", "List", "Here"], 
+          "macros": { 
+             "carbs": { "value": "0g", "status": "Good" }, 
+             "protein": { "value": "0g", "status": "Good" }, 
+             "fat": { "value": "0g", "status": "Good" }, 
+             "calories": { "value": "0", "status": "Good" } 
+          },
+          "glycemic_index": "Medium",
+          "health_score": 0,
+          "analysis_title": "Dr. Reza's Updated Verdict",
+          "analysis_content": ["Comment on the edited meal."],
+          "actionable_advice": ["Updated advice."]
+        }
+        ${tdeeContext}`;
+    } else {
+        // VISION MODE
+        systemPrompt = `You are Dr. Reza, a Malaysian clinical dietitian. Analyze the food image.
+        Return JSON:
+        {
+          "ingredients": ["List", "detected"],
+          "macros": { 
+             "carbs": { "value": "0g", "status": "Good" }, 
+             "protein": { "value": "0g", "status": "Good" }, 
+             "fat": { "value": "0g", "status": "Good" }, 
+             "calories": { "value": "0", "status": "Good" } 
+          },
+          "glycemic_index": "High",
+          "health_score": 0,
+          "analysis_title": "Dr. Reza's Verdict",
+          "analysis_content": ["Medical observation mixed with cultural context."],
+          "actionable_advice": ["Actionable hack."]
+        }
+        RULES: Carbs > 50g = High. Protein > 20g = Good. Use Refined Manglish.
+        ${tdeeContext}`;
+    }
+
+    // 3. Call AI - Llama 4
+    const messages: any[] = [{
+        role: 'user',
+        content: isManualMode 
+            ? [{ type: 'text', text: systemPrompt }] 
+            : [
+                { type: 'text', text: systemPrompt },
+                { type: 'image_url', image_url: { url: `data:${mimeType};base64,${imageBase64}` } }
+              ]
+    }];
+
+    const completion = await groq.chat.completions.create({
+      model: 'meta-llama/llama-4-scout-17b-16e-instruct', 
+      messages: messages,
+      response_format: { type: 'json_object' },
+      max_tokens: 1000,
+    });
+
+    const responseContent = completion.choices[0]?.message?.content;
+    if (!responseContent) throw new Error('No response from AI');
+
+    let cleanedContent = responseContent.trim();
+    if (cleanedContent.startsWith('```json')) cleanedContent = cleanedContent.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+    else if (cleanedContent.startsWith('```')) cleanedContent = cleanedContent.replace(/^```\s*/, '').replace(/\s*```$/, '');
+
+    const analysisResult = JSON.parse(cleanedContent);
+
+    // 5. Post-Process Badges
+    const calculatedStatuses = calculateStatusBadges(
+      parseInt(analysisResult.macros.carbs.value) || 0,
+      parseInt(analysisResult.macros.protein.value) || 0,
+      parseInt(analysisResult.macros.calories.value) || 0,
+      userProfile
+    );
+    analysisResult.macros.carbs.status = calculatedStatuses.carbs;
+    analysisResult.macros.protein.status = calculatedStatuses.protein;
+    analysisResult.macros.calories.status = calculatedStatuses.calories;
+
+    // 6. Save to Supabase
+    const finalResult = { ...analysisResult, analysis_points: analysisResult.analysis_content };
+    const supabase = getSupabaseServer();
+    let imageUrl: string | null = null;
+    
+    try {
         const fileExtension = mimeType.split('/')[1] || 'jpg';
         const fileName = `scan_${Date.now()}.${fileExtension}`;
-        
-        // Convert image to Buffer (we already have arrayBuffer from earlier)
-        const imageBuffer = Buffer.from(arrayBuffer);
-        
-        // Upload to food-images bucket
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('food-images')
-          .upload(fileName, imageBuffer, {
-            contentType: mimeType,
-            upsert: false,
-          });
+        const imageBuffer = Buffer.from(imageBase64, 'base64');
+        const { error } = await supabase.storage.from('food-images').upload(fileName, imageBuffer, { contentType: mimeType, upsert: false });
+        if (!error) {
+            const { data } = supabase.storage.from('food-images').getPublicUrl(fileName);
+            imageUrl = data.publicUrl;
+        }
+    } catch (e) { console.error('Upload failed', e); }
 
-        if (uploadError) {
-          console.error('❌ Error uploading image to Supabase Storage:', uploadError);
-          console.error('❌ Upload error message:', uploadError.message);
-        } else {
-          console.log('✅ Image uploaded successfully:', uploadData.path);
-          
-          // Get public URL
-          const { data: urlData } = supabase.storage
-            .from('food-images')
-            .getPublicUrl(fileName);
-          
-          imageUrl = urlData.publicUrl;
-          console.log('✅ Image public URL:', imageUrl);
-        }
-      } catch (storageError) {
-        console.error('❌ Exception while uploading image to storage:', storageError);
-        if (storageError instanceof Error) {
-          console.error('❌ Error name:', storageError.name);
-          console.error('❌ Error message:', storageError.message);
-        }
-        // Continue even if image upload fails
-      }
-      
-      // Prepare insert data with snake_case keys matching SQL table
-      const insertData = {
-        ingredients: JSON.stringify(analysisResult.ingredients),
-        macros: JSON.stringify(analysisResult.macros),
-        glycemic_index: analysisResult.glycemic_index,
-        health_score: analysisResult.health_score,
-        analysis_points: JSON.stringify(analysisResult.analysis_points),
-        actionable_advice: JSON.stringify(analysisResult.actionable_advice),
+    await supabase.from('scans').insert([{
+        ingredients: finalResult.ingredients,
+        macros: finalResult.macros,
+        glycemic_index: finalResult.glycemic_index,
+        health_score: finalResult.health_score,
+        analysis_points: finalResult.analysis_content,
+        actionable_advice: finalResult.actionable_advice,
+        analysis_content: finalResult.analysis_content,
         image_url: imageUrl,
         created_at: new Date().toISOString(),
-      };
-      
-      console.log('📦 Data to insert:', JSON.stringify(insertData, null, 2));
-      console.log('📋 Column names: ingredients, macros, glycemic_index, health_score, analysis_points, actionable_advice, image_url, created_at');
-      
-      const { data, error: dbError } = await supabase
-        .from('scans')
-        .insert(insertData)
-        .select();
+    }]);
 
-      if (dbError) {
-        console.error('❌ Supabase insert error:', dbError);
-        console.error('❌ Error code:', dbError.code);
-        console.error('❌ Error message:', dbError.message);
-        console.error('❌ Error details:', dbError.details);
-        console.error('❌ Error hint:', dbError.hint);
-        // Continue even if database save fails
-      } else {
-        console.log('✅ Successfully saved to Supabase!');
-        console.log('✅ Inserted data:', JSON.stringify(data, null, 2));
-      }
-    } catch (dbError) {
-      console.error('❌ Exception while saving to Supabase:', dbError);
-      if (dbError instanceof Error) {
-        console.error('❌ Error name:', dbError.name);
-        console.error('❌ Error message:', dbError.message);
-        console.error('❌ Error stack:', dbError.stack);
-      }
-      // Continue even if database save fails
-    }
-    
-    console.log('=== Finished Supabase Save ===');
+    return NextResponse.json(finalResult);
 
-    return NextResponse.json(analysisResult);
   } catch (error) {
-    console.error('Error analyzing food:', error);
-    
-    // Return fallback response instead of error to prevent app crash
-    const fallback = getFallbackResponse();
-    console.log('Using fallback response due to error');
-    return NextResponse.json(fallback);
+    console.error('API Error:', error);
+    return NextResponse.json({ error: 'Failed' }, { status: 500 });
   }
 }
-

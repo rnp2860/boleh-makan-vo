@@ -1,351 +1,229 @@
 'use client';
 
-import { useState } from 'react';
-import Image from 'next/image';
-
-interface AnalysisResult {
-  ingredients: string[];
-  macros: {
-    carbs: { value: string; status: string };
-    protein: { value: string; status: string };
-    fat: { value: string; status: string };
-    calories: { value: string; status: string };
-  };
-  glycemic_index: 'Low' | 'Medium' | 'High';
-  health_score: number;
-  analysis_points: string[];
-  actionable_advice: string[];
-}
+import { useState, useRef, useEffect } from 'react';
+import UserProfileModal, { UserProfile } from '@/components/UserProfileModal'; 
 
 export default function CheckFoodPage() {
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [result, setResult] = useState<AnalysisResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [image, setImage] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<any>(null);
+  const [showSettings, setShowSettings] = useState(false);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Load profile on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('user_profile');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setUserProfile(parsed);
+      } catch (e) {
+        console.error('Failed to load profile', e);
+      }
+    }
+  }, []);
+
+  // Calculate TDEE for display
+  const getTDEE = () => {
+    if (!userProfile) return null;
+    let bmr;
+    if (userProfile.gender === 'male') {
+      bmr = 10 * userProfile.weight + 6.25 * userProfile.height - 5 * userProfile.age + 5;
+    } else {
+      bmr = 10 * userProfile.weight + 6.25 * userProfile.height - 5 * userProfile.age - 161;
+    }
+    const multipliers: any = { sedentary: 1.2, light: 1.375, moderate: 1.55, active: 1.725, very_active: 1.9 };
+    return Math.round(bmr * (multipliers[userProfile.activityLevel] || 1.2));
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setImageFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
-        setSelectedImage(reader.result as string);
+        setImage(reader.result as string);
+        analyzeFood(reader.result as string);
       };
       reader.readAsDataURL(file);
-      setResult(null);
-      setError(null);
     }
   };
 
-  const handleAnalyzeNew = () => {
+  const analyzeFood = async (base64Image: string) => {
+    setLoading(true);
     setResult(null);
-    setSelectedImage(null);
-    setImageFile(null);
-    setError(null);
-  };
-
-  const handleAnalyze = async () => {
-    if (!imageFile) {
-      setError('Please select an image first');
-      return;
-    }
-
-    setIsAnalyzing(true);
-    setError(null);
-    setResult(null);
-
     try {
-      const formData = new FormData();
-      formData.append('image', imageFile);
-
       const response = await fetch('/api/analyze-food', {
         method: 'POST',
-        body: formData,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          image: base64Image.split(',')[1],
+          userProfile: userProfile 
+        }),
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to analyze food');
-      }
-
       const data = await response.json();
       setResult(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Dr. Reza is currently offline. Please try again.');
     } finally {
-      setIsAnalyzing(false);
+      setLoading(false);
     }
-  };
-
-  const getGlycemicIndexColor = (level: string) => {
-    switch (level) {
-      case 'Low':
-        return 'text-teal-600 dark:text-teal-400';
-      case 'Medium':
-        return 'text-yellow-600 dark:text-yellow-400';
-      case 'High':
-        return 'text-red-600 dark:text-red-400';
-      default:
-        return 'text-gray-600 dark:text-gray-400';
-    }
-  };
-
-  const getHealthScoreColor = (score: number) => {
-    if (score >= 70) return 'text-teal-600 dark:text-teal-400';
-    if (score >= 50) return 'text-yellow-600 dark:text-yellow-400';
-    return 'text-red-600 dark:text-red-400';
-  };
-
-  const getStatusColor = (status: string, macroType: string) => {
-    // For carbs and calories, "High" is bad; for protein, "Good" is good
-    if (status === 'High' && (macroType === 'carbs' || macroType === 'calories')) {
-      return 'text-red-600 dark:text-red-400';
-    }
-    if (status === 'Bad') {
-      return 'text-red-600 dark:text-red-400';
-    }
-    if (status === 'Moderate') {
-      return 'text-amber-600 dark:text-amber-400';
-    }
-    if (status === 'Good' || status === 'Low') {
-      return 'text-green-600 dark:text-green-400';
-    }
-    return 'text-gray-600 dark:text-gray-400';
   };
 
   return (
-    <main className="flex min-h-screen flex-col items-center bg-white dark:bg-black py-12 px-6">
-      <div className="w-full max-w-4xl">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-black dark:text-white mb-4">
-            Boleh Makan <span className="text-[#008080]">Intelligence</span>
-          </h1>
-          <p className="text-lg text-gray-600 dark:text-gray-300">
-            AI-powered nutritional assessment for diabetic management
-          </p>
+    <main className="min-h-screen bg-slate-50 pb-20">
+      
+      {/* HEADER */}
+      <div className="bg-white p-4 shadow-sm sticky top-0 z-10 flex justify-between items-center">
+        <div>
+          <h1 className="text-xl font-bold text-slate-900 tracking-tight">Boleh Makan</h1>
+          <p className="text-xs text-teal-600 font-medium">AI Metabolic Intelligence</p>
         </div>
-
-        {/* Image Upload Section */}
-        <div className="mb-8 p-6 rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800">
-          <div className="flex flex-col items-center">
-            {/* Image Display - Always show if image exists */}
-            {selectedImage ? (
-              <div className="w-full max-w-2xl mb-6">
-                <div className="relative w-full aspect-video rounded-lg overflow-hidden border-2 border-gray-300 dark:border-gray-700">
-                  <Image
-                    src={selectedImage}
-                    alt="Selected food"
-                    fill
-                    className="object-cover"
-                  />
-                </div>
-              </div>
-            ) : (
-              /* Upload Placeholder - Only show when no image */
-              <label className="cursor-pointer w-full max-w-md">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageSelect}
-                  className="hidden"
-                />
-                <div className="w-full h-64 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg flex items-center justify-center hover:border-[#008080] dark:hover:border-[#008080] transition-colors">
-                  <div className="text-center p-6">
-                    <div className="text-4xl mb-4">📸</div>
-                    <p className="text-gray-700 dark:text-gray-300 font-medium">
-                      Click to upload food image
-                    </p>
-                    <p className="text-sm text-gray-500 dark:text-gray-500 mt-2">
-                      PNG, JPG, or WEBP
-                    </p>
-                  </div>
-                </div>
-              </label>
-            )}
-
-            {/* Analyze Button - Show if image exists and no results */}
-            {selectedImage && !result && (
-              <button
-                onClick={handleAnalyze}
-                disabled={isAnalyzing}
-                className="h-12 px-8 rounded-lg bg-[#008080] hover:bg-[#006666] disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-semibold text-lg shadow-md hover:shadow-lg transition-all"
-              >
-                {isAnalyzing ? 'Analyzing...' : 'Analyze Food'}
-              </button>
-            )}
-
-            {/* Analyze New Image Button - Show when results exist */}
-            {result && (
-              <button
-                onClick={handleAnalyzeNew}
-                className="h-12 px-8 rounded-lg bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 text-gray-800 dark:text-white font-semibold text-lg shadow-md hover:shadow-lg transition-all"
-              >
-                Analyze New Image
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Error Message */}
-        {error && (
-          <div className="mb-8 p-4 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400">
-            <p className="font-semibold">⚠️ Error: {error}</p>
-          </div>
-        )}
-
-        {/* Results Section */}
-        {result && (
-          <div className="space-y-6">
-            {/* Health Score */}
-            <div className="p-6 rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800">
-              <h3 className="text-lg font-semibold text-black dark:text-white mb-4">
-                Health Score
-              </h3>
-              <div className="flex items-baseline gap-3 mb-4">
-                <span className={`text-5xl font-bold ${getHealthScoreColor(result.health_score)}`}>
-                  {result.health_score}
-                </span>
-                <span className="text-2xl text-gray-500 dark:text-gray-400">/ 100</span>
-              </div>
-              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                <div
-                  className={`h-2 rounded-full transition-all ${
-                    result.health_score >= 70
-                      ? 'bg-[#008080]'
-                      : result.health_score >= 50
-                      ? 'bg-yellow-500'
-                      : 'bg-red-500'
-                  }`}
-                  style={{ width: `${result.health_score}%` }}
-                />
-              </div>
-            </div>
-
-            {/* Detected Inventory - Ingredients as Pill Tags */}
-            <div className="p-6 rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800">
-              <h3 className="text-sm font-semibold text-gray-600 dark:text-gray-400 mb-3 uppercase tracking-wide">
-                Detected Inventory
-              </h3>
-              <div className="flex flex-wrap gap-2">
-                {result.ingredients.map((ingredient, index) => (
-                  <span
-                    key={index}
-                    className="px-2.5 py-1 rounded-full bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-xs font-normal"
-                  >
-                    {ingredient}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            {/* The "So What?" Grid - Macros with Status Badges */}
-            <div className="p-6 rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800">
-              <h3 className="text-lg font-semibold text-black dark:text-white mb-4">
-                Nutritional Analysis
-              </h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="text-center p-4 rounded-lg bg-white dark:bg-black border border-gray-200 dark:border-gray-800">
-                  <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">Carbs</div>
-                  <div className="text-lg font-semibold text-black dark:text-white mb-1">
-                    {result.macros.carbs.value}
-                  </div>
-                  <div className={`text-xs font-medium ${getStatusColor(result.macros.carbs.status, 'carbs')}`}>
-                    {result.macros.carbs.status}
-                  </div>
-                </div>
-                <div className="text-center p-4 rounded-lg bg-white dark:bg-black border border-gray-200 dark:border-gray-800">
-                  <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">Protein</div>
-                  <div className="text-lg font-semibold text-black dark:text-white mb-1">
-                    {result.macros.protein.value}
-                  </div>
-                  <div className={`text-xs font-medium ${getStatusColor(result.macros.protein.status, 'protein')}`}>
-                    {result.macros.protein.status}
-                  </div>
-                </div>
-                <div className="text-center p-4 rounded-lg bg-white dark:bg-black border border-gray-200 dark:border-gray-800">
-                  <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">Fat</div>
-                  <div className="text-lg font-semibold text-black dark:text-white mb-1">
-                    {result.macros.fat.value}
-                  </div>
-                  <div className={`text-xs font-medium ${getStatusColor(result.macros.fat.status, 'fat')}`}>
-                    {result.macros.fat.status}
-                  </div>
-                </div>
-                <div className="text-center p-4 rounded-lg bg-white dark:bg-black border border-gray-200 dark:border-gray-800">
-                  <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">Calories</div>
-                  <div className="text-lg font-semibold text-black dark:text-white mb-1">
-                    {result.macros.calories.value}
-                  </div>
-                  <div className={`text-xs font-medium ${getStatusColor(result.macros.calories.status, 'calories')}`}>
-                    {result.macros.calories.status}
-                  </div>
-                </div>
-              </div>
-              <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-800">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">Glycemic Index:</span>
-                  <span className={`text-sm font-semibold ${getGlycemicIndexColor(result.glycemic_index)}`}>
-                    {result.glycemic_index}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Analysis Points - Bullet List with Stethoscope Icon */}
-            <div className="p-6 rounded-lg bg-white dark:bg-black border border-gray-200 dark:border-gray-800">
-              <h3 className="text-lg font-semibold text-black dark:text-white mb-4">
-                Clinical Analysis
-              </h3>
-              <ul className="space-y-2">
-                {result.analysis_points.map((point, index) => (
-                  <li key={index} className="flex items-start gap-3">
-                    <span className="text-[#008080] dark:text-teal-400 mt-0.5">🩺</span>
-                    <span className="text-gray-700 dark:text-gray-300 leading-relaxed flex-1">
-                      {point}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Actionable Advice - Bullet List with Lightning Icon */}
-            <div className="p-6 rounded-lg bg-[#008080]/5 dark:bg-[#008080]/10 border border-[#008080]/20 dark:border-[#008080]/30">
-              <h3 className="text-lg font-semibold text-[#008080] dark:text-teal-400 mb-4">
-                Actionable Advice
-              </h3>
-              <ul className="space-y-2">
-                {result.actionable_advice.map((advice, index) => (
-                  <li key={index} className="flex items-start gap-3">
-                    <span className="text-[#008080] dark:text-teal-400 mt-0.5">⚡</span>
-                    <span className="text-gray-800 dark:text-gray-200 leading-relaxed flex-1">
-                      {advice}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        )}
-
-        {/* Disclaimer Footer */}
-        <div className="mt-12 pt-8 border-t border-gray-200 dark:border-gray-800 text-center">
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            Estimates based on visual data. Not a medical diagnosis.
-          </p>
-        </div>
-
-        {/* Back Button */}
-        <div className="mt-6 text-center">
-          <a
-            href="/"
-            className="inline-block px-6 py-3 rounded-lg bg-gray-100 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 hover:border-[#008080] text-gray-700 dark:text-gray-300 font-medium transition-all"
-          >
-            ← Back to Home
-          </a>
-        </div>
+        
+        {/* THE GEAR ICON BUTTON */}
+        <button 
+          onClick={() => setShowSettings(true)}
+          className="p-2 rounded-full bg-slate-100 hover:bg-teal-50 text-slate-600 hover:text-teal-600 transition-colors"
+        >
+          <span className="text-xl">⚙️</span>
+        </button>
       </div>
+
+      {/* PERSONALIZATION BADGE */}
+      {userProfile && (
+        <div className="bg-teal-600 text-white px-4 py-2 text-xs font-medium text-center shadow-sm">
+          🎯 Customized for {userProfile.goal.replace('_', ' ')} • Daily Limit: {getTDEE()} kcal
+        </div>
+      )}
+
+      <div className="max-w-md mx-auto p-4">
+        
+        {/* CAMERA UPLOAD SECTION */}
+        {!image && (
+          <div 
+            onClick={() => fileInputRef.current?.click()}
+            className="mt-8 border-2 border-dashed border-slate-300 rounded-2xl p-10 flex flex-col items-center justify-center bg-white cursor-pointer hover:border-teal-500 hover:bg-teal-50 transition-all"
+          >
+            <div className="w-16 h-16 bg-teal-100 rounded-full flex items-center justify-center mb-4 text-3xl">
+              📸
+            </div>
+            <p className="text-slate-600 font-medium">Tap to Scan Meal</p>
+            <p className="text-xs text-slate-400 mt-2">Dr. Reza is ready</p>
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              onChange={handleImageUpload} 
+              accept="image/*" 
+              className="hidden" 
+            />
+          </div>
+        )}
+
+        {/* IMAGE PREVIEW & RESULTS */}
+        {image && (
+          <div className="space-y-6">
+            <div className="relative rounded-2xl overflow-hidden shadow-md">
+              <img src={image} alt="Food" className="w-full object-cover" />
+              
+              {/* RETAKE BUTTON */}
+              <button 
+                onClick={() => { setImage(null); setResult(null); }}
+                className="absolute top-3 right-3 bg-black/50 text-white px-3 py-1 rounded-full text-xs backdrop-blur-md"
+              >
+                ✕ Retake
+              </button>
+
+              {/* LOADING STATE */}
+              {loading && (
+                <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-white backdrop-blur-sm">
+                  <div className="w-10 h-10 border-4 border-white border-t-transparent rounded-full animate-spin mb-3"></div>
+                  <p className="font-medium animate-pulse">Dr. Reza is analyzing...</p>
+                </div>
+              )}
+            </div>
+
+            {/* RESULTS DASHBOARD */}
+            {result && !loading && (
+              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-6">
+                
+                {/* 1. INVENTORY TAGS */}
+                {result.ingredients && (
+                  <div className="flex flex-wrap gap-2 justify-center">
+                    {result.ingredients.map((item: string, i: number) => (
+                      <span key={i} className="px-3 py-1 bg-slate-200 text-slate-700 text-xs font-semibold rounded-full border border-slate-300">
+                        {item}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* 2. THE VITALS (MACROS) */}
+                <div className="grid grid-cols-2 gap-3">
+                  {Object.entries(result.macros).map(([key, data]: any) => (
+                    <div key={key} className={`p-4 rounded-xl border ${
+                      data.status === 'High' ? 'bg-red-50 border-red-200' :
+                      data.status === 'Good' ? 'bg-green-50 border-green-200' :
+                      'bg-amber-50 border-amber-200'
+                    }`}>
+                      <p className="text-xs uppercase font-bold text-slate-400 tracking-wider mb-1">{key}</p>
+                      <div className="flex items-end gap-2">
+                        <span className="text-2xl font-black text-slate-800">{data.value}</span>
+                        {data.status === 'High' && <span className="text-[10px] font-bold text-red-600 mb-1">HIGH</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* 3. DR REZA'S DIAGNOSIS */}
+                <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+                  <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                    <span className="text-2xl">🩺</span> Dr. Reza's Verdict
+                  </h3>
+                  <div className="space-y-3">
+                    {(result.analysis_content || result.analysis_points || []).map((point: string, i: number) => (
+                      <div key={i} className="flex gap-3 text-sm text-slate-700 leading-relaxed">
+                        <span className="text-teal-500 mt-1">•</span>
+                        <span>{point}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 4. ACTIONABLE ADVICE */}
+                <div className="bg-teal-50 rounded-2xl p-6 border border-teal-100">
+                  <h3 className="text-lg font-bold text-teal-900 mb-4 flex items-center gap-2">
+                    <span className="text-2xl">⚡</span> Quick Actions
+                  </h3>
+                  <div className="space-y-3">
+                    {(result.actionable_advice || []).map((point: string, i: number) => (
+                      <div key={i} className="flex gap-3 text-sm text-teal-800 leading-relaxed">
+                        <span className="text-teal-600 font-bold">✓</span>
+                        <span>{point}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="text-center text-xs text-slate-400 mt-8">
+                  AI Metabolic Consultant • Not Medical Advice
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* SETTINGS MODAL */}
+      <UserProfileModal 
+        open={showSettings} 
+        onClose={() => setShowSettings(false)} 
+        onSave={(profile) => {
+          setUserProfile(profile);
+          setShowSettings(false);
+        }} 
+      />
+
     </main>
   );
 }
-
