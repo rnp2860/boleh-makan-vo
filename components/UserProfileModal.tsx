@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 
 export interface UserProfile {
   age: number;
@@ -8,6 +9,7 @@ export interface UserProfile {
   height: number; // cm
   weight: number; // kg
   activityLevel: 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active';
+  // Updated to match our 6 specific Health Hero icons
   goal: 'weight_loss' | 'weight_gain' | 'maintenance' | 'diabetes' | 'hypertension' | 'cholesterol' | 'muscle_gain';
   customCalorieLimit?: number; 
 }
@@ -17,6 +19,16 @@ interface Props {
   onClose: () => void;
   onSave: (profile: UserProfile) => void;
 }
+
+// THE 6 HEALTH HERO GOALS
+const GOAL_OPTIONS = [
+  { id: 'weight_loss', label: 'Turun Berat', sub: 'Lose Weight', icon: '/assets/icon-weight-loss.png' },
+  { id: 'maintenance', label: 'Kekal Sihat', sub: 'Maintain', icon: '/assets/icon-maintain.png' },
+  { id: 'muscle_gain', label: 'Naik Otot', sub: 'Build Muscle', icon: '/assets/icon-muscle.png' },
+  { id: 'diabetes', label: 'Kencing Manis', sub: 'Diabetes Care', icon: '/assets/icon-diabetes.png' },
+  { id: 'hypertension', label: 'Kurang Garam', sub: 'Low Salt / BP', icon: '/assets/icon-low-salt.png' },
+  { id: 'cholesterol', label: 'Rendah Kolesterol', sub: 'Heart Health', icon: '/assets/icon-low-fat.png' },
+];
 
 export default function UserProfileModal({ open, onClose, onSave }: Props) {
   const [formData, setFormData] = useState<UserProfile>({
@@ -40,10 +52,9 @@ export default function UserProfileModal({ open, onClose, onSave }: Props) {
     }
   }, [open]);
 
-  // Real-time Calculator
+  // Real-time Calculator Logic
   useEffect(() => {
     let bmr;
-    // Prevent NaN if inputs are empty during typing
     const w = formData.weight || 0;
     const h = formData.height || 0;
     const a = formData.age || 0;
@@ -56,6 +67,7 @@ export default function UserProfileModal({ open, onClose, onSave }: Props) {
     const multipliers: any = { sedentary: 1.2, light: 1.375, moderate: 1.55, active: 1.725, very_active: 1.9 };
     const tdee = Math.round(bmr * (multipliers[formData.activityLevel] || 1.2));
     
+    // Logic Deficits
     if (formData.goal === 'weight_loss') setCalculatedTDEE(tdee - 500);
     else if (formData.goal === 'weight_gain' || formData.goal === 'muscle_gain') setCalculatedTDEE(tdee + 300);
     else if (['diabetes', 'hypertension', 'cholesterol'].includes(formData.goal)) setCalculatedTDEE(tdee - 250);
@@ -72,35 +84,14 @@ export default function UserProfileModal({ open, onClose, onSave }: Props) {
     onClose();
   };
 
-  // Helper to handle goal selection (Tap-to-Select)
-  const GoalButton = ({ value, label, icon }: { value: string, label: string, icon: string }) => (
-    <button
-      type="button"
-      onClick={() => setFormData({ ...formData, goal: value as any })}
-      className={`p-3 rounded-xl border text-left transition-all relative ${
-        formData.goal === value 
-          ? 'bg-teal-50 border-teal-500 ring-1 ring-teal-500' 
-          : 'bg-white border-slate-200 hover:bg-slate-50'
-      }`}
-    >
-      <div className="text-xl mb-1">{icon}</div>
-      <div className={`text-xs font-bold leading-tight ${formData.goal === value ? 'text-teal-700' : 'text-slate-600'}`}>
-        {label}
-      </div>
-      {formData.goal === value && (
-        <div className="absolute top-2 right-2 text-teal-500 text-xs">●</div>
-      )}
-    </button>
-  );
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md h-[85vh] flex flex-col animate-in zoom-in-95 duration-200">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md h-[85vh] flex flex-col animate-in zoom-in-95 duration-200 overflow-hidden">
         
         {/* Header */}
-        <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-white rounded-t-2xl z-10">
+        <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-white z-10">
           <h2 className="text-lg font-bold text-slate-800">Your Profile</h2>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 font-bold">✕</button>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 font-bold hover:bg-slate-200 transition-colors">✕</button>
         </div>
 
         {/* Scrollable Content */}
@@ -111,12 +102,12 @@ export default function UserProfileModal({ open, onClose, onSave }: Props) {
             <h3 className="text-xs font-black text-slate-400 uppercase tracking-wider">Physical Stats</h3>
             
             <div className="grid grid-cols-2 gap-4">
-                {/* Age - Using val || '' to fix sticky zero */}
+                {/* Age */}
                 <div>
                     <label className="block text-xs font-semibold text-slate-500 mb-1">Age</label>
                     <input 
                         type="number" 
-                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-lg font-bold text-slate-900 focus:bg-white focus:border-teal-500 outline-none transition-colors"
+                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-lg font-bold text-slate-900 focus:bg-white focus:border-emerald-500 outline-none transition-colors"
                         value={formData.age || ''} 
                         onChange={(e) => setFormData({...formData, age: Number(e.target.value)})} 
                     />
@@ -124,9 +115,9 @@ export default function UserProfileModal({ open, onClose, onSave }: Props) {
                 {/* Gender */}
                 <div>
                     <label className="block text-xs font-semibold text-slate-500 mb-1">Gender</label>
-                    <div className="flex bg-slate-50 p-1 rounded-xl border border-slate-200">
-                        <button type="button" onClick={() => setFormData({...formData, gender: 'male'})} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${formData.gender === 'male' ? 'bg-white shadow-sm text-teal-600' : 'text-slate-400'}`}>Male</button>
-                        <button type="button" onClick={() => setFormData({...formData, gender: 'female'})} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${formData.gender === 'female' ? 'bg-white shadow-sm text-teal-600' : 'text-slate-400'}`}>Female</button>
+                    <div className="flex bg-slate-50 p-1 rounded-xl border border-slate-200 h-[54px]">
+                        <button type="button" onClick={() => setFormData({...formData, gender: 'male'})} className={`flex-1 rounded-lg text-sm font-bold transition-all ${formData.gender === 'male' ? 'bg-white shadow-sm text-emerald-600' : 'text-slate-400'}`}>Male</button>
+                        <button type="button" onClick={() => setFormData({...formData, gender: 'female'})} className={`flex-1 rounded-lg text-sm font-bold transition-all ${formData.gender === 'female' ? 'bg-white shadow-sm text-emerald-600' : 'text-slate-400'}`}>Female</button>
                     </div>
                 </div>
             </div>
@@ -137,7 +128,7 @@ export default function UserProfileModal({ open, onClose, onSave }: Props) {
                     <label className="block text-xs font-semibold text-slate-500 mb-1">Height (cm)</label>
                     <input 
                         type="number" 
-                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-lg font-bold text-slate-900 focus:bg-white focus:border-teal-500 outline-none transition-colors"
+                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-lg font-bold text-slate-900 focus:bg-white focus:border-emerald-500 outline-none transition-colors"
                         value={formData.height || ''} 
                         onChange={(e) => setFormData({...formData, height: Number(e.target.value)})} 
                     />
@@ -147,7 +138,7 @@ export default function UserProfileModal({ open, onClose, onSave }: Props) {
                     <label className="block text-xs font-semibold text-slate-500 mb-1">Weight (kg)</label>
                     <input 
                         type="number" 
-                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-lg font-bold text-slate-900 focus:bg-white focus:border-teal-500 outline-none transition-colors"
+                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-lg font-bold text-slate-900 focus:bg-white focus:border-emerald-500 outline-none transition-colors"
                         value={formData.weight || ''} 
                         onChange={(e) => setFormData({...formData, weight: Number(e.target.value)})} 
                     />
@@ -157,42 +148,93 @@ export default function UserProfileModal({ open, onClose, onSave }: Props) {
 
           <hr className="border-slate-100" />
 
-          {/* Section 2: Goals (Grid Layout) */}
+          {/* Section 2: Goals (NEW GRID LAYOUT) */}
           <div className="space-y-3">
              <h3 className="text-xs font-black text-slate-400 uppercase tracking-wider">Health Goal</h3>
-             <div className="grid grid-cols-2 gap-2">
-                <GoalButton value="weight_loss" label="Lose Weight" icon="📉" />
-                <GoalButton value="maintenance" label="Maintain" icon="⚖️" />
-                <GoalButton value="muscle_gain" label="Build Muscle" icon="💪" />
-                <GoalButton value="diabetes" label="Diabetes Care" icon="🩸" />
-                <GoalButton value="hypertension" label="Low Salt (BP)" icon="🫀" />
-                <GoalButton value="cholesterol" label="Low Fat/Chol" icon="🍔" />
+             <div className="grid grid-cols-2 gap-3">
+                {GOAL_OPTIONS.map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => setFormData({ ...formData, goal: option.id as any })}
+                    className={`
+                      relative flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all duration-200
+                      ${formData.goal === option.id 
+                        ? 'border-emerald-500 bg-emerald-50 shadow-md ring-1 ring-emerald-500' 
+                        : 'border-slate-100 bg-white hover:border-emerald-200 hover:bg-slate-50'}
+                    `}
+                  >
+                    {/* Icon Image */}
+                    <div className="w-16 h-16 mb-2 relative">
+                      <Image 
+                          src={option.icon} 
+                          alt={option.label} 
+                          fill 
+                          className="object-contain" 
+                          sizes="64px"
+                      />
+                    </div>
+                    
+                    {/* Label */}
+                    <span className="text-sm font-bold text-slate-800 text-center leading-tight">
+                      {option.label}
+                    </span>
+                    <span className="text-[10px] font-semibold text-slate-400 text-center mt-1">
+                      {option.sub}
+                    </span>
+
+                    {/* Checkmark Badge */}
+                    {formData.goal === option.id && (
+                       <div className="absolute top-2 right-2 bg-emerald-500 text-white rounded-full p-1 shadow-sm">
+                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>
+                       </div>
+                    )}
+                  </button>
+                ))}
              </div>
           </div>
 
           <hr className="border-slate-100" />
 
-          {/* Section 3: Calorie Override */}
+          {/* Section 3: Dr. Reza's Prescription */}
           <div className="space-y-3">
-             <h3 className="text-xs font-black text-slate-400 uppercase tracking-wider">Metabolic Target</h3>
-             <div className="bg-teal-50 p-4 rounded-xl border border-teal-100">
-                <div className="flex justify-between items-end mb-3">
-                    <div>
-                        <p className="text-xs text-teal-600 font-bold uppercase">Dr. Reza recommends</p>
-                        <p className="text-2xl font-black text-teal-800">{calculatedTDEE} <span className="text-sm font-medium">kcal</span></p>
-                    </div>
-                </div>
+             <h3 className="text-xs font-black text-slate-400 uppercase tracking-wider">Dr. Reza's Plan</h3>
+             
+             {/* Prescription Card */}
+             <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100 flex gap-4 items-center relative overflow-hidden">
                 
-                <div className="bg-white p-2 rounded-lg border border-teal-200 flex items-center gap-3">
-                    <span className="text-xs font-bold text-slate-400 pl-2">CUSTOM:</span>
-                    <input 
-                       type="number" 
-                       placeholder="Override..."
-                       className="flex-1 p-1 text-sm font-bold text-slate-800 outline-none"
-                       value={formData.customCalorieLimit || ''}
-                       onChange={(e) => setFormData({...formData, customCalorieLimit: e.target.value ? Number(e.target.value) : undefined})}
-                    />
+                {/* Dr. Reza Avatar (Full Body) */}
+                <div className="w-20 h-24 relative flex-shrink-0 -mb-8 self-end">
+                   <Image 
+                     src="/assets/avatar-profile.png" 
+                     alt="Dr. Reza"
+                     fill
+                     className="object-contain object-bottom"
+                   />
                 </div>
+
+                <div className="flex-1 z-10">
+                    <p className="text-xs text-emerald-600 font-bold uppercase mb-1">Daily Target</p>
+                    <div className="flex items-baseline gap-1">
+                      <p className="text-3xl font-black text-emerald-800 tracking-tight">{calculatedTDEE}</p>
+                      <span className="text-sm font-bold text-emerald-600">kcal</span>
+                    </div>
+                    <p className="text-[10px] text-emerald-600/80 leading-tight mt-1">
+                      Based on your vitals and the <strong>{GOAL_OPTIONS.find(g => g.id === formData.goal)?.label}</strong> protocol.
+                    </p>
+                </div>
+             </div>
+             
+             {/* Manual Override */}
+             <div className="bg-white p-3 rounded-xl border border-slate-200 flex items-center gap-3 mt-2">
+                 <span className="text-xs font-bold text-slate-400 uppercase">Manual Override:</span>
+                 <input 
+                    type="number" 
+                    placeholder="Set custom limit..."
+                    className="flex-1 p-1 text-sm font-bold text-slate-800 outline-none placeholder:font-normal"
+                    value={formData.customCalorieLimit || ''}
+                    onChange={(e) => setFormData({...formData, customCalorieLimit: e.target.value ? Number(e.target.value) : undefined})}
+                 />
              </div>
           </div>
         </div>
@@ -201,9 +243,10 @@ export default function UserProfileModal({ open, onClose, onSave }: Props) {
         <div className="p-4 border-t border-slate-100 bg-white rounded-b-2xl">
            <button 
              onClick={handleSubmit}
-             className="w-full bg-slate-900 text-white font-bold text-lg py-4 rounded-xl shadow-lg active:scale-95 transition-transform"
+             className="w-full bg-slate-900 text-white font-bold text-lg py-4 rounded-xl shadow-lg active:scale-95 transition-transform flex items-center justify-center gap-2"
            >
-             Save Updates
+             <span>Confirm Profile</span>
+             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
            </button>
         </div>
 
