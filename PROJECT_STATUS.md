@@ -8,31 +8,42 @@
 - **Deployment:** Vercel (Connected via GitHub)
 
 ## 2. Core Features (Implemented)
-- **Vision Analysis:** - Scans food images for ingredients.
-  - Estimates macros (Carbs, Protein, Fat, Calories).
-  - Provides "Dr. Reza" verdict (Malaysian dietitian persona).
+- **Vision Analysis:** Scans food images -> identifies ingredients -> estimates macros.
 - **Logic Engines:**
-  - **"Blindfold Mode":** If user edits ingredients manually, AI ignores the image and recalculates based on text only (fixes hallucination).
-  - **"Medical Deficit":** - Weight Loss: -500 kcal
-    - Muscle Gain: +300 kcal
-    - Diabetes/Hypertension/Cholesterol: -250 kcal (Therapeutic deficit)
-    - Maintenance: 0 change
-- **User Profile:**
-  - Modal with Mobile-first UI (Tap-to-select goals, clear inputs).
-  - Custom Calorie Override (User can force a manual limit).
-- **Dashboard:**
-  - Daily Calorie Tracker (Currently uses `localStorage` in browser).
-  - Visual Progress Bar (Green/Red based on limit).
+  - **"Blindfold Mode":** AI prioritizes manual text edits over image analysis (anti-hallucination).
+  - **"Medical Deficit":** Adjusts targets for Weight Loss (-500), Muscle Gain (+300), and Sickness (-250).
+- **User Profile:** Mobile-first modal with "tap-to-select" inputs and custom calorie overrides.
+- **Dashboard:** Real-time calorie tracker (currently LocalStorage) with visual progress bar.
 
 ## 3. Current State
 - **GitHub:** Repo `boleh-makan-vo` is live and synced.
-- **Vercel:** Deployment is active. 
-- **Bug Fixes:** - Fixed "Sticky Zero" on inputs.
-  - Fixed "Greyed Out" inputs on mobile.
-  - Fixed Model Decommission error (Switched to Llama 4).
+- **Vercel:** Deployment is active.
+- **Bug Fixes:** Solved "Sticky Zero" inputs and mobile UI contrast issues.
 
-## 4. Roadmap (To-Do)
-- [ ] **Database Connection:** Move Daily Stats from `localStorage` to Supabase DB (so data survives browser clear).
-- [ ] **Authentication:** Allow users to Log In to save their history.
-- [ ] **History Tab:** View past days/weeks.
-- [ ] **Gamification:** Streaks or badges for hitting macro goals.
+## 4. IMMEDIATE ACTION PLAN (Hour 5 & 6)
+
+### Phase 1: "Humanizing" Dr. Reza (Design & Assets)
+- [ ] **Asset Injection:** Create `public/assets/` folder.
+  - Upload `avatar-header.png` (Pixar-style Dr. Reza).
+  - Upload `avatar-profile.png` (Dr. Reza + Word Cloud).
+  - Upload 6x `icon-[goal].png` (Upin & Ipin style 3D icons for goals).
+- [ ] **UI Overhaul:**
+  - **Header:** Replace text with Avatar + Speech Bubble ("Jom makan sihat!").
+  - **Profile:** Replace text buttons with the new Visual Grid of icons.
+
+### Phase 2: The Accuracy Engine (Logic Guardrails)
+- [ ] **Portion Control UI:** Add `0.5x`, `1x`, `1.5x` buttons to result card for instant math correction.
+- [ ] **Reference Anchoring:** Create `data/food-db.ts` with "Golden Standard" calories for top 20 Malaysian foods (Nasi Lemak, Teh Tarik, etc.).
+- [ ] **Prompt Engineering (Chain-of-Thought):**
+  - Force AI to: *List Inventory -> Estimate Volume -> Check Reference DB -> Calculate.*
+- [ ] **Consistency Config:** Set API `temperature` to `0.1` to stop random guessing.
+- [ ] **Transparency:** Show itemized breakdown (Receipt style) so users can see *what* was counted.
+
+### Phase 3: Backend (Data Persistence)
+- [ ] **Database:** Connect Supabase to store User Profiles and Food Logs permanently.
+- [ ] **Auth:** Simple login (Email/Google) so users own their data.
+- [ ] **History Tab:** View past daily logs.
+
+## 5. Future Scalability (Post-MVP)
+- **Native Mobile App:** Port to React Native + Expo (for App Store/Play Store launch).
+- **Growth & Marketing:** Use **Gamma.app** to generate landing pages and pitch decks for investor presentations.
