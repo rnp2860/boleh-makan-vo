@@ -4,7 +4,6 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import Image from 'next/image'; 
 import UserProfileModal, { UserProfile } from '@/components/UserProfileModal'; 
 import DrRezaHeader from '@/components/DrRezaHeader';
-// 👇 This connects us to the "Brain" you showed me in lib/supabaseClient.ts
 import { supabase } from '@/lib/supabaseClient';
 
 interface Ingredient {
@@ -34,13 +33,11 @@ export default function HomePage() {
 
   // 1. Load Data
   useEffect(() => {
-    // Load Profile
     const savedProfile = localStorage.getItem('user_profile');
     if (savedProfile) {
       try { setUserProfile(JSON.parse(savedProfile)); } catch (e) { setShowSettings(true); }
     } else { setShowSettings(true); }
 
-    // Load Daily Log (Local for now, next step: load from Supabase!)
     const today = new Date().toISOString().split('T')[0];
     const savedLog = localStorage.getItem('daily_log');
     if (savedLog) {
@@ -55,7 +52,7 @@ export default function HomePage() {
     }
   }, []);
 
-  // 2. Add to Local Log (Updates the UI banner immediately)
+  // 2. Add to Local Log
   const addToDailyLog = (calories: number) => {
     const today = new Date().toISOString().split('T')[0];
     const val = Math.round(calories);
@@ -90,13 +87,13 @@ export default function HomePage() {
       reader.onloadend = () => {
         setImage(reader.result as string);
         setPortionSize(1.0);
+        // Initial scan: No manual ingredients yet, so pass undefined
         analyzeFood(reader.result as string, undefined); 
       };
       reader.readAsDataURL(file);
     }
   };
 
-  // Calculate total macros dynamically based on ingredients state
   const totalMacros = useMemo(() => {
     return ingredients.reduce((totals, ingredient) => ({
       calories: totals.calories + ingredient.calories,
@@ -109,36 +106,48 @@ export default function HomePage() {
   // 5. Main AI Analysis
   const analyzeFood = async (base64Image: string, manualIngredients?: string[]) => {
     setLoading(true);
+    
+    // Only clear result if it's a fresh scan (not a re-analysis)
     if (!manualIngredients) setResult(null); 
+
     try {
       const response = await fetch('/api/analyze-food', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        // We pass the manual ingredients list to the AI so it knows what changed!
         body: JSON.stringify({ image: base64Image.split(',')[1], userProfile, ingredients: manualIngredients }),
       });
+      
       const data = await response.json();
       if (data.error) throw new Error("Dr. Reza is momentarily unavailable.");
+      
       setResult(data);
       
-      // Initialize ingredients state with detected items (convert string array to Ingredient objects)
-      // Each detected ingredient gets default values from the API result macros divided by ingredient count
-      const detectedItems = data.ingredients || [];
-      const ingredientCount = detectedItems.length || 1;
-      const baseCalories = data.macros?.calories?.value || 150;
-      const baseProtein = data.macros?.protein?.value || 10;
-      const baseCarbs = data.macros?.carbs?.value || 20;
-      const baseFat = data.macros?.fat?.value || 5;
-      
-      const initialIngredients: Ingredient[] = detectedItems.map((name: string) => ({
-        name,
-        calories: Math.round(baseCalories / ingredientCount),
-        protein: Math.round(baseProtein / ingredientCount),
-        carbs: Math.round(baseCarbs / ingredientCount),
-        fat: Math.round(baseFat / ingredientCount),
-      }));
-      
-      setIngredients(initialIngredients);
+      // LOGIC FIX:
+      // Only overwrite the ingredients list if this was a FRESH scan (manualIngredients is undefined).
+      // If manualIngredients exists, it means the user manually built the list, so we KEEP their list
+      // and only update the Verdict (result) above.
+      if (!manualIngredients) {
+          const detectedItems = data.ingredients || [];
+          const ingredientCount = detectedItems.length || 1;
+          const baseCalories = data.macros?.calories?.value || 150;
+          const baseProtein = data.macros?.protein?.value || 10;
+          const baseCarbs = data.macros?.carbs?.value || 20;
+          const baseFat = data.macros?.fat?.value || 5;
+          
+          const initialIngredients: Ingredient[] = detectedItems.map((name: string) => ({
+            name,
+            calories: Math.round(baseCalories / ingredientCount),
+            protein: Math.round(baseProtein / ingredientCount),
+            carbs: Math.round(baseCarbs / ingredientCount),
+            fat: Math.round(baseFat / ingredientCount),
+          }));
+          
+          setIngredients(initialIngredients);
+      }
+
       setIsEditing(false); 
+
     } catch (error) {
       console.error('Error:', error);
       alert('Dr. Reza encountered an issue. Please try again.');
@@ -171,7 +180,6 @@ export default function HomePage() {
         return;
       }
 
-      // Add the ingredient with real nutrition data
       const newIngredientObj: Ingredient = {
         name: data.name || name,
         calories: data.calories || 150,
@@ -197,39 +205,30 @@ export default function HomePage() {
     setIngredients(newList);
   };
   
+  // 7. UPDATED: Trigger Re-Analysis with AI
   const handleUpdateAnalysis = () => {
-    // Update result with new calculated macros and close editing mode
-    // Macros are already being calculated dynamically via useMemo
-    if (result) {
-      const updatedResult = {
-        ...result,
-        macros: {
-          calories: { value: totalMacros.calories, unit: 'kcal', status: totalMacros.calories > 600 ? 'High' : totalMacros.calories > 400 ? 'Moderate' : 'Good' },
-          protein: { value: totalMacros.protein, unit: 'g' },
-          carbs: { value: totalMacros.carbs, unit: 'g' },
-          fat: { value: totalMacros.fat, unit: 'g' },
-        },
-        ingredients: ingredients.map(ing => ing.name),
-      };
-      setResult(updatedResult);
+    if (image && ingredients.length > 0) {
+        // Grab the names of your current ingredients (including the new ones)
+        const currentIngredientNames = ingredients.map(ing => ing.name);
+        
+        // Send them back to Dr. Reza!
+        analyzeFood(image, currentIngredientNames);
+    } else {
+        setIsEditing(false);
     }
-    setIsEditing(false);
   };
 
-  // 7. CONFIRM & SAVE TO SUPABASE (This is the new part!)
+  // 8. Confirm & Save
   const handleConfirmLog = async () => {
     if (totalMacros.calories > 0) {
-       // Calculate final numbers based on portion (using dynamically calculated totals)
        const finalCalories = Math.round(totalMacros.calories * portionSize);
        const finalProtein = Math.round(totalMacros.protein * portionSize);
        const finalCarbs = Math.round(totalMacros.carbs * portionSize);
        const finalFat = Math.round(totalMacros.fat * portionSize);
        const mealName = result?.main_dish_name || "Unknown Meal";
 
-       // A. Update UI immediately (Instant gratification)
        addToDailyLog(finalCalories);
 
-       // B. Save to Cloud (Supabase)
        console.log("Saving to Supabase...");
        try {
          const { error } = await supabase.from('food_logs').insert([
@@ -253,7 +252,6 @@ export default function HomePage() {
          console.error("Save failed:", err);
        }
 
-       // Reset Screen
        setImage(null); setResult(null); setIsEditing(false);
     }
   };
@@ -287,7 +285,6 @@ export default function HomePage() {
         <div className="text-center mt-1"><p className="text-[10px] text-slate-400">{remaining < 0 ? `${Math.abs(remaining)} kcal over limit!` : `${remaining} kcal remaining`}</p></div>
       </div>
 
-      {/* Toast Notification */}
       {toast && (
         <div className={`fixed top-4 left-1/2 transform -translate-x-1/2 z-50 px-4 py-3 rounded-lg shadow-lg transition-all ${
           toast.type === 'error' ? 'bg-red-500 text-white' : 'bg-teal-500 text-white'
@@ -316,7 +313,7 @@ export default function HomePage() {
               {loading && (
                 <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-white backdrop-blur-sm">
                   <div className="w-10 h-10 border-4 border-white border-t-transparent rounded-full animate-spin mb-3"></div>
-                  <p className="font-medium animate-pulse">{isEditing ? "Recalculating..." : "Dr. Reza is analyzing..."}</p>
+                  <p className="font-medium animate-pulse">{isEditing ? "Re-analyzing Verdict..." : "Dr. Reza is analyzing..."}</p>
                 </div>
               )}
             </div>
@@ -331,7 +328,7 @@ export default function HomePage() {
                       {!isEditing ? (
                         <button onClick={() => setIsEditing(true)} className="text-teal-600 text-xs font-bold hover:underline">✎ Edit Ingredients</button>
                       ) : (
-                        <button onClick={handleUpdateAnalysis} className="bg-teal-600 text-white px-3 py-1 rounded-full text-xs font-bold shadow-sm hover:bg-teal-700">✓ Update Analysis</button>
+                        <button onClick={handleUpdateAnalysis} className="bg-teal-600 text-white px-3 py-1 rounded-full text-xs font-bold shadow-sm hover:bg-teal-700">✓ Get New Verdict</button>
                       )}
                    </div>
                    <div className="flex flex-wrap gap-2">
@@ -373,7 +370,7 @@ export default function HomePage() {
                    </div>
                 </div>
 
-                {/* Macros - Now calculated dynamically from ingredients state */}
+                {/* Macros */}
                 {result && (
                   <div className="grid grid-cols-2 gap-3">
                     <div className={`p-4 rounded-xl border ${totalMacros.calories > 600 ? 'bg-red-50 border-red-200' : totalMacros.calories > 400 ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-200'}`}>
@@ -412,20 +409,20 @@ export default function HomePage() {
                 <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
                   <div className="flex items-center gap-3 mb-4">
                     <div className="w-10 h-10 rounded-full border border-slate-200 overflow-hidden relative">
-                       <Image src="/assets/avatar-header.png" alt="Dr Reza" fill className="object-cover" />
+                        <Image src="/assets/avatar-header.png" alt="Dr Reza" fill className="object-cover" />
                     </div>
                     <h3 className="text-lg font-bold text-slate-900">Dr. Reza's Verdict</h3>
                   </div>
                   
                   <div className="space-y-3">
                     {(result.analysis_content || result.analysis_points || []).map((point: string, i: number) => {
-                       const isVerified = point.includes("Verified Database");
-                       return (
+                        const isVerified = point.includes("Verified Database");
+                        return (
                         <div key={i} className={`flex gap-3 text-sm leading-relaxed ${isVerified ? 'bg-emerald-50 p-3 rounded-lg border border-emerald-100 text-emerald-800' : 'text-slate-700'}`}>
                             <span className={isVerified ? 'text-emerald-600' : 'text-teal-500 mt-1'}>{isVerified ? '✅' : '•'}</span>
                             <span className={isVerified ? 'font-medium' : ''}>{point.replace('✅ ', '')}</span>
                         </div>
-                       );
+                        );
                     })}
                   </div>
                 </div>
@@ -444,7 +441,7 @@ export default function HomePage() {
                   </div>
                 )}
 
-                {/* CONFIRM BUTTON (Sends to Supabase!) */}
+                {/* CONFIRM BUTTON */}
                 <button 
                   onClick={handleConfirmLog}
                   className="w-full bg-slate-900 text-white py-3 rounded-xl shadow-lg active:scale-95 transition-transform flex flex-col items-center justify-center"
