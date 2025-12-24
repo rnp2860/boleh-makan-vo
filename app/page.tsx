@@ -28,6 +28,8 @@ export default function HomePage() {
   const [isEditing, setIsEditing] = useState(false);
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [newIngredient, setNewIngredient] = useState('');
+  const [isLookingUp, setIsLookingUp] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'error' | 'success' } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 1. Load Data
@@ -146,19 +148,46 @@ export default function HomePage() {
   };
 
   // 6. Ingredient Management
-  const handleAddIngredient = (e: React.FormEvent) => {
+  const handleAddIngredient = async (e: React.FormEvent) => {
     e.preventDefault();
     const name = newIngredient.trim();
-    if (name) {
+    if (!name) return;
+
+    setIsLookingUp(true);
+    setToast(null);
+
+    try {
+      const response = await fetch('/api/lookup-nutrition', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: name }),
+      });
+
+      const { data, error } = await response.json();
+
+      if (error || !data || data === null) {
+        setToast({ message: 'Food not found', type: 'error' });
+        setTimeout(() => setToast(null), 3000);
+        return;
+      }
+
+      // Add the ingredient with real nutrition data
       const newIngredientObj: Ingredient = {
-        name: name,
-        calories: 150,
-        protein: 10,
-        carbs: 20,
-        fat: 5,
+        name: data.name || name,
+        calories: data.calories || 150,
+        protein: data.protein || 10,
+        carbs: data.carbs || 20,
+        fat: data.fat || 5,
       };
+
       setIngredients([...ingredients, newIngredientObj]);
       setNewIngredient('');
+    } catch (error) {
+      console.error('Error looking up nutrition:', error);
+      setToast({ message: 'Food not found', type: 'error' });
+      setTimeout(() => setToast(null), 3000);
+    } finally {
+      setIsLookingUp(false);
     }
   };
   
@@ -258,6 +287,15 @@ export default function HomePage() {
         <div className="text-center mt-1"><p className="text-[10px] text-slate-400">{remaining < 0 ? `${Math.abs(remaining)} kcal over limit!` : `${remaining} kcal remaining`}</p></div>
       </div>
 
+      {/* Toast Notification */}
+      {toast && (
+        <div className={`fixed top-4 left-1/2 transform -translate-x-1/2 z-50 px-4 py-3 rounded-lg shadow-lg transition-all ${
+          toast.type === 'error' ? 'bg-red-500 text-white' : 'bg-teal-500 text-white'
+        }`}>
+          <p className="text-sm font-medium">{toast.message}</p>
+        </div>
+      )}
+
       <div className="max-w-md mx-auto p-4">
         {/* Upload */}
         {!image && (
@@ -306,8 +344,21 @@ export default function HomePage() {
                    </div>
                    {isEditing && (
                      <form onSubmit={handleAddIngredient} className="mt-3 flex gap-2">
-                        <input type="text" placeholder="Add missing item..." className="flex-1 text-xs p-2 border border-slate-300 rounded-lg outline-none focus:border-teal-500" value={newIngredient} onChange={(e) => setNewIngredient(e.target.value)} />
-                        <button type="submit" className="bg-slate-100 text-slate-600 px-3 py-2 rounded-lg text-xs font-bold hover:bg-slate-200">+</button>
+                        <input 
+                          type="text" 
+                          placeholder={isLookingUp ? "Looking up..." : "Add missing item..."} 
+                          className="flex-1 text-xs p-2 border border-slate-300 rounded-lg outline-none focus:border-teal-500 disabled:opacity-50 disabled:cursor-not-allowed" 
+                          value={newIngredient} 
+                          onChange={(e) => setNewIngredient(e.target.value)}
+                          disabled={isLookingUp}
+                        />
+                        <button 
+                          type="submit" 
+                          disabled={isLookingUp}
+                          className="bg-slate-100 text-slate-600 px-3 py-2 rounded-lg text-xs font-bold hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed min-w-[60px]"
+                        >
+                          {isLookingUp ? '...' : '+'}
+                        </button>
                      </form>
                    )}
                 </div>
