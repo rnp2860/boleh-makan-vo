@@ -21,18 +21,37 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const prompt = `Identify the food item from this text: "${query}". Correct any typos (e.g., "chlecken" -> "Chicken"). Return ONLY a JSON object with keys: name, calories, protein, carbs, fat. All values should be numbers except name (string). If the text is gibberish or not a food item, return null.`;
+    const prompt = `You are a Global Nutrition Expert familiar with Asian and Malaysian cuisine, including dishes like Beef Rendang, Nasi Goreng, Teh Tarik, Roti Canai, Nasi Lemak, Char Kway Teow, Laksa, and other regional foods.
+
+Identify the food item from this text: "${query}". Correct any typos (e.g., "chlecken" -> "Chicken", "nasie lemak" -> "Nasi Lemak").
+
+Return ONLY a valid JSON object (no markdown code blocks, no explanations, no conversational text) with this exact structure:
+{
+  "name": "Food Name",
+  "calories": 123,
+  "protein": 10,
+  "carbs": 20,
+  "fat": 5
+}
+
+All numeric values should be per 100g serving size. The name should be the corrected, properly spelled food name.
+
+Only return null (as JSON: {"name": null}) if the input is completely unrecognizable as food (like "sdflkj" or "table" or "abc123"). Malaysian and Asian dishes should always be recognized and returned with appropriate nutrition estimates.`;
 
     const completion = await groq.chat.completions.create({
       model: 'llama-3.1-70b-versatile',
       messages: [
+        {
+          role: 'system',
+          content: 'You are a Global Nutrition Expert. Always respond with valid JSON only, no markdown code blocks, no explanations, no conversational text. Only output the raw JSON object.',
+        },
         {
           role: 'user',
           content: prompt,
         },
       ],
       response_format: { type: 'json_object' },
-      temperature: 0.3,
+      temperature: 0.2,
       max_tokens: 200,
     });
 
@@ -42,36 +61,56 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ data: null });
     }
 
-    // Parse the response
+    // Parse the response - handle strict JSON only
     let parsed;
     try {
+      // First, try to parse directly
       parsed = JSON.parse(responseContent);
     } catch (e) {
-      // If parsing fails, try to extract JSON from markdown code blocks
-      const cleaned = responseContent.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      // If that fails, try to extract JSON from markdown code blocks or remove any surrounding text
+      let cleaned = responseContent.trim();
+      
+      // Remove markdown code fences if present
+      cleaned = cleaned.replace(/```json\s*/g, '').replace(/```\s*/g, '');
+      
+      // Try to find JSON object in the string (in case there's extra text)
+      const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        cleaned = jsonMatch[0];
+      }
+      
       try {
         parsed = JSON.parse(cleaned);
       } catch (e2) {
+        console.error('Failed to parse JSON response:', responseContent);
         return NextResponse.json({ data: null });
       }
     }
 
-    // Check if the response is null or invalid
-    if (parsed === null || typeof parsed !== 'object') {
+    // Check if the response indicates null (either parsed === null or parsed.name === null)
+    if (parsed === null || (typeof parsed === 'object' && parsed.name === null)) {
       return NextResponse.json({ data: null });
     }
 
-    // Validate the structure
+    // Validate the structure - ensure all required fields are present and valid
     if (
+      parsed &&
+      typeof parsed === 'object' &&
       parsed.name &&
+      typeof parsed.name === 'string' &&
+      parsed.name.trim() !== '' &&
       typeof parsed.calories === 'number' &&
       typeof parsed.protein === 'number' &&
       typeof parsed.carbs === 'number' &&
-      typeof parsed.fat === 'number'
+      typeof parsed.fat === 'number' &&
+      parsed.calories >= 0 &&
+      parsed.protein >= 0 &&
+      parsed.carbs >= 0 &&
+      parsed.fat >= 0
     ) {
       return NextResponse.json({
         data: {
-          name: parsed.name,
+          name: parsed.name.trim(),
           calories: Math.round(parsed.calories),
           protein: Math.round(parsed.protein),
           carbs: Math.round(parsed.carbs),
@@ -81,6 +120,7 @@ export async function POST(req: NextRequest) {
     }
 
     // If structure is invalid, return null
+    console.error('Invalid response structure:', parsed);
     return NextResponse.json({ data: null });
   } catch (error) {
     console.error('Error in lookup-nutrition:', error);
