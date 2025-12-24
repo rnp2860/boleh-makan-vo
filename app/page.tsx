@@ -1,11 +1,19 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import Image from 'next/image'; 
 import UserProfileModal, { UserProfile } from '@/components/UserProfileModal'; 
 import DrRezaHeader from '@/components/DrRezaHeader';
 // 👇 This connects us to the "Brain" you showed me in lib/supabaseClient.ts
 import { supabase } from '@/lib/supabaseClient';
+
+interface Ingredient {
+  name: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+}
 
 export default function HomePage() {
   const [image, setImage] = useState<string | null>(null);
@@ -18,7 +26,7 @@ export default function HomePage() {
   const [portionSize, setPortionSize] = useState<number>(1.0);
   const [dailyStats, setDailyStats] = useState({ calories: 0, count: 0 });
   const [isEditing, setIsEditing] = useState(false);
-  const [editableIngredients, setEditableIngredients] = useState<string[]>([]);
+  const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [newIngredient, setNewIngredient] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -86,6 +94,16 @@ export default function HomePage() {
     }
   };
 
+  // Calculate total macros dynamically based on ingredients state
+  const totalMacros = useMemo(() => {
+    return ingredients.reduce((totals, ingredient) => ({
+      calories: totals.calories + ingredient.calories,
+      protein: totals.protein + ingredient.protein,
+      carbs: totals.carbs + ingredient.carbs,
+      fat: totals.fat + ingredient.fat,
+    }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
+  }, [ingredients]);
+
   // 5. Main AI Analysis
   const analyzeFood = async (base64Image: string, manualIngredients?: string[]) => {
     setLoading(true);
@@ -99,7 +117,25 @@ export default function HomePage() {
       const data = await response.json();
       if (data.error) throw new Error("Dr. Reza is momentarily unavailable.");
       setResult(data);
-      setEditableIngredients(data.ingredients || []);
+      
+      // Initialize ingredients state with detected items (convert string array to Ingredient objects)
+      // Each detected ingredient gets default values from the API result macros divided by ingredient count
+      const detectedItems = data.ingredients || [];
+      const ingredientCount = detectedItems.length || 1;
+      const baseCalories = data.macros?.calories?.value || 150;
+      const baseProtein = data.macros?.protein?.value || 10;
+      const baseCarbs = data.macros?.carbs?.value || 20;
+      const baseFat = data.macros?.fat?.value || 5;
+      
+      const initialIngredients: Ingredient[] = detectedItems.map((name: string) => ({
+        name,
+        calories: Math.round(baseCalories / ingredientCount),
+        protein: Math.round(baseProtein / ingredientCount),
+        carbs: Math.round(baseCarbs / ingredientCount),
+        fat: Math.round(baseFat / ingredientCount),
+      }));
+      
+      setIngredients(initialIngredients);
       setIsEditing(false); 
     } catch (error) {
       console.error('Error:', error);
@@ -112,22 +148,54 @@ export default function HomePage() {
   // 6. Ingredient Management
   const handleAddIngredient = (e: React.FormEvent) => {
     e.preventDefault();
-    if (newIngredient.trim()) { setEditableIngredients([...editableIngredients, newIngredient.trim()]); setNewIngredient(''); }
+    const name = newIngredient.trim();
+    if (name) {
+      const newIngredientObj: Ingredient = {
+        name: name,
+        calories: 150,
+        protein: 10,
+        carbs: 20,
+        fat: 5,
+      };
+      setIngredients([...ingredients, newIngredientObj]);
+      setNewIngredient('');
+    }
   };
+  
   const handleRemoveIngredient = (index: number) => {
-    const newList = [...editableIngredients]; newList.splice(index, 1); setEditableIngredients(newList);
+    const newList = [...ingredients];
+    newList.splice(index, 1);
+    setIngredients(newList);
   };
-  const handleUpdateAnalysis = () => { if (image) analyzeFood(image, editableIngredients); };
+  
+  const handleUpdateAnalysis = () => {
+    // Update result with new calculated macros and close editing mode
+    // Macros are already being calculated dynamically via useMemo
+    if (result) {
+      const updatedResult = {
+        ...result,
+        macros: {
+          calories: { value: totalMacros.calories, unit: 'kcal', status: totalMacros.calories > 600 ? 'High' : totalMacros.calories > 400 ? 'Moderate' : 'Good' },
+          protein: { value: totalMacros.protein, unit: 'g' },
+          carbs: { value: totalMacros.carbs, unit: 'g' },
+          fat: { value: totalMacros.fat, unit: 'g' },
+        },
+        ingredients: ingredients.map(ing => ing.name),
+      };
+      setResult(updatedResult);
+    }
+    setIsEditing(false);
+  };
 
   // 7. CONFIRM & SAVE TO SUPABASE (This is the new part!)
   const handleConfirmLog = async () => {
-    if (result?.macros?.calories?.value) {
-       // Calculate final numbers based on portion
-       const finalCalories = Math.round(result.macros.calories.value * portionSize);
-       const finalProtein = Math.round((result.macros.protein?.value || 0) * portionSize);
-       const finalCarbs = Math.round((result.macros.carbs?.value || 0) * portionSize);
-       const finalFat = Math.round((result.macros.fat?.value || 0) * portionSize);
-       const mealName = result.main_dish_name || "Unknown Meal";
+    if (totalMacros.calories > 0) {
+       // Calculate final numbers based on portion (using dynamically calculated totals)
+       const finalCalories = Math.round(totalMacros.calories * portionSize);
+       const finalProtein = Math.round(totalMacros.protein * portionSize);
+       const finalCarbs = Math.round(totalMacros.carbs * portionSize);
+       const finalFat = Math.round(totalMacros.fat * portionSize);
+       const mealName = result?.main_dish_name || "Unknown Meal";
 
        // A. Update UI immediately (Instant gratification)
        addToDailyLog(finalCalories);
@@ -229,9 +297,9 @@ export default function HomePage() {
                       )}
                    </div>
                    <div className="flex flex-wrap gap-2">
-                      {(isEditing ? editableIngredients : (result.ingredients || [])).map((item: string, i: number) => (
+                      {ingredients.map((ingredient, i) => (
                         <span key={i} className={`px-3 py-1 rounded-full text-xs font-semibold border flex items-center gap-2 ${isEditing ? 'bg-white border-teal-300 text-teal-700' : 'bg-slate-100 border-slate-200 text-slate-700'}`}>
-                          {item}
+                          {ingredient.name}
                           {isEditing && <button onClick={() => handleRemoveIngredient(i)} className="text-teal-400 hover:text-red-500 font-bold">✕</button>}
                         </span>
                       ))}
@@ -254,19 +322,38 @@ export default function HomePage() {
                    </div>
                 </div>
 
-                {/* Macros */}
-                {result.macros && (
+                {/* Macros - Now calculated dynamically from ingredients state */}
+                {result && (
                   <div className="grid grid-cols-2 gap-3">
-                    {Object.entries(result.macros).map(([key, data]: any) => (
-                      <div key={key} className={`p-4 rounded-xl border ${data.status === 'High' ? 'bg-red-50 border-red-200' : data.status === 'Good' ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200'}`}>
-                        <p className="text-xs uppercase font-bold text-slate-400 tracking-wider mb-1">{key}</p>
-                        <div className="flex items-end gap-1">
-                          <span className="text-2xl font-black text-slate-800">{Math.round(data.value * portionSize)}</span>
-                          <span className="text-xs font-bold text-slate-500 mb-1">{data.unit}</span>
-                          {data.status === 'High' && <span className="ml-auto text-[10px] font-bold text-red-600 mb-1 bg-red-100 px-1 rounded">HIGH</span>}
-                        </div>
+                    <div className={`p-4 rounded-xl border ${totalMacros.calories > 600 ? 'bg-red-50 border-red-200' : totalMacros.calories > 400 ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-200'}`}>
+                      <p className="text-xs uppercase font-bold text-slate-400 tracking-wider mb-1">calories</p>
+                      <div className="flex items-end gap-1">
+                        <span className="text-2xl font-black text-slate-800">{Math.round(totalMacros.calories * portionSize)}</span>
+                        <span className="text-xs font-bold text-slate-500 mb-1">kcal</span>
+                        {totalMacros.calories > 600 && <span className="ml-auto text-[10px] font-bold text-red-600 mb-1 bg-red-100 px-1 rounded">HIGH</span>}
                       </div>
-                    ))}
+                    </div>
+                    <div className="p-4 rounded-xl border bg-slate-50 border-slate-200">
+                      <p className="text-xs uppercase font-bold text-slate-400 tracking-wider mb-1">protein</p>
+                      <div className="flex items-end gap-1">
+                        <span className="text-2xl font-black text-slate-800">{Math.round(totalMacros.protein * portionSize)}</span>
+                        <span className="text-xs font-bold text-slate-500 mb-1">g</span>
+                      </div>
+                    </div>
+                    <div className="p-4 rounded-xl border bg-slate-50 border-slate-200">
+                      <p className="text-xs uppercase font-bold text-slate-400 tracking-wider mb-1">carbs</p>
+                      <div className="flex items-end gap-1">
+                        <span className="text-2xl font-black text-slate-800">{Math.round(totalMacros.carbs * portionSize)}</span>
+                        <span className="text-xs font-bold text-slate-500 mb-1">g</span>
+                      </div>
+                    </div>
+                    <div className="p-4 rounded-xl border bg-slate-50 border-slate-200">
+                      <p className="text-xs uppercase font-bold text-slate-400 tracking-wider mb-1">fat</p>
+                      <div className="flex items-end gap-1">
+                        <span className="text-2xl font-black text-slate-800">{Math.round(totalMacros.fat * portionSize)}</span>
+                        <span className="text-xs font-bold text-slate-500 mb-1">g</span>
+                      </div>
+                    </div>
                   </div>
                 )}
 
@@ -312,7 +399,7 @@ export default function HomePage() {
                   className="w-full bg-slate-900 text-white py-3 rounded-xl shadow-lg active:scale-95 transition-transform flex flex-col items-center justify-center"
                 >
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-lg">Log Meal ({Math.round(result.macros.calories.value * portionSize)} kcal)</span>
+                    <span className="font-bold text-lg">Log Meal ({Math.round(totalMacros.calories * portionSize)} kcal)</span>
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
                   </div>
                   <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wide">
