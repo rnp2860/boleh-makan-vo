@@ -21,11 +21,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const prompt = `You are a Global Nutrition Expert familiar with Asian and Malaysian cuisine, including dishes like Beef Rendang, Nasi Goreng, Teh Tarik, Roti Canai, Nasi Lemak, Char Kway Teow, Laksa, and other regional foods.
+    const prompt = `Convert this text string into nutritional data: "${query}"
 
-Identify the food item from this text: "${query}". Correct any typos (e.g., "chlecken" -> "Chicken", "nasie lemak" -> "Nasi Lemak").
-
-Return ONLY a valid JSON object (no markdown code blocks, no explanations, no conversational text) with this exact structure:
+Return ONLY a valid JSON object (no markdown code blocks, no explanations, no conversational text, no filler text like "Here is your data") with this exact structure:
 {
   "name": "Food Name",
   "calories": 123,
@@ -34,16 +32,19 @@ Return ONLY a valid JSON object (no markdown code blocks, no explanations, no co
   "fat": 5
 }
 
-All numeric values should be per 100g serving size. The name should be the corrected, properly spelled food name.
-
-Only return null (as JSON: {"name": null}) if the input is completely unrecognizable as food (like "sdflkj" or "table" or "abc123"). Malaysian and Asian dishes should always be recognized and returned with appropriate nutrition estimates.`;
+Rules:
+- All numeric values should be per 100g serving size
+- Correct minor typos (e.g., "chlecken" -> "Chicken", "nasie lemak" -> "Nasi Lemak")
+- Return nutrition data for ANY food item mentioned
+- Only return null (as JSON: {"name": null}) if the text is pure gibberish with no recognizable food meaning (e.g., "xyz123", "sdflkj")
+- Trust the user's input - if they type a dish name, return nutrition for that dish`;
 
     const completion = await groq.chat.completions.create({
       model: 'llama-3.1-70b-versatile',
       messages: [
         {
           role: 'system',
-          content: 'You are a Global Nutrition Expert. Always respond with valid JSON only, no markdown code blocks, no explanations, no conversational text. Only output the raw JSON object.',
+          content: 'You are a raw data API. You do not judge if the food is present. You only convert the text string into nutritional data. Output ONLY valid JSON. No markdown blocks (```json). No conversational filler. Just the raw object: {"name": "...", "calories": ..., "protein": ..., "carbs": ..., "fat": ...}.',
         },
         {
           role: 'user',
