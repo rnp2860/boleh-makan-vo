@@ -2,14 +2,15 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
-import { MobileLayout } from '@/components/MobileLayout'; // Import our new shell
+import { MobileLayout } from '@/components/MobileLayout';
+import { FoodProvider } from '@/context/FoodContext'; // Import the Brain
 
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
   title: 'Boleh Makan',
   description: 'The AI Nutritionist for Malaysia',
-  manifest: '/manifest.json', // We will add this later for PWA
+  manifest: '/manifest.json',
 };
 
 export default function RootLayout({
@@ -20,10 +21,13 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        {/* WRAP EVERYTHING IN THE MOBILE SHELL */}
-        <MobileLayout>
-          {children}
-        </MobileLayout>
+        {/* 1. ACTIVATE THE BRAIN */}
+        <FoodProvider>
+          {/* 2. RENDER THE SHELL */}
+          <MobileLayout>
+            {children}
+          </MobileLayout>
+        </FoodProvider>
       </body>
     </html>
   );

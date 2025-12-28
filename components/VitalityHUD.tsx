@@ -1,92 +1,53 @@
 // src/components/VitalityHUD.tsx
 import React from 'react';
-import { SmartPill } from './SmartPill';
 
-interface VitalityHUDProps {
-  data: any; // The raw JSON from Dr. Reza
-  isVerified: boolean;
-}
-
-export const VitalityHUD = ({ data, isVerified }: VitalityHUDProps) => {
+export const VitalityHUD = ({ data, isVerified, imageSrc }: { data: any, isVerified: boolean, imageSrc?: string | null }) => {
   const macros = data.macros;
   
-  // 🏥 MALAYSIAN MOH DAILY LIMITS (Hardcoded for V1)
-  const LIMITS = {
-    calories: 2000,
-    sodium: 2000, // Renal Danger Line
-    sugar: 50,    // Diabetes Danger Line
-    protein: 60,  // Target (Higher is good)
-    fiber: 25     // Target (Higher is good)
-  };
-
   return (
-    <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
-      
-      {/* 1. Header Section */}
-      <div className="bg-blue-600 p-4 text-white">
-        <div className="flex justify-between items-start">
-          <div>
-            <h2 className="text-xl font-bold capitalize">{data.food_name}</h2>
-            <div className="flex items-center gap-1 text-xs opacity-90 mt-1">
-               {isVerified ? (
-                 <span className="bg-green-500 text-white px-2 py-0.5 rounded-full flex items-center gap-1 font-bold">
-                   ✓ Verified Anchor
-                 </span>
-               ) : (
-                 <span className="bg-yellow-500 text-black px-2 py-0.5 rounded-full font-bold">
-                   ⚠️ AI Estimate
-                 </span>
-               )}
-            </div>
-          </div>
-          <div className="text-right">
-             <div className="text-3xl font-black">{macros.calories}</div>
-             <div className="text-xs opacity-75">kcal</div>
-          </div>
-        </div>
-      </div>
+    <div className="bg-blue-600 rounded-3xl p-6 text-white shadow-xl shadow-blue-200 relative overflow-hidden">
+      <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-10 -mt-10 blur-2xl"></div>
 
-      {/* 2. Dr. Reza's Comment Bubble */}
-      <div className="p-4 bg-blue-50 border-b border-blue-100">
-        <div className="flex gap-3">
-           <div className="text-2xl">👨‍⚕️</div>
-           <p className="text-sm text-blue-900 italic">"{data.description}"</p>
-        </div>
-      </div>
-
-      {/* 3. The Vitality Metrics (The Pills) */}
-      <div className="p-5 space-y-4">
+      <div className="flex items-center gap-4 mb-6 relative z-10">
         
-        {/* THE BIG KILLERS (Sodium & Sugar) */}
-        <div className="p-3 bg-red-50 rounded-lg border border-red-100">
-            <h3 className="text-xs font-bold text-red-800 uppercase mb-3 tracking-wider">⚠️ Kidney & Diabetes Watch</h3>
-            <SmartPill label="Sodium (Salt)" value={macros.sodium_mg} max={LIMITS.sodium} unit="mg" />
-            <SmartPill label="Sugar" value={macros.sugar_g} max={LIMITS.sugar} unit="g" />
+        {/* THIS IS THE IMAGE CONTAINER */}
+        <div className="h-16 w-16 bg-white/20 rounded-2xl overflow-hidden border-2 border-white/30 flex-shrink-0">
+          {imageSrc ? (
+            <img src={imageSrc} alt="Scanned" className="h-full w-full object-cover" />
+          ) : (
+            <div className="h-full w-full flex items-center justify-center text-2xl">📸</div>
+          )}
         </div>
 
-        {/* THE FUEL (Protein & Fiber) */}
-        <div className="p-3 bg-green-50 rounded-lg border border-green-100">
-            <h3 className="text-xs font-bold text-green-800 uppercase mb-3 tracking-wider">💪 Nutrition Goals</h3>
-            <SmartPill label="Protein" value={macros.protein_g} max={LIMITS.protein} unit="g" isInverse={true} />
-            <SmartPill label="Fiber" value={macros.fiber_g} max={LIMITS.fiber} unit="g" isInverse={true} />
-        </div>
-
-      </div>
-
-      {/* 4. Component List (The Nasi Campur Breakdown) */}
-      {data.components && data.components.length > 0 && (
-        <div className="px-5 pb-5">
-           <p className="text-xs font-bold text-gray-400 uppercase mb-2">Detected Components:</p>
-           <div className="flex flex-wrap gap-2">
-             {data.components.map((item: string, i: number) => (
-               <span key={i} className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded border">
-                 {item}
-               </span>
-             ))}
+        <div>
+           <div className="flex items-center gap-2 mb-1">
+             <span className="bg-blue-500/50 text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider border border-blue-400/30">
+               {isVerified ? 'Verified' : 'AI Analysis'}
+             </span>
            </div>
+           <h2 className="text-2xl font-black leading-tight capitalize">{data.food_name}</h2>
         </div>
-      )}
-
+      </div>
+      {/* ... macros grid ... */}
+      <div className="grid grid-cols-4 gap-2 relative z-10">
+        {/* ... (keep your existing macro grid code here) ... */}
+        <div className="bg-blue-700/50 p-3 rounded-2xl text-center backdrop-blur-sm">
+           <p className="text-[10px] text-blue-200 font-bold uppercase">Cal</p>
+           <p className="text-xl font-black">{macros.calories}</p>
+        </div>
+        <div className="bg-blue-700/30 p-3 rounded-2xl text-center backdrop-blur-sm border border-white/5">
+           <p className="text-[10px] text-blue-200 font-bold uppercase">Prot</p>
+           <p className="text-lg font-bold">{macros.protein_g}g</p>
+        </div>
+        <div className="bg-blue-700/30 p-3 rounded-2xl text-center backdrop-blur-sm border border-white/5">
+           <p className="text-[10px] text-blue-200 font-bold uppercase">Carb</p>
+           <p className="text-lg font-bold">{macros.carbs_g}g</p>
+        </div>
+        <div className="bg-blue-700/30 p-3 rounded-2xl text-center backdrop-blur-sm border border-white/5">
+           <p className="text-[10px] text-blue-200 font-bold uppercase">Fat</p>
+           <p className="text-lg font-bold">{macros.fat_g}g</p>
+        </div>
+      </div>
     </div>
   );
 };

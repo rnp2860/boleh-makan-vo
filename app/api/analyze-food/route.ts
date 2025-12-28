@@ -1,87 +1,66 @@
 // src/app/api/analyze-food/route.ts
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
-import { SYSTEM_PROMPT } from '@/lib/systemPrompt';
-import { findFoodAnchor } from '@/utils/foodSearch';
 
-// 🛑 THIS LINE FIXES THE VERCEL BUILD ERROR
-export const dynamic = 'force-dynamic';
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
-export async function POST(request: Request) {
+export async function POST(req: Request) {
   try {
-    // 1. Initialize OpenAI INSIDE the function
-    const openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-    });
+    const { image, userProfile } = await req.json();
 
-    const { image } = await request.json();
-
-    if (!image) {
-      return NextResponse.json({ error: 'No image provided' }, { status: 400 });
+    // Construct a "Doctor's Note" based on conditions
+    let conditionNote = "";
+    if (userProfile?.healthConditions?.length > 0) {
+      conditionNote = `The user has the following health concerns: ${userProfile.healthConditions.join(', ')}. 
+      Please specifically highlight risks related to these (e.g., sugar for diabetes, sodium for blood pressure).`;
     }
 
-    // 2. Ask Dr. Reza
+    const prompt = `
+      You are Dr. Reza, a Malaysian nutritionist expert. 
+      Analyze this food image. 
+      
+      ${conditionNote}
+
+      Return a JSON object with this EXACT structure:
+      {
+        "food_name": "Name of food (Malay/English)",
+        "category": "rice_dish" | "noodle_dish" | "soup" | "western" | "bread" | "dessert" | "drink" | "other",
+        "components": [
+           { "name": "Rice", "calories": 200, "macros": { "p": 4, "c": 40, "f": 1 } },
+           { "name": "Fried Chicken", "calories": 250, "macros": { "p": 20, "c": 5, "f": 15 } }
+        ],
+        "analysis_content": "A short, friendly advice paragraph (max 30 words). Mention the user's health conditions if relevant.",
+        "risk_analysis": {
+          "is_high_sugar": boolean,
+          "is_high_sodium": boolean
+        }
+      }
+    `;
+
     const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-4o-mini", // 👈 CHANGED TO MINI (Cheaper & Fast)
       messages: [
-        { role: "system", content: SYSTEM_PROMPT },
         {
           role: "user",
           content: [
-            { type: "text", text: "Analyze this Malaysian meal." },
-            {
-              type: "image_url",
-              image_url: {
-                url: image,
-              },
-            },
+            { type: "text", text: prompt },
+            { type: "image_url", image_url: { url: image } },
           ],
         },
       ],
-      max_tokens: 500,
-      response_format: { type: "json_object" },
+      max_tokens: 600,
     });
 
-    // 3. Parse and Intercept
-    const aiContent = response.choices[0].message.content;
-    const aiData = JSON.parse(aiContent || "{}");
-    const verifiedAnchor = findFoodAnchor(aiData.food_name);
-
-    let finalResult = { ...aiData };
-    let isVerified = false;
-
-    if (verifiedAnchor) {
-      console.log(`✅ Anchor Match Found: ${verifiedAnchor.name}`);
-      finalResult = {
-        ...aiData,
-        food_name: verifiedAnchor.name,
-        macros: {
-          calories: verifiedAnchor.calories,
-          protein_g: verifiedAnchor.protein_g,
-          carbs_g: verifiedAnchor.carbs_g,
-          fat_g: verifiedAnchor.fat_g,
-          sodium_mg: verifiedAnchor.sodium_mg,
-          sugar_g: aiData.macros.sugar_g,
-          fiber_g: verifiedAnchor.fiber_g,
-        },
-        risk_analysis: {
-          ...aiData.risk_analysis,
-          is_high_sodium: verifiedAnchor.risk_flags?.includes('high_sodium') || verifiedAnchor.sodium_mg > 800,
-          is_high_sugar: verifiedAnchor.risk_flags?.includes('high_sugar') || false,
-        }
-      };
-      isVerified = true;
-    }
-
-    return NextResponse.json({ 
-      success: true, 
-      data: finalResult,
-      is_verified: isVerified,
-      source: isVerified ? verifiedAnchor?.source : 'AI_Estimate'
-    });
+    const content = response.choices[0].message.content;
+    // Clean up markdown code blocks if present (e.g. ```json ... ```)
+    const cleanContent = content?.replace(/```json|```/g, '').trim();
+    
+    return NextResponse.json({ data: JSON.parse(cleanContent || '{}'), is_verified: false });
 
   } catch (error: any) {
-    console.error('Error analyzing food:', error);
-    return NextResponse.json({ error: error.message || 'Failed to analyze food' }, { status: 500 });
+    console.error("Analysis Error:", error);
+    return NextResponse.json({ error: 'Dr. Reza is busy...' }, { status: 500 });
   }
 }

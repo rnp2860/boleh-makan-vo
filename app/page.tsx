@@ -1,465 +1,279 @@
+// src/app/page.tsx
 'use client';
 
-import { useState, useRef, useEffect, useMemo } from 'react';
-import Image from 'next/image'; 
-import UserProfileModal, { UserProfile } from '@/components/UserProfileModal'; 
-import DrRezaHeader from '@/components/DrRezaHeader';
-import { supabase } from '@/lib/supabaseClient';
-
-interface Ingredient {
-  name: string;
-  calories: number;
-  protein: number;
-  carbs: number;
-  fat: number;
-}
+import { useState } from 'react'; // 👈 Added useState
+import Link from 'next/link';
+import Image from 'next/image';
+import { DateStrip } from '@/components/DateStrip';
+import { WeeklyChart } from '@/components/WeeklyChart';
+import MealDetailsModal from '@/components/MealDetailsModal'; // 👈 Added Import
+import { useFood } from '@/context/FoodContext';
 
 export default function HomePage() {
-  const [image, setImage] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<any>(null);
-  const [showSettings, setShowSettings] = useState(false);
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const { stats, meals, userProfile, dailyBudget, deleteMeal, getWeeklyStats, streak } = useFood();
+  const [selectedMeal, setSelectedMeal] = useState<any>(null); // 👈 State for Modal
   
-  // Portion Control State (Default 1.0x)
-  const [portionSize, setPortionSize] = useState<number>(1.0);
-  const [dailyStats, setDailyStats] = useState({ calories: 0, count: 0 });
-  const [isEditing, setIsEditing] = useState(false);
-  const [ingredients, setIngredients] = useState<Ingredient[]>([]);
-  const [newIngredient, setNewIngredient] = useState('');
-  const [isLookingUp, setIsLookingUp] = useState(false);
-  const [toast, setToast] = useState<{ message: string; type: 'error' | 'success' } | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  if (!userProfile) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
+        <div className="w-24 h-24 relative mb-4 rounded-full overflow-hidden border-4 border-white shadow-xl animate-bounce">
+          <Image 
+            src="/assets/avatar-header.png" 
+            alt="Dr. Reza" 
+            fill 
+            className="object-cover" 
+          />
+        </div>
+        <div className="text-blue-600 font-bold animate-pulse">Loading Dr. Reza...</div>
+      </div>
+    );
+  }
 
-  // 1. Load Data
-  useEffect(() => {
-    const savedProfile = localStorage.getItem('user_profile');
-    if (savedProfile) {
-      try { setUserProfile(JSON.parse(savedProfile)); } catch (e) { setShowSettings(true); }
-    } else { setShowSettings(true); }
+  const budget = dailyBudget || 2000;
+  const rawRemaining = budget - stats.calories;
+  const isOverBudget = rawRemaining < 0;
+  const progressPercent = Math.min((stats.calories / budget) * 100, 100);
 
-    const today = new Date().toISOString().split('T')[0];
-    const savedLog = localStorage.getItem('daily_log');
-    if (savedLog) {
-       const log = JSON.parse(savedLog);
-       if (log.date !== today) {
-         localStorage.setItem('daily_log', JSON.stringify({ date: today, items: [] }));
-         setDailyStats({ calories: 0, count: 0 });
-       } else {
-         const totalCals = log.items.reduce((acc: number, item: any) => acc + (parseInt(item.calories) || 0), 0);
-         setDailyStats({ calories: totalCals, count: log.items.length });
-       }
-    }
-  }, []);
+  // Avatar Logic
+  const ratio = stats.calories / budget;
+  let currentStage = 1;
 
-  // 2. Add to Local Log
-  const addToDailyLog = (calories: number) => {
-    const today = new Date().toISOString().split('T')[0];
-    const val = Math.round(calories);
-    const savedLog = localStorage.getItem('daily_log');
-    let log = savedLog ? JSON.parse(savedLog) : { date: today, items: [] };
-    if (log.date !== today) log = { date: today, items: [] };
-    log.items.push({ calories: val, timestamp: new Date() });
-    localStorage.setItem('daily_log', JSON.stringify(log));
-    setDailyStats(prev => ({ calories: prev.calories + val, count: prev.count + 1 }));
+  if (ratio >= 1) {
+    currentStage = 5; 
+  } else {
+    currentStage = Math.floor(ratio * 4) + 1;
+    currentStage = Math.min(Math.max(currentStage, 1), 4);
+  }
+
+  const getGoalLabel = () => {
+    if (userProfile.goal === 'lose_weight') return "Nak Kurus";
+    if (userProfile.goal === 'build_muscle') return "Kasi Sado";
+    return "Maintain Je";
   };
 
-  // 3. TDEE Calculation
-  const getTDEE = () => {
-    if (!userProfile) return 2000;
-    if (userProfile.customCalorieLimit && userProfile.customCalorieLimit > 0) return userProfile.customCalorieLimit;
-    let bmr;
-    if (userProfile.gender === 'male') bmr = 10 * userProfile.weight + 6.25 * userProfile.height - 5 * userProfile.age + 5;
-    else bmr = 10 * userProfile.weight + 6.25 * userProfile.height - 5 * userProfile.age - 161;
-    const multipliers: any = { sedentary: 1.2, light: 1.375, moderate: 1.55, active: 1.725, very_active: 1.9 };
-    const tdee = Math.round(bmr * (multipliers[userProfile.activityLevel] || 1.2));
-    if (userProfile.goal === 'weight_loss') return tdee - 500;
-    if (userProfile.goal === 'weight_gain' || userProfile.goal === 'muscle_gain') return tdee + 300;
-    if (['diabetes', 'hypertension', 'cholesterol'].includes(userProfile.goal)) return tdee - 250;
-    return tdee;
-  };
-
-  // 4. Handle Image Upload
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImage(reader.result as string);
-        setPortionSize(1.0);
-        // Initial scan: No manual ingredients yet, so pass undefined
-        analyzeFood(reader.result as string, undefined); 
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const totalMacros = useMemo(() => {
-    return ingredients.reduce((totals, ingredient) => ({
-      calories: totals.calories + ingredient.calories,
-      protein: totals.protein + ingredient.protein,
-      carbs: totals.carbs + ingredient.carbs,
-      fat: totals.fat + ingredient.fat,
-    }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
-  }, [ingredients]);
-
-  // 5. Main AI Analysis
-  const analyzeFood = async (base64Image: string, manualIngredients?: string[]) => {
-    setLoading(true);
-    
-    // Only clear result if it's a fresh scan (not a re-analysis)
-    if (!manualIngredients) setResult(null); 
-
-    try {
-      const response = await fetch('/api/analyze-food', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        // We pass the manual ingredients list to the AI so it knows what changed!
-        body: JSON.stringify({ image: base64Image.split(',')[1], userProfile, ingredients: manualIngredients }),
-      });
-      
-      const data = await response.json();
-      if (data.error) throw new Error("Dr. Reza is momentarily unavailable.");
-      
-      setResult(data);
-      
-      // LOGIC FIX:
-      // Only overwrite the ingredients list if this was a FRESH scan (manualIngredients is undefined).
-      // If manualIngredients exists, it means the user manually built the list, so we KEEP their list
-      // and only update the Verdict (result) above.
-      if (!manualIngredients) {
-          const detectedItems = data.ingredients || [];
-          const ingredientCount = detectedItems.length || 1;
-          const baseCalories = data.macros?.calories?.value || 150;
-          const baseProtein = data.macros?.protein?.value || 10;
-          const baseCarbs = data.macros?.carbs?.value || 20;
-          const baseFat = data.macros?.fat?.value || 5;
-          
-          const initialIngredients: Ingredient[] = detectedItems.map((name: string) => ({
-            name,
-            calories: Math.round(baseCalories / ingredientCount),
-            protein: Math.round(baseProtein / ingredientCount),
-            carbs: Math.round(baseCarbs / ingredientCount),
-            fat: Math.round(baseFat / ingredientCount),
-          }));
-          
-          setIngredients(initialIngredients);
-      }
-
-      setIsEditing(false); 
-
-    } catch (error) {
-      console.error('Error:', error);
-      alert('Dr. Reza encountered an issue. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // 6. Ingredient Management
-  const handleAddIngredient = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const name = newIngredient.trim();
-    if (!name) return;
-
-    setIsLookingUp(true);
-    setToast(null);
-
-    try {
-      const response = await fetch('/api/lookup-nutrition', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: name }),
-      });
-
-      const { data, error } = await response.json();
-
-      if (error || !data || data === null) {
-        setToast({ message: 'Food not found', type: 'error' });
-        setTimeout(() => setToast(null), 3000);
-        return;
-      }
-
-      const newIngredientObj: Ingredient = {
-        name: data.name || name,
-        calories: data.calories || 150,
-        protein: data.protein || 10,
-        carbs: data.carbs || 20,
-        fat: data.fat || 5,
-      };
-
-      setIngredients([...ingredients, newIngredientObj]);
-      setNewIngredient('');
-    } catch (error) {
-      console.error('Error looking up nutrition:', error);
-      setToast({ message: 'Food not found', type: 'error' });
-      setTimeout(() => setToast(null), 3000);
-    } finally {
-      setIsLookingUp(false);
-    }
-  };
+  const firstName = userProfile.name ? userProfile.name.split(' ')[0] : 'User';
   
-  const handleRemoveIngredient = (index: number) => {
-    const newList = [...ingredients];
-    newList.splice(index, 1);
-    setIngredients(newList);
+  // CHART LOGIC
+  const weeklyData = getWeeklyStats();
+  const daysTrackedCount = weeklyData.filter(day => day.calories > 0).length;
+  const isChartUnlocked = daysTrackedCount >= 3;
+  const daysRemainingToUnlock = 3 - daysTrackedCount;
+
+  const sortedMeals = [...meals].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+  const getTimeGap = (current: Date, previous: Date) => {
+    const diffMs = current.getTime() - previous.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const hours = Math.floor(diffMins / 60);
+    const mins = diffMins % 60;
+    if (hours > 0) return `${hours}h ${mins}m gap`;
+    return `${mins}m gap`;
   };
-  
-  // 7. UPDATED: Trigger Re-Analysis with AI
-  const handleUpdateAnalysis = () => {
-    if (image && ingredients.length > 0) {
-        // Grab the names of your current ingredients (including the new ones)
-        const currentIngredientNames = ingredients.map(ing => ing.name);
-        
-        // Send them back to Dr. Reza!
-        analyzeFood(image, currentIngredientNames);
-    } else {
-        setIsEditing(false);
-    }
-  };
-
-  // 8. Confirm & Save
-  const handleConfirmLog = async () => {
-    if (totalMacros.calories > 0) {
-       const finalCalories = Math.round(totalMacros.calories * portionSize);
-       const finalProtein = Math.round(totalMacros.protein * portionSize);
-       const finalCarbs = Math.round(totalMacros.carbs * portionSize);
-       const finalFat = Math.round(totalMacros.fat * portionSize);
-       const mealName = result?.main_dish_name || "Unknown Meal";
-
-       addToDailyLog(finalCalories);
-
-       console.log("Saving to Supabase...");
-       try {
-         const { error } = await supabase.from('food_logs').insert([
-            {
-                meal_name: mealName,
-                calories: finalCalories,
-                protein: finalProtein,
-                carbs: finalCarbs,
-                fat: finalFat,
-                portion_size: portionSize
-            }
-         ]);
-         
-         if (error) {
-             console.error("Supabase Error:", error);
-             alert("Saved locally, but failed to sync to cloud.");
-         } else {
-             console.log("✅ Saved to Supabase successfully!");
-         }
-       } catch (err) {
-         console.error("Save failed:", err);
-       }
-
-       setImage(null); setResult(null); setIsEditing(false);
-    }
-  };
-
-  const tdee = getTDEE() || 2000;
-  const remaining = tdee - dailyStats.calories;
 
   return (
-    <main className="min-h-screen bg-slate-50 pb-28">
-      {/* Navbar */}
-      <div className="bg-white p-4 shadow-sm sticky top-0 z-10 flex justify-between items-center">
-        <div>
-          <h1 className="text-xl font-bold text-slate-900 tracking-tight">Boleh Makan</h1>
-          <p className="text-xs text-teal-600 font-medium">AI Metabolic Intelligence</p>
+    <div className="bg-gray-50 min-h-screen pb-24">
+      
+      {/* HEADER */}
+      <div className="bg-white p-6 pb-4 border-b border-gray-100">
+        <div className="flex justify-between items-center mb-4">
+           {/* HEADER WITH AVATAR */}
+           <div className="flex items-center gap-3">
+             <div className="w-12 h-12 relative rounded-full overflow-hidden border border-gray-100 shadow-sm bg-gray-50">
+               <Image 
+                 src="/assets/avatar-header.png" 
+                 alt="Dr. Reza Profile" 
+                 fill 
+                 className="object-cover"
+               />
+             </div>
+             <div>
+               <h1 className="text-2xl font-black text-gray-900 leading-none">Today</h1>
+               <p className="text-xs text-gray-500 font-bold mt-1">Welcome back, {firstName}</p>
+             </div>
+           </div>
+           
+           {/* STREAK BADGE */}
+           <div className="flex flex-col items-end">
+             <div className="flex items-center gap-1 bg-orange-50 px-3 py-1 rounded-full border border-orange-100">
+               <span className="text-lg">🔥</span>
+               <span className="text-xs font-bold text-orange-600">{streak} Day Streak</span>
+             </div>
+             <p className="text-[9px] text-gray-300 mt-1 font-bold tracking-wider uppercase">Current Goal</p>
+             <p className="text-xs font-bold text-blue-600">{getGoalLabel()}</p>
+           </div>
         </div>
-        <button onClick={() => setShowSettings(true)} className="p-2 rounded-full bg-slate-100 hover:bg-teal-50 text-slate-600 hover:text-teal-600 transition-colors"><span className="text-xl">⚙️</span></button>
+        <DateStrip />
       </div>
 
-      <DrRezaHeader />
-
-      {/* Tracker Banner */}
-      <div className="bg-slate-900 text-white p-4">
-        <div className="grid grid-cols-3 divide-x divide-slate-700 text-center">
-            <div><p className="text-xs text-slate-400 uppercase font-bold">Today</p><p className="text-lg font-bold text-teal-400">{dailyStats.calories}</p><p className="text-[10px] text-slate-500">kcal</p></div>
-            <div><p className="text-xs text-slate-400 uppercase font-bold">Limit</p><p className="text-lg font-bold">{tdee}</p><p className="text-[10px] text-slate-500">kcal</p></div>
-            <div><p className="text-xs text-slate-400 uppercase font-bold">Meals</p><p className="text-lg font-bold text-yellow-400">{dailyStats.count}</p><p className="text-[10px] text-slate-500">scans</p></div>
-        </div>
-        <div className="mt-3 w-full bg-slate-800 rounded-full h-2 overflow-hidden">
-            <div className={`h-full ${remaining < 0 ? 'bg-red-500' : 'bg-teal-500'} transition-all duration-500`} style={{ width: `${Math.min((dailyStats.calories / tdee) * 100, 100)}%` }}></div>
-        </div>
-        <div className="text-center mt-1"><p className="text-[10px] text-slate-400">{remaining < 0 ? `${Math.abs(remaining)} kcal over limit!` : `${remaining} kcal remaining`}</p></div>
-      </div>
-
-      {toast && (
-        <div className={`fixed top-4 left-1/2 transform -translate-x-1/2 z-50 px-4 py-3 rounded-lg shadow-lg transition-all ${
-          toast.type === 'error' ? 'bg-red-500 text-white' : 'bg-teal-500 text-white'
-        }`}>
-          <p className="text-sm font-medium">{toast.message}</p>
-        </div>
-      )}
-
-      <div className="max-w-md mx-auto p-4">
-        {/* Upload */}
-        {!image && (
-          <div onClick={() => fileInputRef.current?.click()} className="mt-8 border-2 border-dashed border-slate-300 rounded-2xl p-10 flex flex-col items-center justify-center bg-white cursor-pointer hover:border-teal-500 hover:bg-teal-50 transition-all">
-            <div className="w-16 h-16 bg-teal-100 rounded-full flex items-center justify-center mb-4 text-3xl">📸</div>
-            <p className="text-slate-600 font-medium">Tap to Scan Meal</p>
-            <p className="text-xs text-slate-400 mt-2">Dr. Reza is ready</p>
-            <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/*" className="hidden" />
-          </div>
-        )}
-
-        {/* Results */}
-        {image && (
-          <div className="space-y-6">
-            <div className="relative rounded-2xl overflow-hidden shadow-md">
-              <img src={image} alt="Food" className="w-full object-cover" />
-              <button onClick={() => { setImage(null); setResult(null); setIsEditing(false); }} className="absolute top-3 right-3 bg-black/50 text-white px-3 py-1 rounded-full text-xs backdrop-blur-md">✕ Retake</button>
-              {loading && (
-                <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-white backdrop-blur-sm">
-                  <div className="w-10 h-10 border-4 border-white border-t-transparent rounded-full animate-spin mb-3"></div>
-                  <p className="font-medium animate-pulse">{isEditing ? "Re-analyzing Verdict..." : "Dr. Reza is analyzing..."}</p>
-                </div>
-              )}
+      {/* SUMMARY CARD CONTAINER */}
+      <div className="px-4 mt-6"> 
+        <div className={`
+          rounded-3xl p-6 text-white shadow-lg transition-colors duration-500 relative overflow-hidden
+          ${isOverBudget ? 'bg-gradient-to-br from-red-600 to-red-500' : 'bg-gradient-to-br from-blue-600 to-blue-500'}
+        `}>
+          
+          {/* Main Content Row */}
+          <div className="flex justify-between items-center h-28 relative z-10">
+            
+            {/* Left: Calories */}
+            <div className="z-10">
+              <p className="text-white/80 text-xs font-bold uppercase tracking-wider">
+                {isOverBudget ? 'Over Limit' : 'Calories Left'}
+              </p>
+              <h2 className="text-4xl font-black mt-1">
+                {isOverBudget ? Math.abs(rawRemaining) : rawRemaining}
+                {isOverBudget && <span className="text-sm font-medium opacity-70 ml-1">over</span>}
+              </h2>
             </div>
 
-            {result && !loading && (
-              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-6">
-                
-                {/* Inventory */}
-                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-                   <div className="flex justify-between items-center mb-3">
-                      <p className="text-xs font-bold text-slate-500 uppercase">Detected Inventory</p>
-                      {!isEditing ? (
-                        <button onClick={() => setIsEditing(true)} className="text-teal-600 text-xs font-bold hover:underline">✎ Edit Ingredients</button>
-                      ) : (
-                        <button onClick={handleUpdateAnalysis} className="bg-teal-600 text-white px-3 py-1 rounded-full text-xs font-bold shadow-sm hover:bg-teal-700">✓ Get New Verdict</button>
-                      )}
-                   </div>
-                   <div className="flex flex-wrap gap-2">
-                      {ingredients.map((ingredient, i) => (
-                        <span key={i} className={`px-3 py-1 rounded-full text-xs font-semibold border flex items-center gap-2 ${isEditing ? 'bg-white border-teal-300 text-teal-700' : 'bg-slate-100 border-slate-200 text-slate-700'}`}>
-                          {ingredient.name}
-                          {isEditing && <button onClick={() => handleRemoveIngredient(i)} className="text-teal-400 hover:text-red-500 font-bold">✕</button>}
-                        </span>
-                      ))}
-                   </div>
-                   {isEditing && (
-                     <form onSubmit={handleAddIngredient} className="mt-3 flex gap-2">
-                        <input 
-                          type="text" 
-                          placeholder={isLookingUp ? "Looking up..." : "Add missing item..."} 
-                          className="flex-1 text-xs p-2 border border-slate-300 rounded-lg outline-none focus:border-teal-500 disabled:opacity-50 disabled:cursor-not-allowed" 
-                          value={newIngredient} 
-                          onChange={(e) => setNewIngredient(e.target.value)}
-                          disabled={isLookingUp}
-                        />
-                        <button 
-                          type="submit" 
-                          disabled={isLookingUp}
-                          className="bg-slate-100 text-slate-600 px-3 py-2 rounded-lg text-xs font-bold hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed min-w-[60px]"
-                        >
-                          {isLookingUp ? '...' : '+'}
-                        </button>
-                     </form>
-                   )}
-                </div>
+            {/* CENTER: SNUG STATUS AVATAR */}
+            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-28 h-28 z-0">
+              <Image
+                src={`/avatar/state_${currentStage}.png`}
+                alt="Status Avatar"
+                fill
+                className="object-contain"
+                priority
+              />
+            </div>
 
-                {/* Portion Control */}
-                <div className="flex flex-col items-center">
-                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Portion Size / Saiz Hidangan</p>
-                   <div className="bg-slate-100 p-1 rounded-xl flex gap-1">
-                      {[0.5, 1.0, 1.5, 2.0].map((size) => (
-                        <button key={size} onClick={() => setPortionSize(size)} className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${portionSize === size ? 'bg-white text-teal-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>{size}x</button>
-                      ))}
-                   </div>
-                </div>
+            {/* Right: Budget */}
+            <div className="text-right z-10">
+              <p className="text-white/80 text-xs font-bold uppercase">Budget</p>
+              <p className="font-bold text-lg">{budget}</p>
+            </div>
+          </div>
 
-                {/* Macros */}
-                {result && (
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className={`p-4 rounded-xl border ${totalMacros.calories > 600 ? 'bg-red-50 border-red-200' : totalMacros.calories > 400 ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-200'}`}>
-                      <p className="text-xs uppercase font-bold text-slate-400 tracking-wider mb-1">calories</p>
-                      <div className="flex items-end gap-1">
-                        <span className="text-2xl font-black text-slate-800">{Math.round(totalMacros.calories * portionSize)}</span>
-                        <span className="text-xs font-bold text-slate-500 mb-1">kcal</span>
-                        {totalMacros.calories > 600 && <span className="ml-auto text-[10px] font-bold text-red-600 mb-1 bg-red-100 px-1 rounded">HIGH</span>}
-                      </div>
-                    </div>
-                    <div className="p-4 rounded-xl border bg-slate-50 border-slate-200">
-                      <p className="text-xs uppercase font-bold text-slate-400 tracking-wider mb-1">protein</p>
-                      <div className="flex items-end gap-1">
-                        <span className="text-2xl font-black text-slate-800">{Math.round(totalMacros.protein * portionSize)}</span>
-                        <span className="text-xs font-bold text-slate-500 mb-1">g</span>
-                      </div>
-                    </div>
-                    <div className="p-4 rounded-xl border bg-slate-50 border-slate-200">
-                      <p className="text-xs uppercase font-bold text-slate-400 tracking-wider mb-1">carbs</p>
-                      <div className="flex items-end gap-1">
-                        <span className="text-2xl font-black text-slate-800">{Math.round(totalMacros.carbs * portionSize)}</span>
-                        <span className="text-xs font-bold text-slate-500 mb-1">g</span>
-                      </div>
-                    </div>
-                    <div className="p-4 rounded-xl border bg-slate-50 border-slate-200">
-                      <p className="text-xs uppercase font-bold text-slate-400 tracking-wider mb-1">fat</p>
-                      <div className="flex items-end gap-1">
-                        <span className="text-2xl font-black text-slate-800">{Math.round(totalMacros.fat * portionSize)}</span>
-                        <span className="text-xs font-bold text-slate-500 mb-1">g</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Verdict */}
-                <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-10 h-10 rounded-full border border-slate-200 overflow-hidden relative">
-                        <Image src="/assets/avatar-header.png" alt="Dr Reza" fill className="object-cover" />
-                    </div>
-                    <h3 className="text-lg font-bold text-slate-900">Dr. Reza's Verdict</h3>
-                  </div>
-                  
-                  <div className="space-y-3">
-                    {(result.analysis_content || result.analysis_points || []).map((point: string, i: number) => {
-                        const isVerified = point.includes("Verified Database");
-                        return (
-                        <div key={i} className={`flex gap-3 text-sm leading-relaxed ${isVerified ? 'bg-emerald-50 p-3 rounded-lg border border-emerald-100 text-emerald-800' : 'text-slate-700'}`}>
-                            <span className={isVerified ? 'text-emerald-600' : 'text-teal-500 mt-1'}>{isVerified ? '✅' : '•'}</span>
-                            <span className={isVerified ? 'font-medium' : ''}>{point.replace('✅ ', '')}</span>
-                        </div>
-                        );
-                    })}
-                  </div>
-                </div>
-
-                {/* Quick Actions */}
-                {result.actionable_advice && result.actionable_advice.length > 0 && (
-                  <div className="bg-teal-50 rounded-2xl p-6 border border-teal-100">
-                    <h3 className="text-lg font-bold text-teal-900 mb-4 flex items-center gap-2"><span className="text-2xl">⚡</span> Quick Actions</h3>
-                    <div className="space-y-3">
-                      {result.actionable_advice.map((point: string, i: number) => (
-                        <div key={i} className="flex gap-3 text-sm text-teal-800 leading-relaxed">
-                          <span className="text-teal-600 font-bold">✓</span><span>{point}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* CONFIRM BUTTON */}
-                <button 
-                  onClick={handleConfirmLog}
-                  className="w-full bg-slate-900 text-white py-3 rounded-xl shadow-lg active:scale-95 transition-transform flex flex-col items-center justify-center"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-lg">Log Meal ({Math.round(totalMacros.calories * portionSize)} kcal)</span>
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
-                  </div>
-                  <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wide">
-                    Tap to save to history
-                  </span>
-                </button>
+          {/* Bottom Section */}
+          <div className="mt-2">
+            {isOverBudget ? (
+              <div className="flex items-center justify-center bg-white/20 backdrop-blur-sm rounded-2xl p-3 animate-fade-in">
+                 <span className="text-sm font-bold text-white">Food Coma imminent!</span>
+              </div>
+            ) : (
+              <div className="w-full bg-black/20 h-2.5 rounded-full overflow-hidden">
+                 <div className="bg-white h-full rounded-full transition-all duration-1000 ease-out" style={{ width: `${progressPercent}%` }}></div>
               </div>
             )}
+            
+            <p className="text-xs text-white/80 mt-3 text-right font-medium">
+              {stats.calories} kcal consumed
+            </p>
+          </div>
+        </div>
+        
+        {/* BADGES */}
+        {userProfile.healthConditions.length > 0 && (
+           <div className="mt-4 flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+             {userProfile.healthConditions.map(c => (
+               <span key={c} className="bg-blue-50 text-blue-700 text-[10px] font-bold px-3 py-1 rounded-full border border-blue-100 capitalize">
+                 {c.replace('_', ' ')}
+               </span>
+             ))}
+           </div>
+        )}
+      </div>
+
+      {/* WEEKLY CHART SECTION */}
+      <div className="px-4 mb-6 mt-8">
+        {isChartUnlocked ? (
+          <WeeklyChart data={weeklyData} />
+        ) : (
+          <div className="bg-white rounded-3xl p-6 border-2 border-dashed border-gray-200 flex flex-col items-center justify-center text-center relative overflow-hidden">
+            <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-3 text-2xl grayscale opacity-50">
+              📊
+            </div>
+            <h3 className="text-gray-900 font-bold text-sm">Trend Chart Locked</h3>
+            <p className="text-gray-400 text-xs mt-1 mb-4 max-w-[200px] leading-relaxed">
+              Track meals for <span className="font-bold text-blue-600">{daysRemainingToUnlock} more {daysRemainingToUnlock === 1 ? 'day' : 'days'}</span> to unlock your weekly analysis!
+            </p>
+            
+            <div className="w-48 h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-blue-500 rounded-full transition-all duration-500" 
+                style={{ width: `${(daysTrackedCount / 3) * 100}%` }}
+              ></div>
+            </div>
+            <p className="text-[10px] text-gray-400 mt-2 font-bold uppercase tracking-widest">{daysTrackedCount} / 3 Days</p>
           </div>
         )}
       </div>
-      <UserProfileModal open={showSettings} onClose={() => setShowSettings(false)} onSave={(profile) => { setUserProfile(profile); setShowSettings(false); }} />
-    </main>
+
+      {/* MEAL LIST */}
+      <div className="px-4">
+        <h3 className="font-bold text-gray-800 mb-4 ml-1">Your Meals</h3>
+        {sortedMeals.length === 0 ? (
+          <div className="bg-white rounded-2xl p-10 text-center border border-dashed border-gray-300">
+            <div className="text-4xl mb-3">🍽️</div>
+            <p className="text-gray-500 font-medium">No meals tracked today.</p>
+            <p className="text-xs text-gray-400 mt-1">Tap the camera button to start!</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {sortedMeals.map((meal, index) => {
+              const previousMeal = sortedMeals[index - 1];
+              const timeGapLabel = previousMeal 
+                ? getTimeGap(new Date(meal.timestamp), new Date(previousMeal.timestamp))
+                : "First meal";
+
+              return (
+                <div key={meal.id} className="relative group">
+                  {/* Timeline Connector */}
+                  {index < sortedMeals.length - 1 && <div className="absolute left-7 top-16 bottom-[-24px] w-0.5 bg-gray-100 z-0"></div>}
+                  
+                  {/* CLICKABLE CARD (Trigger Modal) */}
+                  <div 
+                    onClick={() => setSelectedMeal(meal)} // 👈 OPEN MODAL ON CLICK
+                    className="bg-white p-4 rounded-3xl shadow-sm border border-gray-100 flex justify-between items-start animate-slide-up z-10 relative cursor-pointer active:scale-95 transition-transform"
+                  >
+                    <div className="flex gap-4">
+                      <div className="h-16 w-16 bg-gray-100 rounded-2xl overflow-hidden flex-shrink-0 border border-gray-50">
+                        {meal.image ? <img src={meal.image} alt={meal.name} className="h-full w-full object-cover" /> : <div className="h-full w-full flex items-center justify-center text-2xl">🥗</div>}
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-gray-800 capitalize leading-tight text-sm mb-1">{meal.name}</h4>
+                        {meal.components && meal.components.length > 0 && <p className="text-[10px] text-gray-400 leading-tight mt-0.5 mb-1 line-clamp-1">{meal.components.join(', ')}</p>}
+                        <div className="flex items-center gap-2 mb-2">
+                          <p className="text-[10px] text-gray-400 font-bold bg-gray-50 px-2 py-0.5 rounded-lg">{new Date(meal.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                          <p className="text-[10px] text-blue-500 font-black uppercase tracking-tighter">{timeGapLabel}</p>
+                        </div>
+                        <div className="flex gap-1.5 text-[9px] font-bold">
+                          <span className="bg-blue-50 text-blue-600 px-2 py-1 rounded-lg">P: {meal.protein}g</span>
+                          <span className="bg-orange-50 text-orange-600 px-2 py-1 rounded-lg">C: {meal.carbs}g</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end justify-between h-16">
+                      <div className="text-right">
+                        <span className="font-black text-gray-900 block leading-none text-base">{meal.calories}</span>
+                        <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">kcal</span>
+                      </div>
+                      
+                      {/* Trash Button - stopPropagation prevents opening modal */}
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); deleteMeal(meal.id); }} 
+                        className="text-gray-300 hover:text-red-500 transition-colors p-1"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* MEAL DETAILS MODAL */}
+      <MealDetailsModal 
+        meal={selectedMeal} 
+        onClose={() => setSelectedMeal(null)} 
+        onDelete={deleteMeal} 
+      />
+
+    </div>
   );
 }
