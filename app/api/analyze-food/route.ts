@@ -4,10 +4,12 @@ import OpenAI from 'openai';
 import { SYSTEM_PROMPT } from '@/lib/systemPrompt';
 import { findFoodAnchor } from '@/utils/foodSearch';
 
+// 🛑 THIS LINE FIXES THE VERCEL BUILD ERROR
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: Request) {
   try {
-    // 1. Initialize OpenAI INSIDE the function (Safety First)
-    // This prevents the "Build Error" on Vercel
+    // 1. Initialize OpenAI INSIDE the function
     const openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
     });
@@ -18,7 +20,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No image provided' }, { status: 400 });
     }
 
-    // 2. Ask Dr. Reza (OpenAI) to identify the food
+    // 2. Ask Dr. Reza
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
@@ -40,11 +42,9 @@ export async function POST(request: Request) {
       response_format: { type: "json_object" },
     });
 
-    // 3. Parse the AI's "Guess"
+    // 3. Parse and Intercept
     const aiContent = response.choices[0].message.content;
     const aiData = JSON.parse(aiContent || "{}");
-
-    // 4. THE INTERCEPT: Check our "Anchor File"
     const verifiedAnchor = findFoodAnchor(aiData.food_name);
 
     let finalResult = { ...aiData };
@@ -71,8 +71,6 @@ export async function POST(request: Request) {
         }
       };
       isVerified = true;
-    } else {
-      console.log(`⚠️ No Anchor Match. Using AI Estimate for: ${aiData.food_name}`);
     }
 
     return NextResponse.json({ 
@@ -84,7 +82,6 @@ export async function POST(request: Request) {
 
   } catch (error: any) {
     console.error('Error analyzing food:', error);
-    const errorMessage = error.message || 'Failed to analyze food';
-    return NextResponse.json({ error: errorMessage }, { status: 500 });
+    return NextResponse.json({ error: error.message || 'Failed to analyze food' }, { status: 500 });
   }
 }
