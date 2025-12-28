@@ -2,6 +2,7 @@
 'use client';
 
 import { useState } from 'react';
+import { VitalityHUD } from '@/components/VitalityHUD'; // Import the new HUD
 
 export default function TestScanPage() {
   const [image, setImage] = useState<string | null>(null);
@@ -22,13 +23,14 @@ export default function TestScanPage() {
     }
   };
 
-  // The Action: Send to our new API
+  // The Action: Send to our API
   const handleAnalyze = async () => {
     if (!image) return;
     setLoading(true);
     setError('');
 
     try {
+      // Make sure this points to the correct route you created earlier
       const response = await fetch('/api/analyze-food', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -48,64 +50,72 @@ export default function TestScanPage() {
   };
 
   return (
-    <div className="p-8 max-w-xl mx-auto font-sans">
-      <h1 className="text-2xl font-bold mb-4">🧪 Dr. Reza Test Lab</h1>
-      
-      {/* 1. Upload Section */}
-      <div className="mb-6 p-4 border-2 border-dashed border-gray-300 rounded-lg">
-        <input 
-          type="file" 
-          accept="image/*" 
-          onChange={handleFileChange}
-          className="block w-full text-sm text-gray-500"
-        />
-      </div>
-
-      {/* 2. Preview Section */}
-      {image && (
-        <div className="mb-6 text-center">
-          <img src={image} alt="Preview" className="max-h-64 mx-auto rounded shadow" />
-          <button
-            onClick={handleAnalyze}
-            disabled={loading}
-            className="mt-4 px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400"
-          >
-            {loading ? 'Dr. Reza is thinking...' : '🔍 Analyze Now'}
-          </button>
+    <div className="min-h-screen bg-gray-50 p-8 font-sans">
+      <div className="max-w-xl mx-auto">
+        <h1 className="text-3xl font-bold mb-6 text-center text-gray-800">🧪 Dr. Reza Test Lab</h1>
+        
+        {/* 1. Upload Section */}
+        <div className="mb-6 p-6 bg-white border-2 border-dashed border-gray-300 rounded-xl shadow-sm hover:border-blue-400 transition-colors">
+          <input 
+            type="file" 
+            accept="image/*" 
+            onChange={handleFileChange}
+            className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+          />
         </div>
-      )}
 
-      {/* 3. Error Display */}
-      {error && (
-        <div className="p-4 bg-red-100 text-red-700 rounded mb-4">
-          Error: {error}
-        </div>
-      )}
-
-      {/* 4. The Verdict Display */}
-      {result && (
-        <div className="space-y-4">
-          {/* A. Verified Badge Check */}
-          <div className={`p-4 rounded-lg border ${result.is_verified ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
-            <h2 className="font-bold flex items-center gap-2">
-              {result.is_verified ? '✅ VERIFIED ANCHOR' : '⚠️ AI ESTIMATE'}
-            </h2>
-            <p className="text-sm opacity-75">Source: {result.source}</p>
+        {/* 2. Preview & Action Section */}
+        {image && (
+          <div className="mb-8 text-center animate-fade-in">
+            <div className="relative inline-block">
+              <img 
+                src={image} 
+                alt="Preview" 
+                className="max-h-64 mx-auto rounded-lg shadow-md border border-gray-200" 
+              />
+              {/* Optional: Add a 'Analyzing' overlay if you want later */}
+            </div>
+            
+            <div className="mt-4">
+              <button
+                onClick={handleAnalyze}
+                disabled={loading}
+                className={`px-8 py-3 rounded-full font-bold text-white shadow-lg transition-all transform hover:scale-105 ${
+                  loading 
+                    ? 'bg-gray-400 cursor-not-allowed' 
+                    : 'bg-blue-600 hover:bg-blue-700'
+                }`}
+              >
+                {loading ? 'Dr. Reza is thinking...' : '🔍 Analyze Now'}
+              </button>
+            </div>
           </div>
+        )}
 
-          {/* B. The Data */}
-          <div className="bg-gray-100 p-4 rounded text-sm overflow-auto">
-            <pre>{JSON.stringify(result.data, null, 2)}</pre>
+        {/* 3. Error Display */}
+        {error && (
+          <div className="p-4 bg-red-50 text-red-700 border border-red-200 rounded-lg mb-6 text-center font-medium">
+            Error: {error}
           </div>
+        )}
 
-          {/* C. Renal Guard Check */}
-          {result.data.risk_analysis.is_high_sodium && (
-             <div className="p-3 bg-red-600 text-white font-bold text-center rounded animate-pulse">
-               🚨 HIGH SODIUM ALERT! 
+        {/* 4. The Verdict Display (New HUD) */}
+        {result && (
+          <div className="mt-6 animate-slide-up">
+             <VitalityHUD data={result.data} isVerified={result.is_verified} />
+             
+             {/* Debug info (Optional - hidden for users, visible for you) */}
+             <div className="mt-8 pt-8 border-t border-gray-200">
+               <details className="text-xs text-gray-400 cursor-pointer">
+                 <summary>View Raw JSON (Debug)</summary>
+                 <pre className="mt-2 bg-gray-100 p-4 rounded overflow-auto">
+                   {JSON.stringify(result, null, 2)}
+                 </pre>
+               </details>
              </div>
-          )}
-        </div>
-      )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
