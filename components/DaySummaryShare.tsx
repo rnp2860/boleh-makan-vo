@@ -160,7 +160,7 @@ Tracked with Boleh Makan 🇲🇾
             </button>
           </div>
           
-          {typeof navigator !== 'undefined' && navigator.share && (
+          {typeof navigator !== 'undefined' && 'share' in navigator && (
             <button 
               onClick={() => handleShare('native')}
               className="w-full py-3 bg-teal-500 text-white font-bold rounded-xl mb-3"
