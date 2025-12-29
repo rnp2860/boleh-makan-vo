@@ -1,146 +1,309 @@
 // src/app/profile/page.tsx
+// 🎨 REDESIGNED: Beautiful gamified profile page
 'use client';
 
 import { useFood } from '@/context/FoodContext';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 
 export default function ProfilePage() {
   const { userProfile, setGoal, toggleCondition, updateDetails, dailyBudget, setManualOverride, setUserName } = useFood();
   const router = useRouter();
 
-  // 🛡️ FIX: Handle the case where profile hasn't loaded yet
-  // This satisfies TypeScript by ensuring userProfile exists before we use it
   if (!userProfile) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-gray-400 font-bold animate-pulse">Loading Profile...</div>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-teal-50 to-white">
+        <div className="text-teal-500 font-bold animate-pulse">Loading Profile...</div>
       </div>
     );
   }
 
-  // Now it is safe to access properties because we passed the check above
   const isGoal = (g: string) => userProfile.goal === g;
   const hasCondition = (c: string) => userProfile.healthConditions.includes(c);
   const { details, manualOverride } = userProfile;
 
+  // Check if values are default/empty
+  const isNameEmpty = !userProfile.name || userProfile.name.trim() === '';
+  const isAgeDefault = !details.age || details.age === 0;
+  const isHeightDefault = !details.height || details.height === 0;
+  const isWeightDefault = !details.weight || details.weight === 0;
+
+  // 🎯 Health Goals with images
+  const healthGoals = [
+    { id: 'lose_weight', label: 'Turun Berat', icon: '/assets/icon-weight-loss.png', color: 'emerald' },
+    { id: 'maintain', label: 'Kekal Sihat', icon: '/assets/icon-maintain.png', color: 'blue' },
+    { id: 'build_muscle', label: 'Bina Otot', icon: '/assets/icon-muscle.png', color: 'purple' },
+  ];
+
+  // 🏥 Health Conditions with images
+  const healthConditions = [
+    { id: 'Diabetes', label: 'Diabetes', icon: '/assets/icon-diabetes.png', color: 'rose' },
+    { id: 'High Blood Pressure', label: 'Kurang Masin', icon: '/assets/icon-kurang-masin.png', color: 'orange' },
+    { id: 'High Cholesterol', label: 'Kurang Minyak', icon: '/assets/icon-tak-nak-minyak.png', color: 'amber' },
+    { id: 'Kidney Care', label: 'Jaga Kidney', icon: '/assets/icon-jaga-kidney.png', color: 'violet' },
+  ];
+
+  // 🏃 Activity Levels
+  const activityLevels = [
+    { id: 'sedentary', label: 'Duduk Jer', emoji: '🪑', desc: 'Office/WFH' },
+    { id: 'light', label: 'Ringan', emoji: '🚶', desc: 'Jalan sikit' },
+    { id: 'moderate', label: 'Aktif', emoji: '🏃', desc: 'Gym 3x/week' },
+    { id: 'active', label: 'Atlet', emoji: '🔥', desc: 'Daily workout' },
+  ];
+
   return (
-    <div className="min-h-screen bg-gray-50 pb-32 p-6 font-sans">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-black text-gray-800 tracking-tight">Your Profile</h1>
-        <button 
-          onClick={() => router.push('/')} 
-          className="bg-white px-4 py-2 rounded-xl text-sm font-bold text-gray-600 shadow-sm border border-gray-100"
-        >
-          Done
-        </button>
-      </div>
-
-      {/* 1. NAME */}
-      <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 mb-4">
-        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block">Name</label>
-        <input 
-          value={userProfile.name} 
-          onChange={(e) => setUserName(e.target.value)} 
-          className="w-full text-xl font-bold text-gray-800 outline-none placeholder-gray-300"
-          placeholder="Your Name"
-        />
-      </div>
-
-      {/* 2. PHYSICAL STATS */}
-      <div className="grid grid-cols-2 gap-4 mb-4">
-        <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100">
-           <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block">Age</label>
-           <input 
-             type="number" 
-             value={details.age} 
-             onChange={(e) => updateDetails({ age: Number(e.target.value) })}
-             className="w-full text-2xl font-black text-gray-800 outline-none" 
-           />
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-teal-50/30 pb-32 font-sans">
+      
+      {/* 🎨 HEADER */}
+      <div className="bg-gradient-to-br from-teal-500 to-emerald-600 px-6 pt-8 pb-16 rounded-b-[40px] shadow-lg">
+        <div className="flex justify-between items-start mb-4">
+          <div>
+            <p className="text-teal-100 text-xs font-medium mb-1">Your Profile</p>
+            <h1 className="text-2xl font-black text-white tracking-tight">
+              {isNameEmpty ? 'Foodie Friend' : userProfile.name} 👋
+            </h1>
+          </div>
+          <button 
+            onClick={() => router.push('/')} 
+            className="bg-white/20 backdrop-blur px-4 py-2 rounded-xl text-sm font-bold text-white border border-white/30"
+          >
+            Done
+          </button>
         </div>
-        <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100">
-           <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block">Gender</label>
-           <div className="flex bg-gray-100 rounded-lg p-1">
-             <button onClick={() => updateDetails({ gender: 'male' })} className={`flex-1 py-1 rounded-md text-xs font-bold ${details.gender === 'male' ? 'bg-white shadow text-blue-600' : 'text-gray-400'}`}>Male</button>
-             <button onClick={() => updateDetails({ gender: 'female' })} className={`flex-1 py-1 rounded-md text-xs font-bold ${details.gender === 'female' ? 'bg-white shadow text-pink-500' : 'text-gray-400'}`}>Fem</button>
-           </div>
+        
+        {/* Dr. Reza Avatar - Larger rectangular card */}
+        <div className="flex items-center gap-4 bg-white/10 backdrop-blur rounded-2xl p-4 mt-4">
+          <div className="w-16 h-20 rounded-2xl overflow-hidden bg-white/20 flex-shrink-0 shadow-lg">
+            <Image src="/assets/avatar-profile.png" alt="Dr. Reza" width={64} height={80} className="w-full h-full object-cover" />
+          </div>
+          <div className="flex-1">
+            <p className="text-white text-sm font-medium leading-relaxed">
+              "Tell me about yourself so I can help you better!"
+            </p>
+            <p className="text-white/60 text-xs mt-1">— Dr. Reza</p>
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 mb-4">
-        <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100">
-           <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block">Height (cm)</label>
-           <input 
-             type="number" 
-             value={details.height} 
-             onChange={(e) => updateDetails({ height: Number(e.target.value) })}
-             className="w-full text-2xl font-black text-gray-800 outline-none" 
-           />
+      {/* 📝 CONTENT */}
+      <div className="px-5 -mt-8 space-y-4">
+        
+        {/* NAME CARD */}
+        <div className="bg-white p-5 rounded-3xl shadow-lg border border-slate-100">
+          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">
+            Your Name <span className="font-normal normal-case text-slate-300">(what should Dr. Reza call you?)</span>
+          </label>
+          <input 
+            value={userProfile.name} 
+            onChange={(e) => setUserName(e.target.value)} 
+            className={`w-full text-xl font-bold outline-none bg-transparent ${isNameEmpty ? 'text-slate-300' : 'text-slate-800'}`}
+            placeholder="Enter your name or nickname"
+          />
         </div>
-        <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100">
-           <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block">Weight (kg)</label>
-           <input 
-             type="number" 
-             value={details.weight} 
-             onChange={(e) => updateDetails({ weight: Number(e.target.value) })}
-             className="w-full text-2xl font-black text-gray-800 outline-none" 
-           />
+
+        {/* PHYSICAL STATS */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="bg-white p-4 rounded-2xl shadow-md border border-slate-100">
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Age</label>
+            <div className="flex items-baseline gap-1">
+              <input 
+                type="number" 
+                value={details.age || ''} 
+                onChange={(e) => updateDetails({ age: Number(e.target.value) })}
+                placeholder="25"
+                className={`w-full text-2xl font-black outline-none bg-transparent placeholder-slate-300 ${isAgeDefault ? 'text-slate-300' : 'text-slate-800'}`}
+              />
+              <span className="text-slate-300 text-sm">yrs</span>
+            </div>
+          </div>
+          <div className="bg-white p-4 rounded-2xl shadow-md border border-slate-100">
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Gender</label>
+            <div className="flex bg-slate-100 rounded-xl p-1">
+              <button 
+                onClick={() => updateDetails({ gender: 'male' })} 
+                className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${details.gender === 'male' ? 'bg-white shadow-md text-blue-600' : 'text-slate-400'}`}
+              >
+                👨 Male
+              </button>
+              <button 
+                onClick={() => updateDetails({ gender: 'female' })} 
+                className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${details.gender === 'female' ? 'bg-white shadow-md text-pink-500' : 'text-slate-400'}`}
+              >
+                👩 Female
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
 
-      {/* 3. HEALTH GOAL */}
-      <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 mb-4">
-        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4 block">Health Goal</label>
-        <div className="grid grid-cols-3 gap-2">
-           <button onClick={() => setGoal('lose_weight')} className={`py-3 rounded-xl text-xs font-bold border transition-all ${isGoal('lose_weight') ? 'bg-green-100 border-green-500 text-green-700 ring-2 ring-green-500/20' : 'bg-gray-50 border-transparent text-gray-400'}`}>Turun Berat</button>
-           <button onClick={() => setGoal('maintain')} className={`py-3 rounded-xl text-xs font-bold border transition-all ${isGoal('maintain') ? 'bg-blue-100 border-blue-500 text-blue-700 ring-2 ring-blue-500/20' : 'bg-gray-50 border-transparent text-gray-400'}`}>Kekal Sihat</button>
-           <button onClick={() => setGoal('build_muscle')} className={`py-3 rounded-xl text-xs font-bold border transition-all ${isGoal('build_muscle') ? 'bg-purple-100 border-purple-500 text-purple-700 ring-2 ring-purple-500/20' : 'bg-gray-50 border-transparent text-gray-400'}`}>Bina Otot</button>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="bg-white p-4 rounded-2xl shadow-md border border-slate-100">
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Height</label>
+            <div className="flex items-baseline gap-1">
+              <input 
+                type="number" 
+                value={details.height || ''} 
+                onChange={(e) => updateDetails({ height: Number(e.target.value) })}
+                placeholder="165"
+                className={`w-full text-2xl font-black outline-none bg-transparent placeholder-slate-300 ${isHeightDefault ? 'text-slate-300' : 'text-slate-800'}`}
+              />
+              <span className="text-slate-300 text-sm">cm</span>
+            </div>
+          </div>
+          <div className="bg-white p-4 rounded-2xl shadow-md border border-slate-100">
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Weight</label>
+            <div className="flex items-baseline gap-1">
+              <input 
+                type="number" 
+                value={details.weight || ''} 
+                onChange={(e) => updateDetails({ weight: Number(e.target.value) })}
+                placeholder="60"
+                className={`w-full text-2xl font-black outline-none bg-transparent placeholder-slate-300 ${isWeightDefault ? 'text-slate-300' : 'text-slate-800'}`}
+              />
+              <span className="text-slate-300 text-sm">kg</span>
+            </div>
+          </div>
         </div>
-      </div>
 
-      {/* 4. ACTIVITY */}
-      <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 mb-4">
-        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4 block">Activity Level</label>
-        <div className="space-y-2">
-          {['sedentary', 'light', 'moderate', 'active'].map((level) => (
-             <button 
-               key={level} 
-               onClick={() => updateDetails({ activity: level as any })}
-               className={`w-full text-left p-3 rounded-xl text-xs font-bold capitalize border transition-all ${details.activity === level ? 'bg-orange-50 border-orange-200 text-orange-700' : 'bg-gray-50 border-transparent text-gray-400'}`}
-             >
-               {level}
-             </button>
-          ))}
+        {/* 🎯 HEALTH GOAL */}
+        <div className="bg-white p-5 rounded-3xl shadow-lg border border-slate-100">
+          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-4 block">🎯 Health Goal</label>
+          <div className="grid grid-cols-3 gap-3">
+            {healthGoals.map((goal) => (
+              <button 
+                key={goal.id}
+                onClick={() => setGoal(goal.id as any)} 
+                className={`relative p-3 rounded-2xl border-2 transition-all duration-300 ${
+                  isGoal(goal.id) 
+                    ? `border-${goal.color}-400 bg-${goal.color}-50 ring-4 ring-${goal.color}-400/20 scale-105` 
+                    : 'border-slate-100 bg-slate-50 hover:border-slate-200'
+                }`}
+                style={{
+                  borderColor: isGoal(goal.id) ? (goal.color === 'emerald' ? '#34d399' : goal.color === 'blue' ? '#60a5fa' : '#a78bfa') : undefined,
+                  backgroundColor: isGoal(goal.id) ? (goal.color === 'emerald' ? '#d1fae5' : goal.color === 'blue' ? '#dbeafe' : '#ede9fe') : undefined,
+                  transform: isGoal(goal.id) ? 'scale(1.05)' : 'scale(1)',
+                  boxShadow: isGoal(goal.id) ? `0 0 20px ${goal.color === 'emerald' ? 'rgba(52,211,153,0.3)' : goal.color === 'blue' ? 'rgba(96,165,250,0.3)' : 'rgba(167,139,250,0.3)'}` : 'none'
+                }}
+              >
+                <div className={`mx-auto mb-2 rounded-xl overflow-hidden transition-all duration-300 ${isGoal(goal.id) ? 'w-16 h-16' : 'w-14 h-14'}`}>
+                  <Image src={goal.icon} alt={goal.label} width={64} height={64} className="w-full h-full object-contain" />
+                </div>
+                <p className={`text-[10px] font-bold text-center ${isGoal(goal.id) ? 'text-slate-700' : 'text-slate-400'}`}>
+                  {goal.label}
+                </p>
+                {isGoal(goal.id) && (
+                  <div className="absolute -top-1 -right-1 w-5 h-5 bg-teal-500 rounded-full flex items-center justify-center">
+                    <span className="text-white text-xs">✓</span>
+                  </div>
+                )}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
 
-      {/* 5. MANUAL OVERRIDE */}
-      <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 mb-4">
-         <div className="flex justify-between items-center mb-2">
-           <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Daily Calorie Target</label>
-           <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-lg">Auto: {dailyBudget}</span>
-         </div>
-         <input 
-           type="number" 
-           placeholder="Auto (Tap to set manual)" 
-           value={manualOverride || ''}
-           onChange={(e) => setManualOverride(e.target.value ? Number(e.target.value) : null)}
-           className="w-full text-xl font-bold text-gray-800 outline-none placeholder-gray-300" 
-         />
-         <p className="text-[10px] text-gray-400 mt-2">Leave empty to calculate automatically based on your stats.</p>
-      </div>
-
-      {/* 6. CONDITIONS */}
-      <div className="mb-8">
-        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4 block px-2">Health Conditions</label>
-        <div className="flex flex-wrap gap-2">
-          {['Diabetes', 'High Blood Pressure', 'High Cholesterol'].map(c => (
-            <button key={c} onClick={() => toggleCondition(c)} className={`px-4 py-2 rounded-full text-xs font-bold border transition-all ${hasCondition(c) ? 'bg-red-500 border-red-500 text-white' : 'bg-white border-gray-200 text-gray-400'}`}>
-              {c}
-            </button>
-          ))}
+        {/* 🏃 ACTIVITY LEVEL - 2x2 Grid */}
+        <div className="bg-white p-5 rounded-3xl shadow-lg border border-slate-100">
+          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-4 block">🏃 Activity Level</label>
+          <div className="grid grid-cols-2 gap-2">
+            {activityLevels.map((level) => (
+              <button 
+                key={level.id}
+                onClick={() => updateDetails({ activity: level.id as any })}
+                className={`p-3 rounded-xl border-2 transition-all duration-200 flex items-center gap-3 ${
+                  details.activity === level.id 
+                    ? 'bg-orange-50 border-orange-300 shadow-md' 
+                    : 'bg-slate-50 border-transparent hover:bg-slate-100'
+                }`}
+              >
+                <span className="text-2xl">{level.emoji}</span>
+                <div className="text-left">
+                  <p className={`text-xs font-bold ${details.activity === level.id ? 'text-orange-700' : 'text-slate-500'}`}>
+                    {level.label}
+                  </p>
+                  <p className="text-[9px] text-slate-400">{level.desc}</p>
+                </div>
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
 
+        {/* 🏥 HEALTH CONDITIONS */}
+        <div className="bg-white p-5 rounded-3xl shadow-lg border border-slate-100">
+          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-4 block">🏥 Health Conditions</label>
+          <p className="text-[10px] text-slate-400 mb-4 -mt-2">Select any that apply to you</p>
+          <div className="grid grid-cols-2 gap-3">
+            {healthConditions.map((condition) => (
+              <button 
+                key={condition.id}
+                onClick={() => toggleCondition(condition.id)} 
+                className={`relative p-3 rounded-2xl border-2 transition-all duration-300 ${
+                  hasCondition(condition.id) 
+                    ? 'border-red-300 bg-red-50 shadow-md scale-[1.02]' 
+                    : 'border-slate-100 bg-slate-50 hover:border-slate-200'
+                }`}
+                style={{
+                  boxShadow: hasCondition(condition.id) ? '0 0 15px rgba(239,68,68,0.2)' : 'none'
+                }}
+              >
+                <div className={`w-12 h-12 mx-auto mb-2 rounded-xl overflow-hidden transition-all ${hasCondition(condition.id) ? 'scale-110' : ''}`}>
+                  <Image src={condition.icon} alt={condition.label} width={48} height={48} className="w-full h-full object-contain" />
+                </div>
+                <p className={`text-[10px] font-bold text-center ${hasCondition(condition.id) ? 'text-red-600' : 'text-slate-400'}`}>
+                  {condition.label}
+                </p>
+                {hasCondition(condition.id) && (
+                  <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
+                    <span className="text-white text-xs">✓</span>
+                  </div>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* 🔢 DAILY TARGET */}
+        <div className="bg-gradient-to-br from-slate-100 to-slate-200 p-5 rounded-3xl shadow-lg border border-slate-200">
+          <div className="flex justify-between items-center mb-3">
+            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Daily Calorie Target</label>
+            <span className="text-xs font-bold text-teal-600 bg-teal-100 px-3 py-1 rounded-lg">
+              Auto: {dailyBudget} kcal
+            </span>
+          </div>
+          
+          {/* Input box with visible border */}
+          <div className="bg-white rounded-xl border-2 border-slate-300 p-3 mb-3">
+            <input 
+              type="number" 
+              placeholder="Leave empty for auto" 
+              value={manualOverride || ''}
+              onChange={(e) => setManualOverride(e.target.value ? Number(e.target.value) : null)}
+              className="w-full text-2xl font-black text-slate-800 outline-none bg-transparent placeholder-slate-400 placeholder:text-base placeholder:font-medium" 
+            />
+          </div>
+          
+          <p className="text-[10px] text-slate-500 mb-4">
+            💡 Override only if you have a specific target from a dietitian.
+          </p>
+          
+          {/* Scientific Method Explanation */}
+          <div className="bg-white/60 rounded-xl p-3 border border-slate-200">
+            <div className="flex items-start gap-2">
+              <span className="text-base">🔬</span>
+              <div>
+                <p className="text-[10px] font-bold text-slate-600 mb-1">How We Calculate</p>
+                <p className="text-[9px] text-slate-500 leading-relaxed">
+                  We use the <span className="font-semibold text-slate-600">Mifflin-St Jeor Equation</span> — 
+                  the gold standard method recommended by dietitians worldwide. 
+                  Your BMR is calculated from age, height, weight & gender, 
+                  then multiplied by your activity level to get your TDEE (Total Daily Energy Expenditure).
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* SPACER */}
+        <div className="h-4"></div>
+      </div>
     </div>
   );
 }

@@ -70,10 +70,10 @@ export const FoodProvider = ({ children }: { children: React.ReactNode }) => {
   
   // Default Profile (Kept in LocalStorage for now)
   const [userProfile, setUserProfile] = useState<UserProfile>({
-    name: 'Dr. Reza User',
+    name: '',
     healthConditions: [],
     goal: 'maintain',
-    details: { age: 30, height: 170, weight: 70, gender: 'male', activity: 'sedentary' },
+    details: { age: 0, height: 0, weight: 0, gender: 'male', activity: 'sedentary' },
     manualOverride: null 
   });
 
