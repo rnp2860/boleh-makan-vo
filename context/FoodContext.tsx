@@ -60,6 +60,7 @@ type FoodContextType = {
   dailyBudget: number;
   getWeeklyStats: () => { day: string; calories: number; budget: number; protein: number; carbs: number; fat: number }[];
   streak: number;
+  isLoaded: boolean;
 };
 
 const FoodContext = createContext<FoodContextType | undefined>(undefined);
@@ -317,7 +318,7 @@ export const FoodProvider = ({ children }: { children: React.ReactNode }) => {
     <FoodContext.Provider value={{ 
       meals, addMeal, deleteMeal, stats, userProfile, 
       toggleCondition, setGoal, updateDetails, setManualOverride, setUserName, 
-      dailyBudget, getWeeklyStats, streak: calculateStreak() 
+      dailyBudget, getWeeklyStats, streak: calculateStreak(), isLoaded 
     }}>
       {children}
     </FoodContext.Provider>

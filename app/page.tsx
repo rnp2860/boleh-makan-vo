@@ -12,7 +12,7 @@ import DaySummaryShare from '@/components/DaySummaryShare';
 import { useFood } from '@/context/FoodContext';
 
 export default function HomePage() {
-  const { meals, userProfile, dailyBudget, deleteMeal, getWeeklyStats, streak } = useFood();
+  const { meals, userProfile, dailyBudget, deleteMeal, getWeeklyStats, streak, isLoaded } = useFood();
   const [selectedMeal, setSelectedMeal] = useState<any>(null);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showDayShare, setShowDayShare] = useState(false);
@@ -72,10 +72,10 @@ export default function HomePage() {
     return "Maintain Je";
   };
 
-  // Chart logic
+  // Chart logic - only unlock after data is loaded AND user has 3+ days of data
   const weeklyData = getWeeklyStats();
   const daysTrackedCount = weeklyData.filter(day => day.calories > 0).length;
-  const isChartUnlocked = daysTrackedCount >= 3;
+  const isChartUnlocked = isLoaded && daysTrackedCount >= 3;
 
   const getTimeGap = (current: Date, previous: Date) => {
     const diffMs = current.getTime() - previous.getTime();
@@ -147,40 +147,71 @@ export default function HomePage() {
         <div className="relative">
           <WeeklyChart data={weeklyData} />
           
-          {/* Grey overlay when locked - lighter and stays on top */}
+          {/* Cool Lock Screen Overlay */}
           {!isChartUnlocked && (
-            <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-[2px] rounded-3xl flex flex-col items-center justify-center p-6 z-50">
-              <div className="text-center">
-                <div className="w-16 h-16 bg-slate-800/90 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <span className="text-3xl">🔒</span>
+            <div className="absolute inset-0 bg-gradient-to-br from-slate-800/70 via-slate-900/60 to-teal-900/50 backdrop-blur-[3px] rounded-3xl flex flex-col items-center justify-center p-5 z-50">
+              {/* Glowing Lock Icon */}
+              <div className="relative mb-4">
+                <div className="absolute inset-0 bg-teal-500/30 rounded-full blur-xl animate-pulse"></div>
+                <div className="relative w-16 h-16 bg-gradient-to-br from-slate-700 to-slate-800 rounded-2xl flex items-center justify-center shadow-2xl border border-slate-600/50">
+                  <span className="text-3xl">🔐</span>
                 </div>
-                <h3 className="text-white font-bold text-lg mb-2">Weekly Insights Locked</h3>
-                <p className="text-slate-200 text-sm mb-4 max-w-[250px]">
-                  Track your meals for <span className="text-teal-400 font-bold">{3 - daysTrackedCount} more {3 - daysTrackedCount === 1 ? 'day' : 'days'}</span> to unlock your trend analysis
-                </p>
-                
-                {/* Progress indicator */}
-                <div className="flex items-center justify-center gap-2 mb-3">
-                  {[0, 1, 2].map((i) => (
+              </div>
+              
+              {/* Title */}
+              <h3 className="text-white font-bold text-lg mb-1">Weekly Insights</h3>
+              <p className="text-teal-300 text-xs font-semibold mb-3">🔒 LOCKED</p>
+              
+              {/* Dr. Reza Avatar + Message */}
+              <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-3 mb-4 max-w-[260px] border border-white/10">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-teal-400/50 flex-shrink-0">
+                    <Image 
+                      src="/assets/avatar-header.png" 
+                      alt="Dr. Reza" 
+                      width={40} 
+                      height={40} 
+                      className="object-cover"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-white/90 text-xs leading-relaxed">
+                      {daysTrackedCount === 0 && "\"Log your first meal to start your health journey with me!\""}
+                      {daysTrackedCount === 1 && "\"Good start! 2 more days and I can show you your trends.\""}
+                      {daysTrackedCount === 2 && "\"Almost there! One more day of logging!\""}
+                    </p>
+                    <p className="text-teal-400 text-[10px] font-bold mt-1">— Dr. Reza</p>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Progress Dots */}
+              <div className="flex items-center gap-3 mb-3">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="flex flex-col items-center">
                     <div 
-                      key={i} 
-                      className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg font-bold transition-all ${
+                      className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold transition-all duration-300 ${
                         i < daysTrackedCount 
-                          ? 'bg-teal-500 text-white scale-110' 
-                          : 'bg-slate-700/80 text-slate-400'
+                          ? 'bg-gradient-to-br from-teal-400 to-teal-600 text-white shadow-lg shadow-teal-500/30 scale-110' 
+                          : 'bg-slate-700/60 text-slate-400 border border-slate-600/50'
                       }`}
                     >
-                      {i < daysTrackedCount ? '✓' : i + 1}
+                      {i < daysTrackedCount ? '✓' : `D${i + 1}`}
                     </div>
-                  ))}
-                </div>
-                
-                <p className="text-slate-300 text-xs">
-                  {daysTrackedCount === 0 && "Start your journey today! 🚀"}
-                  {daysTrackedCount === 1 && "Great start! Keep going! 💪"}
-                  {daysTrackedCount === 2 && "One more day to unlock! 🎯"}
-                </p>
+                    <span className={`text-[9px] mt-1 ${i < daysTrackedCount ? 'text-teal-400' : 'text-slate-500'}`}>
+                      {i < daysTrackedCount ? 'Done' : 'Log'}
+                    </span>
+                  </div>
+                ))}
               </div>
+              
+              {/* CTA */}
+              <Link 
+                href="/check-food" 
+                className="bg-gradient-to-r from-teal-500 to-teal-600 text-white text-xs font-bold px-5 py-2.5 rounded-full shadow-lg shadow-teal-500/30 hover:shadow-teal-500/50 transition-all"
+              >
+                📸 Scan Your Next Meal
+              </Link>
             </div>
           )}
         </div>
