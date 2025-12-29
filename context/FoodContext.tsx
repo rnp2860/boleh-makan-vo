@@ -58,7 +58,7 @@ type FoodContextType = {
   setManualOverride: (val: number | null) => void;
   setUserName: (name: string) => void;
   dailyBudget: number;
-  getWeeklyStats: () => { day: string; calories: number; budget: number }[];
+  getWeeklyStats: () => { day: string; calories: number; budget: number; protein: number; carbs: number; fat: number }[];
   streak: number;
 };
 
@@ -290,10 +290,17 @@ export const FoodProvider = ({ children }: { children: React.ReactNode }) => {
       );
       
       const totalCal = dayMeals.reduce((sum, m) => sum + m.calories, 0);
+      const totalProtein = dayMeals.reduce((sum, m) => sum + (m.protein || 0), 0);
+      const totalCarbs = dayMeals.reduce((sum, m) => sum + (m.carbs || 0), 0);
+      const totalFat = dayMeals.reduce((sum, m) => sum + (m.fat || 0), 0);
+      
       days.push({
         day: d.toLocaleDateString('en-US', { weekday: 'short' }),
         calories: totalCal,
-        budget: dailyBudget
+        budget: dailyBudget,
+        protein: totalProtein,
+        carbs: totalCarbs,
+        fat: totalFat
       });
     }
     return days;
