@@ -3,17 +3,15 @@
 
 import React, { useState } from 'react';
 
-interface Meal {
-  name: string;
-  calories: number;
-  protein: number;
-  carbs: number;
-  fat: number;
-  timestamp: string;
-}
-
 interface DaySummaryShareProps {
-  meals: Meal[];
+  meals: Array<{
+    name: string;
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+    timestamp: Date | string;
+  }>;
   date: Date;
   totalCalories: number;
   totalProtein: number;
