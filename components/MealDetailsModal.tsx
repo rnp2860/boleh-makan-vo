@@ -32,6 +32,8 @@ export default function MealDetailsModal({ meal, onClose, onDelete }: MealDetail
   const dateStr = dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
   const timeStr = dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
+  const APP_URL = 'https://boleh-makan.vercel.app';
+  
   // Generate share text
   const generateShareText = () => {
     const ingredientsList = meal.components?.length > 0 
@@ -49,7 +51,8 @@ ${ingredientsList}
 
 🩺 Dr. Reza says: "${analysis}"
 
-Tracked with Boleh Makan 🇲🇾`;
+📲 Track your meals with Boleh Makan 🇲🇾
+${APP_URL}`;
   };
 
   const handleShare = async (platform: string) => {
@@ -74,10 +77,28 @@ Tracked with Boleh Makan 🇲🇾`;
       case 'native':
         if (navigator.share) {
           try {
-            await navigator.share({
+            // Try to include image if available
+            const shareData: ShareData = {
               title: `My Meal: ${meal.name}`,
               text: text,
-            });
+              url: APP_URL,
+            };
+            
+            // If meal has an image, try to share it (works on mobile)
+            if (meal.image && 'canShare' in navigator) {
+              try {
+                const response = await fetch(meal.image);
+                const blob = await response.blob();
+                const file = new File([blob], `${meal.name}.jpg`, { type: 'image/jpeg' });
+                if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                  shareData.files = [file];
+                }
+              } catch (imgErr) {
+                console.log('Could not include image in share');
+              }
+            }
+            
+            await navigator.share(shareData);
           } catch (err) {
             console.log('Share cancelled');
           }
@@ -249,10 +270,10 @@ Tracked with Boleh Makan 🇲🇾`;
               </button>
               
               <button onClick={() => handleShare('twitter')} className="flex flex-col items-center gap-2">
-                <div className="w-14 h-14 bg-sky-500 rounded-2xl flex items-center justify-center text-white text-2xl">
-                  🐦
+                <div className="w-14 h-14 bg-black rounded-2xl flex items-center justify-center text-white text-xl font-black">
+                  𝕏
                 </div>
-                <span className="text-xs text-slate-600 font-medium">Twitter</span>
+                <span className="text-xs text-slate-600 font-medium">X</span>
               </button>
               
               <button onClick={() => handleShare('facebook')} className="flex flex-col items-center gap-2">

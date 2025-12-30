@@ -409,7 +409,7 @@ export default function CheckFoodPage() {
             {/* Speech Bubble */}
             <div className="mt-4 bg-white rounded-2xl px-6 py-4 shadow-lg border border-slate-100 relative max-w-xs">
               <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-white rotate-45 border-l border-t border-slate-100"></div>
-              <p className="text-slate-700 text-center font-medium text-sm leading-relaxed">
+              <p className="text-slate-700 text-center font-medium text-base leading-relaxed">
                 Hai! 👋 I'm <span className="text-teal-600 font-bold">Dr. Reza</span>. 
                 <br/>Show me what you're eating today!
               </p>
@@ -429,7 +429,7 @@ export default function CheckFoodPage() {
               </div>
               <div className="text-left">
                 <h3 className="text-lg font-bold">Take a Photo</h3>
-                <p className="text-teal-100 text-sm">Snap or choose from gallery</p>
+                <p className="text-teal-100 text-base">Snap or choose from gallery</p>
               </div>
             </button>
 
@@ -443,9 +443,9 @@ export default function CheckFoodPage() {
               </div>
               <div className="text-left flex-1">
                 <h3 className="text-lg font-bold">Type It In</h3>
-                <p className="text-slate-400 text-sm">Quick log without photo</p>
+                <p className="text-slate-400 text-base">Quick log without photo</p>
               </div>
-              <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded-lg">BASIC</span>
+              <span className="text-xs font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded-lg">BASIC</span>
             </button>
 
             <input 
@@ -458,12 +458,12 @@ export default function CheckFoodPage() {
           </div>
 
           {/* Pro tip */}
-          <div className="bg-teal-50 border border-teal-100 rounded-xl p-3 mt-6 mx-1">
-            <div className="flex items-start gap-2">
-              <span className="text-base">💡</span>
+          <div className="bg-teal-50 border border-teal-100 rounded-xl p-4 mt-6 mx-1">
+            <div className="flex items-start gap-3">
+              <span className="text-xl">💡</span>
               <div>
-                <p className="text-xs font-bold text-teal-700 mb-0.5">Pro Tip</p>
-                <p className="text-[11px] text-teal-600 leading-relaxed">
+                <p className="text-sm font-bold text-teal-700 mb-1">Pro Tip</p>
+                <p className="text-xs text-teal-600 leading-relaxed">
                   <strong>Take a Photo</strong> gives you the most accurate analysis — I can see portion sizes, ingredients, and cooking style! 
                   <span className="text-teal-500"> Type It In is great for quick entries, but may miss some details.</span>
                 </p>
@@ -471,10 +471,15 @@ export default function CheckFoodPage() {
             </div>
           </div>
 
-          {/* Footer hint */}
-          <p className="text-center text-xs text-slate-400 mt-6 font-medium">
-            I'll analyze it instantly ⚡
-          </p>
+          {/* Footer with Dr. Reza */}
+          <div className="flex items-center justify-center gap-2 mt-6">
+            <div className="w-8 h-8 rounded-full overflow-hidden">
+              <Image src="/assets/avatar-header-thumbsup.png" alt="Dr. Reza" width={32} height={32} className="w-full h-full object-cover" />
+            </div>
+            <p className="text-sm text-slate-500 font-medium">
+              "I'll analyze it instantly!" ⚡
+            </p>
+          </div>
         </div>
       )}
 

@@ -37,10 +37,10 @@ export default function ProfilePage() {
 
   // 🏥 Health Conditions with images
   const healthConditions = [
-    { id: 'Diabetes', label: 'Diabetes', icon: '/assets/icon-diabetes.png', color: 'rose' },
-    { id: 'High Blood Pressure', label: 'Kurang Masin', icon: '/assets/icon-kurang-masin.png', color: 'orange' },
-    { id: 'High Cholesterol', label: 'Kurang Minyak', icon: '/assets/icon-tak-nak-minyak.png', color: 'amber' },
-    { id: 'Kidney Care', label: 'Jaga Kidney', icon: '/assets/icon-jaga-kidney.png', color: 'violet' },
+    { id: 'Diabetes', label: 'Diabetes', sublabel: '(Blood Sugar)', icon: '/assets/icon-diabetes.png', color: 'rose' },
+    { id: 'High Blood Pressure', label: 'Darah Tinggi', sublabel: '(Blood Pressure)', icon: '/assets/icon-kurang-masin.png', color: 'orange' },
+    { id: 'High Cholesterol', label: 'Kolesterol', sublabel: '(Cholesterol)', icon: '/assets/icon-tak-nak-minyak.png', color: 'amber' },
+    { id: 'Kidney Care', label: 'Jaga Buah Pinggang', sublabel: '(Kidney Care)', icon: '/assets/icon-jaga-kidney.png', color: 'violet' },
   ];
 
   // 🏃 Activity Levels
@@ -247,8 +247,11 @@ export default function ProfilePage() {
                 <div className={`w-14 h-14 mx-auto mb-2 rounded-xl overflow-hidden transition-all ${hasCondition(condition.id) ? 'scale-110' : ''}`}>
                   <Image src={condition.icon} alt={condition.label} width={56} height={56} className="w-full h-full object-contain" />
                 </div>
-                <p className={`text-xs font-bold text-center ${hasCondition(condition.id) ? 'text-red-600' : 'text-slate-500'}`}>
+                <p className={`text-sm font-bold text-center ${hasCondition(condition.id) ? 'text-red-600' : 'text-slate-600'}`}>
                   {condition.label}
+                </p>
+                <p className={`text-[10px] text-center ${hasCondition(condition.id) ? 'text-red-400' : 'text-slate-400'}`}>
+                  {condition.sublabel}
                 </p>
                 {hasCondition(condition.id) && (
                   <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
@@ -285,13 +288,13 @@ export default function ProfilePage() {
           </p>
           
           {/* Scientific Method Explanation */}
-          <div className="bg-white/60 rounded-xl p-3 border border-slate-200">
-            <div className="flex items-start gap-2">
-              <span className="text-base">🔬</span>
+          <div className="bg-white/60 rounded-xl p-4 border border-slate-200">
+            <div className="flex items-start gap-3">
+              <span className="text-xl">🔬</span>
               <div>
-                <p className="text-[10px] font-bold text-slate-600 mb-1">How We Calculate</p>
-                <p className="text-[9px] text-slate-500 leading-relaxed">
-                  We use the <span className="font-semibold text-slate-600">Mifflin-St Jeor Equation</span> — 
+                <p className="text-xs font-bold text-slate-700 mb-1">How We Calculate</p>
+                <p className="text-[11px] text-slate-600 leading-relaxed">
+                  We use the <span className="font-semibold text-teal-600">Mifflin-St Jeor Equation</span> — 
                   the gold standard method recommended by dietitians worldwide. 
                   Your BMR is calculated from age, height, weight & gender, 
                   then multiplied by your activity level to get your TDEE (Total Daily Energy Expenditure).

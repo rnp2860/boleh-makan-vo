@@ -40,6 +40,8 @@ export default function DaySummaryShare({
     year: 'numeric'
   });
 
+  const APP_URL = 'https://boleh-makan.vercel.app';
+  
   const generateShareText = () => {
     const mealsList = meals.map((m, i) => 
       `${i + 1}. ${m.name} - ${m.calories} kcal`
@@ -57,7 +59,8 @@ ${mealsList}
 • Carbs: ${totalCarbs}g
 • Fat: ${totalFat}g
 
-Tracked with Boleh Makan 🇲🇾
+📲 Track your meals with Boleh Makan 🇲🇾
+${APP_URL}
 #BolehMakan #HealthyEating`;
   };
 
@@ -86,6 +89,7 @@ Tracked with Boleh Makan 🇲🇾
             await navigator.share({
               title: `${userName}'s Food Diary - ${dateStr}`,
               text: text,
+              url: APP_URL,
             });
           } catch (err) {
             console.log('Share cancelled');
@@ -139,10 +143,10 @@ Tracked with Boleh Makan 🇲🇾
             </button>
             
             <button onClick={() => handleShare('twitter')} className="flex flex-col items-center gap-2">
-              <div className="w-14 h-14 bg-sky-500 rounded-2xl flex items-center justify-center text-white text-2xl shadow-lg">
-                🐦
+              <div className="w-14 h-14 bg-black rounded-2xl flex items-center justify-center text-white text-xl font-black shadow-lg">
+                𝕏
               </div>
-              <span className="text-xs text-slate-600 font-medium">Twitter</span>
+              <span className="text-xs text-slate-600 font-medium">X</span>
             </button>
             
             <button onClick={() => handleShare('facebook')} className="flex flex-col items-center gap-2">
