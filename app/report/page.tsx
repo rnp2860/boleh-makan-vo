@@ -209,38 +209,38 @@ export default function ReportPage() {
         {/* ═══════════════ SUMMARY METRICS ═══════════════ */}
         <div className="p-4 border-b border-slate-200 bg-slate-50 print:p-3">
           <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">Period Summary: {reportPeriod === 'week' ? '7 Days' : '30 Days'}</h3>
-          <div className="grid grid-cols-8 gap-2 print:gap-1">
-            <div className="text-center p-2 bg-white rounded-lg border border-slate-200 print:p-1">
-              <div className="text-lg font-black text-slate-800 print:text-sm">{stats.totalMeals}</div>
-              <div className="text-[8px] text-slate-500 font-medium uppercase">Meals</div>
+          <div className="grid grid-cols-8 gap-1">
+            <div className="text-center p-1.5 bg-white rounded-lg border border-slate-200">
+              <div className="text-sm font-black text-slate-800">{stats.totalMeals}</div>
+              <div className="text-[7px] text-slate-500 font-medium uppercase">Meals</div>
             </div>
-            <div className="text-center p-2 bg-white rounded-lg border border-slate-200 print:p-1">
-              <div className="text-lg font-black text-slate-800 print:text-sm">{stats.daysTracked}</div>
-              <div className="text-[8px] text-slate-500 font-medium uppercase">Days</div>
+            <div className="text-center p-1.5 bg-white rounded-lg border border-slate-200">
+              <div className="text-sm font-black text-slate-800">{stats.daysTracked}</div>
+              <div className="text-[7px] text-slate-500 font-medium uppercase">Days</div>
             </div>
-            <div className="text-center p-2 bg-blue-50 rounded-lg border border-blue-200 print:p-1">
-              <div className="text-lg font-black text-blue-600 print:text-sm">{stats.avgCalories}</div>
-              <div className="text-[8px] text-blue-500 font-medium uppercase">Avg kcal</div>
+            <div className="text-center p-1.5 bg-blue-50 rounded-lg border border-blue-200">
+              <div className="text-sm font-black text-blue-600">{stats.avgCalories}</div>
+              <div className="text-[7px] text-blue-500 font-medium uppercase">kcal</div>
             </div>
-            <div className="text-center p-2 bg-green-50 rounded-lg border border-green-200 print:p-1">
-              <div className="text-lg font-black text-green-600 print:text-sm">{stats.avgProtein}g</div>
-              <div className="text-[8px] text-green-500 font-medium uppercase">Protein</div>
+            <div className="text-center p-1.5 bg-green-50 rounded-lg border border-green-200">
+              <div className="text-sm font-black text-green-600">{stats.avgProtein}g</div>
+              <div className="text-[7px] text-green-500 font-medium uppercase">Protein</div>
             </div>
-            <div className="text-center p-2 bg-orange-50 rounded-lg border border-orange-200 print:p-1">
-              <div className="text-lg font-black text-orange-500 print:text-sm">{stats.avgCarbs}g</div>
-              <div className="text-[8px] text-orange-400 font-medium uppercase">Carbs</div>
+            <div className="text-center p-1.5 bg-orange-50 rounded-lg border border-orange-200">
+              <div className="text-sm font-black text-orange-500">{stats.avgCarbs}g</div>
+              <div className="text-[7px] text-orange-400 font-medium uppercase">Carbs</div>
             </div>
-            <div className="text-center p-2 bg-amber-50 rounded-lg border border-amber-200 print:p-1">
-              <div className="text-lg font-black text-amber-500 print:text-sm">{stats.avgFat}g</div>
-              <div className="text-[8px] text-amber-400 font-medium uppercase">Fat</div>
+            <div className="text-center p-1.5 bg-amber-50 rounded-lg border border-amber-200">
+              <div className="text-sm font-black text-amber-500">{stats.avgFat}g</div>
+              <div className="text-[7px] text-amber-400 font-medium uppercase">Fat</div>
             </div>
-            <div className="text-center p-2 bg-pink-50 rounded-lg border border-pink-200 print:p-1">
-              <div className="text-lg font-black text-pink-500 print:text-sm">{stats.avgSugar}g</div>
-              <div className="text-[8px] text-pink-400 font-medium uppercase">Sugar</div>
+            <div className="text-center p-1.5 bg-pink-50 rounded-lg border border-pink-200">
+              <div className="text-sm font-black text-pink-500">{stats.avgSugar}g</div>
+              <div className="text-[7px] text-pink-400 font-medium uppercase">Sugar</div>
             </div>
-            <div className="text-center p-2 bg-purple-50 rounded-lg border border-purple-200 print:p-1">
-              <div className="text-lg font-black text-purple-500 print:text-sm">{stats.avgSodium}</div>
-              <div className="text-[8px] text-purple-400 font-medium uppercase">Sodium</div>
+            <div className="text-center p-1.5 bg-purple-50 rounded-lg border border-purple-200">
+              <div className="text-sm font-black text-purple-500">{stats.avgSodium}</div>
+              <div className="text-[7px] text-purple-400 font-medium uppercase">Na(mg)</div>
             </div>
           </div>
           <div className="mt-3 flex items-center gap-4">
