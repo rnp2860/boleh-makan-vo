@@ -24,8 +24,8 @@ export const MobileLayout = ({ children }: MobileLayoutProps) => {
           {children}
         </div>
 
-        {/* BOTTOM NAV */}
-        <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-200 h-20 flex justify-around items-end pb-4 z-50">
+        {/* BOTTOM NAV - Hidden in print */}
+        <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-200 h-20 flex justify-around items-end pb-4 z-50 print:hidden">
           
           {/* 1. DIARY */}
           <Link href="/" className={`flex flex-col items-center gap-1 w-16 ${isActive('/')}`}>
