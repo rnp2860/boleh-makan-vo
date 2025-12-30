@@ -234,7 +234,40 @@ export default function HomePage() {
             <div className="text-4xl mb-3">🍽️</div>
             <p className="text-slate-500 font-medium">No meals tracked {isToday ? 'today' : 'on this day'}.</p>
             {isToday && (
-              <p className="text-xs text-slate-400 mt-1">Tap the camera button to start!</p>
+              <div className="mt-4">
+                {/* Prominent CTA for first-time users */}
+                <div className="bg-gradient-to-r from-blue-50 to-teal-50 rounded-xl p-4 border border-blue-100">
+                  <p className="text-blue-700 font-bold text-sm mb-2">
+                    Ready to start your health journey?
+                  </p>
+                  <p className="text-slate-500 text-xs">
+                    Tap the camera button below to log your first meal!
+                  </p>
+                </div>
+                
+                {/* Animated Arrow Pointing Down */}
+                <div className="flex flex-col items-center mt-4">
+                  <div className="animate-bounce">
+                    <svg 
+                      xmlns="http://www.w3.org/2000/svg" 
+                      className="h-10 w-10 text-blue-500" 
+                      fill="none" 
+                      viewBox="0 0 24 24" 
+                      stroke="currentColor"
+                      strokeWidth={2.5}
+                    >
+                      <path 
+                        strokeLinecap="round" 
+                        strokeLinejoin="round" 
+                        d="M19 14l-7 7m0 0l-7-7m7 7V3" 
+                      />
+                    </svg>
+                  </div>
+                  <div className="mt-2 bg-blue-600 text-white text-xs font-bold px-3 py-1.5 rounded-full animate-pulse shadow-lg shadow-blue-300">
+                    📸 Tap Here!
+                  </div>
+                </div>
+              </div>
             )}
           </div>
         ) : (
