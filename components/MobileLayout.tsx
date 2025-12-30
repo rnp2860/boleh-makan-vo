@@ -3,6 +3,7 @@
 
 import React from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 
 interface MobileLayoutProps {
@@ -13,6 +14,9 @@ export const MobileLayout = ({ children }: MobileLayoutProps) => {
   const pathname = usePathname();
 
   const isActive = (path: string) => pathname === path ? 'text-blue-600' : 'text-gray-400';
+  
+  // Don't show chat FAB on chat page itself
+  const showChatFab = pathname !== '/chat';
 
   return (
     <div className="min-h-screen bg-gray-100 flex justify-center">
@@ -23,6 +27,29 @@ export const MobileLayout = ({ children }: MobileLayoutProps) => {
            {/* Added pb-24 so content doesn't get hidden behind the nav bar */}
           {children}
         </div>
+
+        {/* FLOATING CHAT BUTTON - Ask Dr. Reza */}
+        {showChatFab && (
+          <Link 
+            href="/chat" 
+            className="fixed bottom-24 right-4 z-40 print:hidden group"
+          >
+            <div className="relative">
+              {/* Pulse animation */}
+              <div className="absolute inset-0 bg-teal-400 rounded-full animate-ping opacity-30"></div>
+              {/* Button */}
+              <div className="relative bg-gradient-to-br from-teal-500 to-emerald-600 rounded-full p-3 shadow-lg shadow-teal-500/30 hover:shadow-teal-500/50 transition-all hover:scale-105">
+                <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-white">
+                  <Image src="/assets/avatar-header.png" alt="Dr. Reza" width={40} height={40} className="w-full h-full object-cover" />
+                </div>
+              </div>
+              {/* Label */}
+              <div className="absolute -left-20 top-1/2 -translate-y-1/2 bg-slate-800 text-white text-xs font-bold px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                Ask Dr. Reza
+              </div>
+            </div>
+          </Link>
+        )}
 
         {/* BOTTOM NAV - Hidden in print */}
         <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-200 h-20 flex justify-around items-end pb-4 z-50 print:hidden">
