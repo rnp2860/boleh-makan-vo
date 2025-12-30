@@ -149,53 +149,47 @@ export default function HomePage() {
         <div className="relative overflow-hidden rounded-2xl">
           <WeeklyChart data={weeklyData} />
           
-          {/* Cool Lock Screen Overlay - Contained within chart boundaries */}
+          {/* Lock Screen Overlay - Centered, no lock icon */}
           {shouldShowLockOverlay && (
-            <div className="absolute inset-0 bg-gradient-to-br from-slate-800/80 via-slate-900/70 to-teal-900/60 backdrop-blur-[3px] flex flex-col items-center justify-center p-4 z-50 overflow-hidden">
-              {/* Glowing Lock Icon - Smaller */}
-              <div className="relative mb-2">
-                <div className="absolute inset-0 bg-teal-500/30 rounded-full blur-lg animate-pulse"></div>
-                <div className="relative w-12 h-12 bg-gradient-to-br from-slate-700 to-slate-800 rounded-xl flex items-center justify-center shadow-xl border border-slate-600/50">
-                  <span className="text-2xl">🔐</span>
-                </div>
-              </div>
+            <div className="absolute inset-0 bg-gradient-to-br from-slate-800/85 via-slate-900/75 to-teal-900/65 backdrop-blur-[3px] flex flex-col items-center justify-center p-4 z-50 overflow-hidden">
               
-              {/* Title - Compact */}
-              <h3 className="text-white font-bold text-base mb-0.5">Weekly Insights</h3>
-              <p className="text-teal-300 text-[10px] font-semibold mb-2">🔒 LOCKED</p>
+              {/* Title */}
+              <h3 className="text-white font-bold text-lg mb-1">Weekly Insights</h3>
               
-              {/* Dr. Reza Message - Compact */}
-              <div className="bg-white/10 backdrop-blur-sm rounded-xl px-3 py-2 mb-2 max-w-[240px] border border-white/10">
-                <p className="text-white/90 text-[11px] leading-snug text-center">
-                  {daysTrackedCount === 0 && "Log your first meal to unlock!"}
-                  {daysTrackedCount === 1 && "2 more days to see trends!"}
-                  {daysTrackedCount === 2 && "Almost there! 1 more day!"}
-                </p>
-              </div>
+              {/* Message */}
+              <p className="text-teal-300 text-xs font-medium mb-4 text-center">
+                Log your first 3 days to unlock!
+              </p>
               
-              {/* Progress Dots - Smaller */}
-              <div className="flex items-center gap-2 mb-2">
-                {[0, 1, 2].map((i) => (
-                  <div key={i} className="flex flex-col items-center">
-                    <div 
-                      className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold transition-all duration-300 ${
-                        i < daysTrackedCount 
-                          ? 'bg-gradient-to-br from-teal-400 to-teal-600 text-white shadow-md shadow-teal-500/30' 
-                          : 'bg-slate-700/60 text-slate-400 border border-slate-600/50'
-                      }`}
-                    >
-                      {i < daysTrackedCount ? '✓' : `${i + 1}`}
+              {/* Progress Checkboxes - Day 1, 2, 3 */}
+              <div className="flex items-center gap-3 mb-4">
+                {[1, 2, 3].map((day) => {
+                  const isCompleted = day <= daysTrackedCount;
+                  return (
+                    <div key={day} className="flex flex-col items-center">
+                      <div 
+                        className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold transition-all duration-300 ${
+                          isCompleted 
+                            ? 'bg-gradient-to-br from-teal-400 to-teal-600 text-white shadow-lg shadow-teal-500/40' 
+                            : 'bg-slate-700/50 text-slate-400 border-2 border-slate-600/50'
+                        }`}
+                      >
+                        {isCompleted ? '✓' : day}
+                      </div>
+                      <span className={`text-[10px] mt-1.5 font-medium ${isCompleted ? 'text-teal-400' : 'text-slate-500'}`}>
+                        Day {day}
+                      </span>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
               
-              {/* CTA - Compact */}
+              {/* CTA Button */}
               <Link 
                 href="/check-food" 
-                className="bg-gradient-to-r from-teal-500 to-teal-600 text-white text-[11px] font-bold px-4 py-2 rounded-full shadow-md shadow-teal-500/30 hover:shadow-teal-500/50 transition-all"
+                className="bg-gradient-to-r from-teal-500 to-teal-600 text-white text-xs font-bold px-5 py-2.5 rounded-full shadow-lg shadow-teal-500/30 hover:shadow-teal-500/50 transition-all"
               >
-                📸 Scan Meal
+                📸 Log Today's Meal
               </Link>
             </div>
           )}
