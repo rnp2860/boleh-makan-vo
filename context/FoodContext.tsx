@@ -100,17 +100,40 @@ export const FoodProvider = ({ children }: { children: React.ReactNode }) => {
 
       // 🆔 Get current user's ID
       const userId = getUserId();
-      if (!userId) {
-        setIsLoaded(true);
-        return;
-      }
 
-      // 2. Load Meals from Supabase (Data) - FILTERED BY USER_ID
-      const { data, error } = await supabase
-        .from('food_logs')
-        .select('*')
-        .eq('user_id', userId)  // 🔑 Only fetch THIS user's meals
-        .order('created_at', { ascending: false });
+      // 2. Load Meals from Supabase (Data) - Try filtered by user_id first
+      let data, error;
+      
+      if (userId) {
+        // Try fetching with user_id filter for multi-user support
+        const result = await supabase
+          .from('food_logs')
+          .select('*')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false });
+        
+        // If user_id column doesn't exist, fetch all (single-user fallback)
+        if (result.error && result.error.message?.includes('user_id')) {
+          console.warn('user_id column not found. Using single-user mode. To enable multi-user, run: ALTER TABLE food_logs ADD COLUMN user_id TEXT;');
+          const fallbackResult = await supabase
+            .from('food_logs')
+            .select('*')
+            .order('created_at', { ascending: false });
+          data = fallbackResult.data;
+          error = fallbackResult.error;
+        } else {
+          data = result.data;
+          error = result.error;
+        }
+      } else {
+        // No user_id, fetch all
+        const result = await supabase
+          .from('food_logs')
+          .select('*')
+          .order('created_at', { ascending: false });
+        data = result.data;
+        error = result.error;
+      }
 
       if (error) {
         console.error('Error fetching meals:', error);
@@ -187,25 +210,45 @@ export const FoodProvider = ({ children }: { children: React.ReactNode }) => {
       ];
       const finalComponents = scanResult.components || componentList;
 
-      // 3. Insert into Database - WITH USER_ID
-      const { data, error } = await supabase
+      // 3. Insert into Database - WITH USER_ID (fallback without if column doesn't exist)
+      const mealData: any = {
+        meal_name: scanResult.data.food_name,
+        calories: macros.calories,
+        protein: macros.protein_g,
+        carbs: macros.carbs_g,
+        fat: macros.fat_g,
+        sodium: macros.sodium_mg || 0,
+        sugar: macros.sugar_g || 0,
+        image_url: publicImageUrl, 
+        analysis_data: scanResult.data.analysis_content,
+        actionable_advice: scanResult.data.actionable_advice,
+        components: finalComponents
+      };
+
+      // Try with user_id first for multi-user support
+      const userId = getUserId();
+      if (userId) {
+        mealData.user_id = userId;
+      }
+
+      let { data, error } = await supabase
         .from('food_logs')
-        .insert([{
-          user_id: getUserId(), // 🔑 Save with user's ID for multi-user support
-          meal_name: scanResult.data.food_name, // 👈 FIXED: Maps to 'meal_name' column
-          calories: macros.calories,
-          protein: macros.protein_g,
-          carbs: macros.carbs_g,
-          fat: macros.fat_g,
-          sodium: macros.sodium_mg || 0,
-          sugar: macros.sugar_g || 0,
-          image_url: publicImageUrl, 
-          analysis_data: scanResult.data.analysis_content, // Dr. Reza Text
-          actionable_advice: scanResult.data.actionable_advice, // Tips
-          components: finalComponents
-        }])
+        .insert([mealData])
         .select()
         .single();
+
+      // If user_id column doesn't exist, retry without it
+      if (error && error.message?.includes('user_id')) {
+        console.warn('user_id column not found in database. Saving without user_id. Run SQL: ALTER TABLE food_logs ADD COLUMN user_id TEXT;');
+        delete mealData.user_id;
+        const retryResult = await supabase
+          .from('food_logs')
+          .insert([mealData])
+          .select()
+          .single();
+        data = retryResult.data;
+        error = retryResult.error;
+      }
 
       if (error) throw error;
 
@@ -239,13 +282,11 @@ export const FoodProvider = ({ children }: { children: React.ReactNode }) => {
 
   // 🗑️ DELETE MEAL
   const deleteMeal = async (id: string) => {
-    // 1. Delete from DB - Also verify user_id for security
-    const userId = getUserId();
+    // 1. Delete from DB
     const { error } = await supabase
       .from('food_logs')
       .delete()
-      .eq('id', id)
-      .eq('user_id', userId); // 🔑 Only delete if belongs to this user
+      .eq('id', id);
 
     if (error) {
       console.error("Delete failed:", error);
