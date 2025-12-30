@@ -75,7 +75,9 @@ export default function HomePage() {
   // Chart logic - only unlock after data is loaded AND user has 3+ days of data
   const weeklyData = getWeeklyStats();
   const daysTrackedCount = weeklyData.filter(day => day.calories > 0).length;
-  const isChartUnlocked = isLoaded && daysTrackedCount >= 3;
+  // Chart stays locked until: loaded + has 3+ days tracked
+  // Use explicit variable to avoid any hydration issues
+  const shouldShowLockOverlay = !isLoaded || daysTrackedCount < 3;
 
   const getTimeGap = (current: Date, previous: Date) => {
     const diffMs = current.getTime() - previous.getTime();
@@ -148,7 +150,7 @@ export default function HomePage() {
           <WeeklyChart data={weeklyData} />
           
           {/* Cool Lock Screen Overlay */}
-          {!isChartUnlocked && (
+          {shouldShowLockOverlay && (
             <div className="absolute inset-0 bg-gradient-to-br from-slate-800/70 via-slate-900/60 to-teal-900/50 backdrop-blur-[3px] rounded-3xl flex flex-col items-center justify-center p-5 z-50">
               {/* Glowing Lock Icon */}
               <div className="relative mb-4">
@@ -327,7 +329,7 @@ export default function HomePage() {
       </div>
 
       {/* PDF REPORT BUTTON (if chart unlocked) */}
-      {isChartUnlocked && (
+      {!shouldShowLockOverlay && (
         <div className="px-4 mt-6">
           <Link 
             href="/report"

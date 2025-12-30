@@ -471,12 +471,12 @@ export default function CheckFoodPage() {
             </div>
           </div>
 
-          {/* Footer with Dr. Reza */}
-          <div className="flex items-center justify-center gap-2 mt-6">
-            <div className="w-8 h-8 rounded-full overflow-hidden">
-              <Image src="/assets/avatar-header-thumbsup.png" alt="Dr. Reza" width={32} height={32} className="w-full h-full object-cover" />
+          {/* Footer with Dr. Reza Full Body */}
+          <div className="flex flex-col items-center justify-center mt-6">
+            <div className="w-20 h-28 overflow-hidden">
+              <Image src="/assets/avatar-fullbody-pointing.png" alt="Dr. Reza" width={80} height={112} className="w-full h-full object-contain" />
             </div>
-            <p className="text-sm text-slate-500 font-medium">
+            <p className="text-sm text-slate-500 font-medium mt-2">
               "I'll analyze it instantly!" ⚡
             </p>
           </div>
