@@ -137,10 +137,10 @@ export async function POST(req: Request) {
 
     console.log("Identified food:", foodName);
 
-    // 🏦 STEP 2: CHECK SUPABASE DATABASE
+    // 🏦 STEP 2: CHECK SUPABASE DATABASE (including new columns: sodium_mg, sugar_g, health_tags)
     const { data: dbMatch } = await supabase
       .from('food_library')
-      .select('*')
+      .select('*, sodium_mg, sugar_g, health_tags')
       .ilike('name', `%${foodName}%`)
       .limit(1)
       .maybeSingle();
@@ -208,6 +208,16 @@ Be helpful, specific, and caring.`
         ];
       }
 
+      // 🆕 Use new DB columns if available, otherwise use component totals
+      const finalSodium = dbMatch.sodium_mg ?? dbMatch.sodium ?? totalFromComponents.sodium ?? 400;
+      const finalSugar = dbMatch.sugar_g ?? dbMatch.sugar ?? totalFromComponents.sugar ?? 5;
+      const healthTags = dbMatch.health_tags || [];
+      
+      // Determine health warnings from tags or thresholds
+      const isHighSodium = healthTags.includes('high_sodium') || finalSodium > 800;
+      const isHighSugar = healthTags.includes('high_sugar') || finalSugar > 15;
+      const isHighProtein = healthTags.includes('high_protein') || (dbMatch.protein || 0) > 25;
+
       return NextResponse.json({
         success: true,
         source: 'database',
@@ -221,15 +231,17 @@ Be helpful, specific, and caring.`
             protein_g: dbMatch.protein || 0,
             carbs_g: dbMatch.carbs || 0,
             fat_g: dbMatch.fat || 0,
-            sugar_g: dbMatch.sugar || totalFromComponents.sugar || 5,
-            sodium_mg: dbMatch.sodium || totalFromComponents.sodium || 400,
+            sugar_g: finalSugar,
+            sodium_mg: finalSodium,
           },
           valid_lauk: enrichedLauk,
           analysis_content: drRezaTip,
           halal_status: halalCheck,
+          health_tags: healthTags,
           risk_analysis: { 
-            is_high_sodium: (dbMatch.sodium || totalFromComponents.sodium || 0) > 800, 
-            is_high_sugar: (dbMatch.sugar || totalFromComponents.sugar || 0) > 15 
+            is_high_sodium: isHighSodium, 
+            is_high_sugar: isHighSugar,
+            is_high_protein: isHighProtein
           }
         }
       });
@@ -305,6 +317,14 @@ IMPORTANT:
       { name: "Ayam Goreng", calories: 250, protein: 20, carbs: 5, fat: 15 },
     ];
 
+    // Build health_tags from AI analysis
+    const aiHealthTags: string[] = [];
+    const finalMacros = totalMacros.calories > 0 ? totalMacros : { calories: 350, protein_g: 12, carbs_g: 45, fat_g: 12, sugar_g: 5, sodium_mg: 400 };
+    
+    if (finalMacros.sodium_mg > 800) aiHealthTags.push('high_sodium');
+    if (finalMacros.sugar_g > 15) aiHealthTags.push('high_sugar');
+    if (finalMacros.protein_g > 25) aiHealthTags.push('high_protein');
+
     return NextResponse.json({
       success: true,
       source: 'ai_estimate',
@@ -313,11 +333,16 @@ IMPORTANT:
         food_name: safeFoodName,
         category: aiData.category || 'other',
         components: aiData.components || getTypicalComponents(safeFoodName, totalMacros),
-        macros: totalMacros.calories > 0 ? totalMacros : { calories: 350, protein_g: 12, carbs_g: 45, fat_g: 12, sugar_g: 5, sodium_mg: 400 },
+        macros: finalMacros,
         valid_lauk: defaultLauk,
         analysis_content: aiData.analysis_content || "Enjoy your meal! Balance is key. 🍽️",
         halal_status: halalCheck,
-        risk_analysis: aiData.risk_analysis || { is_high_sodium: totalMacros.sodium_mg > 800, is_high_sugar: totalMacros.sugar_g > 15 }
+        health_tags: aiHealthTags,
+        risk_analysis: { 
+          is_high_sodium: finalMacros.sodium_mg > 800, 
+          is_high_sugar: finalMacros.sugar_g > 15,
+          is_high_protein: finalMacros.protein_g > 25
+        }
       }
     });
 

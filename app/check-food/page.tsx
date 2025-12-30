@@ -218,8 +218,9 @@ export default function CheckFoodPage() {
   const getFinalData = () => {
     if (!baseResult) return null;
     let totalCal = 0, totalProt = 0, totalCarb = 0, totalFat = 0;
-    let totalSodium = baseResult.data.risk_analysis?.is_high_sodium ? 800 : 400;
-    let totalSugar = 0;
+    // 🆕 Use API-provided sodium/sugar as base (from DB or AI estimate)
+    let totalSodium = baseResult.data.macros?.sodium_mg || 0;
+    let totalSugar = baseResult.data.macros?.sugar_g || 0;
     const activeComponentsName: string[] = [];
 
     // Original components from AI/DB
@@ -229,6 +230,9 @@ export default function CheckFoodPage() {
         totalProt += comp.macros?.p || 0;
         totalCarb += comp.macros?.c || 0;
         totalFat += comp.macros?.f || 0;
+        // Add component-level sodium/sugar if not using API totals
+        if (!baseResult.data.macros?.sodium_mg) totalSodium += comp.macros?.sodium || 0;
+        if (!baseResult.data.macros?.sugar_g) totalSugar += comp.macros?.sugar || 0;
         activeComponentsName.push(comp.name);
       }
     });
@@ -248,8 +252,8 @@ export default function CheckFoodPage() {
       totalProt += item.protein_g;
       totalCarb += item.carbs_g;
       totalFat += item.fat_g;
-      totalSodium += item.sodium_mg;
-      if (item.sugar_g) totalSugar += item.sugar_g;
+      totalSodium += item.sodium_mg || 0;
+      totalSugar += item.sugar_g || 0;
       activeComponentsName.push(item.name);
     });
 
@@ -261,6 +265,9 @@ export default function CheckFoodPage() {
     totalProt = Math.round(totalProt * portion);
     totalCarb = Math.round(totalCarb * portion);
     totalFat = Math.round(totalFat * portion);
+    // Scale sodium/sugar with portion (except drinks)
+    totalSodium = Math.round(totalSodium * portion);
+    totalSugar = Math.round(totalSugar * portion * 10) / 10; // Keep 1 decimal
 
     // Apply kuah modifier
     if (shouldShowKuah()) {
@@ -302,7 +309,7 @@ export default function CheckFoodPage() {
           components: finalData.components 
         }, processedImage);
 
-        // 2️⃣ Save to Supabase (cloud backup)
+        // 2️⃣ Save to Supabase (cloud backup) - including sodium & sugar
         try {
           await fetch('/api/log-meal', {
             method: 'POST',
@@ -313,11 +320,14 @@ export default function CheckFoodPage() {
               protein: finalData.macros.protein_g,
               carbs: finalData.macros.carbs_g,
               fat: finalData.macros.fat_g,
+              sodium: finalData.macros.sodium_mg,
+              sugar: finalData.macros.sugar_g,
               portion_size: portion,
               image_base64: processedImage,
               user_id: getUserId(),
               components: finalData.components,
-              analysis_content: baseResult.data?.analysis_content
+              analysis_content: baseResult.data?.analysis_content,
+              health_tags: baseResult.data?.health_tags || []
             })
           });
           console.log('✅ Meal saved to Supabase');
@@ -625,7 +635,10 @@ export default function CheckFoodPage() {
                 </div>
                 <div className="grid grid-cols-3 gap-3 text-center">
                   <div className="bg-white/20 rounded-lg px-3 py-2 backdrop-blur-sm">
-                    <p className="text-white/80 text-[10px] font-bold">Protein</p>
+                    <p className="text-white/80 text-[10px] font-bold flex items-center justify-center gap-1">
+                      Protein
+                      {baseResult.data.risk_analysis?.is_high_protein && <span title="High Protein">💪</span>}
+                    </p>
                     <p className="text-white font-black">{finalData.macros.protein_g}g</p>
                   </div>
                   <div className="bg-white/20 rounded-lg px-3 py-2 backdrop-blur-sm">
@@ -636,6 +649,24 @@ export default function CheckFoodPage() {
                     <p className="text-white/80 text-[10px] font-bold">Fat</p>
                     <p className="text-white font-black">{finalData.macros.fat_g}g</p>
                   </div>
+                </div>
+              </div>
+              
+              {/* 🆕 SODIUM & SUGAR ROW with Warning Icons */}
+              <div className="grid grid-cols-2 gap-3 mt-3 pt-3 border-t border-white/20">
+                <div className={`rounded-lg px-3 py-2 backdrop-blur-sm ${baseResult.data.risk_analysis?.is_high_sodium ? 'bg-amber-500/40' : 'bg-white/20'}`}>
+                  <p className="text-white/80 text-[10px] font-bold flex items-center gap-1">
+                    Sodium
+                    {baseResult.data.risk_analysis?.is_high_sodium && <span title="High Sodium - Watch your salt intake!">⚠️</span>}
+                  </p>
+                  <p className="text-white font-black">{finalData.macros.sodium_mg || 0}<span className="text-xs font-medium ml-0.5">mg</span></p>
+                </div>
+                <div className={`rounded-lg px-3 py-2 backdrop-blur-sm ${baseResult.data.risk_analysis?.is_high_sugar ? 'bg-pink-500/40' : 'bg-white/20'}`}>
+                  <p className="text-white/80 text-[10px] font-bold flex items-center gap-1">
+                    Sugar
+                    {baseResult.data.risk_analysis?.is_high_sugar && <span title="High Sugar - Watch your sugar intake!">🍭</span>}
+                  </p>
+                  <p className="text-white font-black">{finalData.macros.sugar_g || 0}<span className="text-xs font-medium ml-0.5">g</span></p>
                 </div>
               </div>
             </div>

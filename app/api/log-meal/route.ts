@@ -13,12 +13,15 @@ export async function POST(req: Request) {
       calories, 
       protein, 
       carbs, 
-      fat, 
+      fat,
+      sodium,
+      sugar,
       portion_size, 
       image_base64,
       user_id,
       components,
-      analysis_content
+      analysis_content,
+      health_tags
     } = await req.json();
 
     let image_url = null;
@@ -56,7 +59,7 @@ export async function POST(req: Request) {
       }
     }
 
-    // Insert meal log into database
+    // Insert meal log into database (including sodium_mg and sugar_g)
     const { data, error } = await supabase
       .from('food_logs')
       .insert({
@@ -65,12 +68,13 @@ export async function POST(req: Request) {
         protein: Math.round(protein),
         carbs: Math.round(carbs),
         fat: Math.round(fat),
+        sodium: sodium ? Math.round(sodium) : null,
+        sugar: sugar ? Math.round(sugar * 10) / 10 : null, // Keep 1 decimal for sugar
         portion_size: portion_size || 1.0,
         image_url,
         user_id: user_id || null,
-        // Store additional data as JSON if your table supports it
-        // components: components,
-        // analysis_content: analysis_content
+        components: components || null,
+        analysis_data: analysis_content || null,
       })
       .select()
       .single();
