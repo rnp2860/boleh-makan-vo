@@ -471,14 +471,19 @@ export default function CheckFoodPage() {
             </div>
           </div>
 
-          {/* Footer with Dr. Reza Full Body */}
-          <div className="flex flex-col items-center justify-center mt-6">
-            <div className="w-20 h-28 overflow-hidden">
-              <Image src="/assets/avatar-fullbody-pointing.png" alt="Dr. Reza" width={80} height={112} className="w-full h-full object-contain" />
+          {/* Footer with Dr. Reza Speech Bubble */}
+          <div className="flex items-end justify-center gap-2 mt-6">
+            {/* Dr. Reza Full Body */}
+            <div className="w-16 h-24 flex-shrink-0">
+              <Image src="/assets/avatar-fullbody-pointing.png" alt="Dr. Reza" width={64} height={96} className="w-full h-full object-contain" />
             </div>
-            <p className="text-sm text-slate-500 font-medium mt-2">
-              "I'll analyze it instantly!" ⚡
-            </p>
+            {/* Speech Bubble */}
+            <div className="relative bg-white rounded-2xl px-4 py-3 shadow-md border border-slate-100 mb-4">
+              <div className="absolute -left-2 bottom-4 w-3 h-3 bg-white rotate-45 border-l border-b border-slate-100"></div>
+              <p className="text-sm text-slate-600 font-medium">
+                "I'll analyze it instantly!" ⚡
+              </p>
+            </div>
           </div>
         </div>
       )}
