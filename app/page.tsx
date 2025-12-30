@@ -168,13 +168,20 @@ export default function HomePage() {
                   return (
                     <div key={day} className="flex flex-col items-center">
                       <div 
-                        className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold transition-all duration-300 ${
+                        className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold transition-all duration-300 relative ${
                           isCompleted 
                             ? 'bg-gradient-to-br from-teal-400 to-teal-600 text-white shadow-lg shadow-teal-500/40' 
                             : 'bg-slate-700/50 text-slate-400 border-2 border-slate-600/50'
                         }`}
                       >
-                        {isCompleted ? '✓' : day}
+                        {/* Day number */}
+                        <span className={isCompleted ? 'opacity-70' : ''}>{day}</span>
+                        {/* Strikethrough line when completed */}
+                        {isCompleted && (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="w-6 h-0.5 bg-white rounded-full transform -rotate-45"></div>
+                          </div>
+                        )}
                       </div>
                       <span className={`text-[10px] mt-1.5 font-medium ${isCompleted ? 'text-teal-400' : 'text-slate-500'}`}>
                         Day {day}
