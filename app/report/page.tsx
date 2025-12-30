@@ -148,28 +148,28 @@ export default function ReportPage() {
         </div>
 
         {/* SUMMARY STATS */}
-        <div className="p-6 border-b border-slate-200">
-          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">Weekly Averages (Per Day)</h3>
-          <div className="grid grid-cols-5 gap-3">
-            <div className="text-center p-4 bg-blue-50 rounded-xl">
-              <div className="text-2xl font-black text-blue-600">{avgCalories}</div>
-              <div className="text-[10px] text-blue-500 font-medium uppercase">Calories</div>
+        <div className="p-4 border-b border-slate-200">
+          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Weekly Averages (Per Day)</h3>
+          <div className="grid grid-cols-5 gap-1.5">
+            <div className="text-center p-2 bg-blue-50 rounded-lg">
+              <div className="text-sm font-black text-blue-600">{avgCalories}</div>
+              <div className="text-[8px] text-blue-500 font-medium uppercase">kcal</div>
             </div>
-            <div className="text-center p-4 bg-green-50 rounded-xl">
-              <div className="text-2xl font-black text-green-600">{avgProtein}g</div>
-              <div className="text-[10px] text-green-500 font-medium uppercase">Protein</div>
+            <div className="text-center p-2 bg-green-50 rounded-lg">
+              <div className="text-sm font-black text-green-600">{avgProtein}g</div>
+              <div className="text-[8px] text-green-500 font-medium uppercase">Protein</div>
             </div>
-            <div className="text-center p-4 bg-orange-50 rounded-xl">
-              <div className="text-2xl font-black text-orange-500">{avgCarbs}g</div>
-              <div className="text-[10px] text-orange-400 font-medium uppercase">Carbs</div>
+            <div className="text-center p-2 bg-orange-50 rounded-lg">
+              <div className="text-sm font-black text-orange-500">{avgCarbs}g</div>
+              <div className="text-[8px] text-orange-400 font-medium uppercase">Carbs</div>
             </div>
-            <div className="text-center p-4 bg-amber-50 rounded-xl">
-              <div className="text-2xl font-black text-amber-500">{avgFat}g</div>
-              <div className="text-[10px] text-amber-400 font-medium uppercase">Fat</div>
+            <div className="text-center p-2 bg-amber-50 rounded-lg">
+              <div className="text-sm font-black text-amber-500">{avgFat}g</div>
+              <div className="text-[8px] text-amber-400 font-medium uppercase">Fat</div>
             </div>
-            <div className="text-center p-4 bg-slate-100 rounded-xl">
-              <div className="text-2xl font-black text-slate-600">{daysWithData}/7</div>
-              <div className="text-[10px] text-slate-400 font-medium uppercase">Days Logged</div>
+            <div className="text-center p-2 bg-slate-100 rounded-lg">
+              <div className="text-sm font-black text-slate-600">{daysWithData}/7</div>
+              <div className="text-[8px] text-slate-400 font-medium uppercase">Days</div>
             </div>
           </div>
         </div>

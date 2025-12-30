@@ -54,33 +54,33 @@ export default function ProfilePage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-teal-50/30 pb-32 font-sans">
       
-      {/* 🎨 HEADER */}
-      <div className="bg-gradient-to-br from-teal-500 to-emerald-600 px-6 pt-8 pb-16 rounded-b-[40px] shadow-lg">
-        <div className="flex justify-between items-start mb-4">
+      {/* 🎨 HEADER - Compact with softer colors */}
+      <div className="bg-gradient-to-br from-teal-400 via-teal-500 to-emerald-500 px-5 pt-6 pb-10 rounded-b-[32px] shadow-md">
+        <div className="flex justify-between items-start mb-3">
           <div>
-            <p className="text-teal-100 text-xs font-medium mb-1">Your Profile</p>
-            <h1 className="text-2xl font-black text-white tracking-tight">
+            <p className="text-teal-100 text-xs font-medium mb-0.5">Your Profile</p>
+            <h1 className="text-xl font-black text-white tracking-tight">
               {isNameEmpty ? 'Foodie Friend' : userProfile.name} 👋
             </h1>
           </div>
           <button 
             onClick={() => router.push('/')} 
-            className="bg-white/20 backdrop-blur px-4 py-2 rounded-xl text-sm font-bold text-white border border-white/30"
+            className="bg-white/20 backdrop-blur px-3 py-1.5 rounded-lg text-sm font-bold text-white border border-white/30"
           >
             Done
           </button>
         </div>
         
-        {/* Dr. Reza Avatar - Larger rectangular card */}
-        <div className="flex items-center gap-4 bg-white/10 backdrop-blur rounded-2xl p-4 mt-4">
-          <div className="w-16 h-20 rounded-2xl overflow-hidden bg-white/20 flex-shrink-0 shadow-lg">
-            <Image src="/assets/avatar-profile.png" alt="Dr. Reza" width={64} height={80} className="w-full h-full object-cover" />
+        {/* Dr. Reza Avatar - Compact */}
+        <div className="flex items-center gap-3 bg-white/15 backdrop-blur rounded-xl p-3 mt-2">
+          <div className="w-12 h-14 rounded-xl overflow-hidden bg-white/20 flex-shrink-0 shadow-lg">
+            <Image src="/assets/avatar-profile.png" alt="Dr. Reza" width={48} height={56} className="w-full h-full object-cover" />
           </div>
           <div className="flex-1">
-            <p className="text-white text-sm font-medium leading-relaxed">
+            <p className="text-white text-xs font-medium leading-relaxed">
               "Tell me about yourself so I can help you better!"
             </p>
-            <p className="text-white/60 text-xs mt-1">— Dr. Reza</p>
+            <p className="text-white/60 text-[10px] mt-0.5">— Dr. Reza</p>
           </div>
         </div>
       </div>
@@ -166,7 +166,7 @@ export default function ProfilePage() {
 
         {/* 🎯 HEALTH GOAL */}
         <div className="bg-white p-5 rounded-3xl shadow-lg border border-slate-100">
-          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-4 block">🎯 Health Goal</label>
+          <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4 block">🎯 Health Goal</label>
           <div className="grid grid-cols-3 gap-3">
             {healthGoals.map((goal) => (
               <button 
@@ -187,7 +187,7 @@ export default function ProfilePage() {
                 <div className={`mx-auto mb-2 rounded-xl overflow-hidden transition-all duration-300 ${isGoal(goal.id) ? 'w-16 h-16' : 'w-14 h-14'}`}>
                   <Image src={goal.icon} alt={goal.label} width={64} height={64} className="w-full h-full object-contain" />
                 </div>
-                <p className={`text-[10px] font-bold text-center ${isGoal(goal.id) ? 'text-slate-700' : 'text-slate-400'}`}>
+                <p className={`text-xs font-bold text-center ${isGoal(goal.id) ? 'text-slate-700' : 'text-slate-500'}`}>
                   {goal.label}
                 </p>
                 {isGoal(goal.id) && (
@@ -202,7 +202,7 @@ export default function ProfilePage() {
 
         {/* 🏃 ACTIVITY LEVEL - 2x2 Grid */}
         <div className="bg-white p-5 rounded-3xl shadow-lg border border-slate-100">
-          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-4 block">🏃 Activity Level</label>
+          <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4 block">🏃 Activity Level</label>
           <div className="grid grid-cols-2 gap-2">
             {activityLevels.map((level) => (
               <button 
@@ -216,10 +216,10 @@ export default function ProfilePage() {
               >
                 <span className="text-2xl">{level.emoji}</span>
                 <div className="text-left">
-                  <p className={`text-xs font-bold ${details.activity === level.id ? 'text-orange-700' : 'text-slate-500'}`}>
+                  <p className={`text-sm font-bold ${details.activity === level.id ? 'text-orange-700' : 'text-slate-600'}`}>
                     {level.label}
                   </p>
-                  <p className="text-[9px] text-slate-400">{level.desc}</p>
+                  <p className="text-[10px] text-slate-400">{level.desc}</p>
                 </div>
               </button>
             ))}
@@ -228,8 +228,8 @@ export default function ProfilePage() {
 
         {/* 🏥 HEALTH CONDITIONS */}
         <div className="bg-white p-5 rounded-3xl shadow-lg border border-slate-100">
-          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-4 block">🏥 Health Conditions</label>
-          <p className="text-[10px] text-slate-400 mb-4 -mt-2">Select any that apply to you</p>
+          <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 block">🏥 Health Conditions</label>
+          <p className="text-xs text-slate-400 mb-4 -mt-1">Select any that apply to you</p>
           <div className="grid grid-cols-2 gap-3">
             {healthConditions.map((condition) => (
               <button 
@@ -244,10 +244,10 @@ export default function ProfilePage() {
                   boxShadow: hasCondition(condition.id) ? '0 0 15px rgba(239,68,68,0.2)' : 'none'
                 }}
               >
-                <div className={`w-12 h-12 mx-auto mb-2 rounded-xl overflow-hidden transition-all ${hasCondition(condition.id) ? 'scale-110' : ''}`}>
-                  <Image src={condition.icon} alt={condition.label} width={48} height={48} className="w-full h-full object-contain" />
+                <div className={`w-14 h-14 mx-auto mb-2 rounded-xl overflow-hidden transition-all ${hasCondition(condition.id) ? 'scale-110' : ''}`}>
+                  <Image src={condition.icon} alt={condition.label} width={56} height={56} className="w-full h-full object-contain" />
                 </div>
-                <p className={`text-[10px] font-bold text-center ${hasCondition(condition.id) ? 'text-red-600' : 'text-slate-400'}`}>
+                <p className={`text-xs font-bold text-center ${hasCondition(condition.id) ? 'text-red-600' : 'text-slate-500'}`}>
                   {condition.label}
                 </p>
                 {hasCondition(condition.id) && (
@@ -263,7 +263,7 @@ export default function ProfilePage() {
         {/* 🔢 DAILY TARGET */}
         <div className="bg-gradient-to-br from-slate-100 to-slate-200 p-5 rounded-3xl shadow-lg border border-slate-200">
           <div className="flex justify-between items-center mb-3">
-            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Daily Calorie Target</label>
+            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">🔢 Daily Calorie Target</label>
             <span className="text-xs font-bold text-teal-600 bg-teal-100 px-3 py-1 rounded-lg">
               Auto: {dailyBudget} kcal
             </span>

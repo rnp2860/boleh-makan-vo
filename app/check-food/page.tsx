@@ -441,10 +441,11 @@ export default function CheckFoodPage() {
               <div className="w-14 h-14 bg-slate-100 rounded-xl flex items-center justify-center">
                 <span className="text-3xl">✏️</span>
               </div>
-              <div className="text-left">
+              <div className="text-left flex-1">
                 <h3 className="text-lg font-bold">Type It In</h3>
-                <p className="text-slate-400 text-sm">Describe what you ate</p>
+                <p className="text-slate-400 text-sm">Quick log without photo</p>
               </div>
+              <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded-lg">BASIC</span>
             </button>
 
             <input 
@@ -456,8 +457,22 @@ export default function CheckFoodPage() {
             />
           </div>
 
+          {/* Pro tip */}
+          <div className="bg-teal-50 border border-teal-100 rounded-xl p-3 mt-6 mx-1">
+            <div className="flex items-start gap-2">
+              <span className="text-base">💡</span>
+              <div>
+                <p className="text-xs font-bold text-teal-700 mb-0.5">Pro Tip</p>
+                <p className="text-[11px] text-teal-600 leading-relaxed">
+                  <strong>Take a Photo</strong> gives you the most accurate analysis — I can see portion sizes, ingredients, and cooking style! 
+                  <span className="text-teal-500"> Type It In is great for quick entries, but may miss some details.</span>
+                </p>
+              </div>
+            </div>
+          </div>
+
           {/* Footer hint */}
-          <p className="text-center text-xs text-slate-400 mt-8 font-medium">
+          <p className="text-center text-xs text-slate-400 mt-6 font-medium">
             I'll analyze it instantly ⚡
           </p>
         </div>
