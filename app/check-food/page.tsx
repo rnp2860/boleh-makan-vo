@@ -473,9 +473,14 @@ export default function CheckFoodPage() {
 
           {/* Footer with Dr. Reza Speech Bubble */}
           <div className="flex items-end justify-center gap-3 mt-6">
-            {/* Dr. Reza Full Body - Bigger */}
-            <div className="w-24 h-36 flex-shrink-0">
-              <Image src="/assets/avatar-fullbody-pointing.png" alt="Dr. Reza" width={96} height={144} className="w-full h-full object-contain" />
+            {/* Dr. Reza Full Body - Using img tag for better mobile compatibility */}
+            <div className="w-24 h-36 flex-shrink-0 relative">
+              <img 
+                src="/assets/avatar-fullbody-pointing.png" 
+                alt="Dr. Reza" 
+                className="w-full h-full object-contain"
+                style={{ maxWidth: '96px', maxHeight: '144px' }}
+              />
             </div>
             {/* Speech Bubble */}
             <div className="relative bg-white rounded-2xl px-5 py-4 shadow-md border border-slate-100 mb-8">
