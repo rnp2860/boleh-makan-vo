@@ -246,25 +246,32 @@ export default function HomePage() {
                 </div>
                 
                 {/* Animated Arrow Pointing Down */}
-                <div className="flex flex-col items-center mt-4">
+                <div className="flex flex-col items-center mt-5">
                   <div className="animate-bounce">
-                    <svg 
-                      xmlns="http://www.w3.org/2000/svg" 
-                      className="h-10 w-10 text-blue-500" 
-                      fill="none" 
-                      viewBox="0 0 24 24" 
-                      stroke="currentColor"
-                      strokeWidth={2.5}
-                    >
-                      <path 
-                        strokeLinecap="round" 
-                        strokeLinejoin="round" 
-                        d="M19 14l-7 7m0 0l-7-7m7 7V3" 
-                      />
-                    </svg>
-                  </div>
-                  <div className="mt-2 bg-blue-600 text-white text-xs font-bold px-3 py-1.5 rounded-full animate-pulse shadow-lg shadow-blue-300">
-                    📸 Tap Here!
+                    {/* Cool double-line arrow with gradient effect */}
+                    <div className="relative">
+                      <svg 
+                        xmlns="http://www.w3.org/2000/svg" 
+                        className="h-16 w-16 text-blue-500 drop-shadow-lg" 
+                        fill="none" 
+                        viewBox="0 0 24 24" 
+                        stroke="url(#arrowGradient)"
+                        strokeWidth={2}
+                      >
+                        <defs>
+                          <linearGradient id="arrowGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" stopColor="#3B82F6" />
+                            <stop offset="100%" stopColor="#14B8A6" />
+                          </linearGradient>
+                        </defs>
+                        {/* Main arrow shaft */}
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v14" />
+                        {/* Arrow head - wider chevron */}
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l7 7 7-7" />
+                        {/* Second chevron for depth */}
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M8 10l4 4 4-4" opacity="0.5" />
+                      </svg>
+                    </div>
                   </div>
                 </div>
               </div>
