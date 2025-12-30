@@ -250,7 +250,10 @@ export const FoodProvider = ({ children }: { children: React.ReactNode }) => {
         error = retryResult.error;
       }
 
-      if (error) throw error;
+      if (error) {
+        console.error("Supabase insert error:", error);
+        throw new Error(`Database error: ${error.message || error.code || 'Unknown error'}`);
+      }
 
       // 4. Update UI Optimistically (or using returned data)
       if (data) {
@@ -272,11 +275,14 @@ export const FoodProvider = ({ children }: { children: React.ReactNode }) => {
           isHighSugar: (data.sugar || 0) > 20,
         };
         setMeals((prev) => [newMeal, ...prev]);
+        console.log('✅ Meal saved successfully:', newMeal.name);
       }
 
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to save meal:", err);
-      alert("Failed to save meal to cloud. Check internet connection.");
+      // Show more detailed error message
+      const errorMsg = err?.message || 'Unknown error';
+      alert(`Failed to save meal: ${errorMsg}`);
     }
   };
 
