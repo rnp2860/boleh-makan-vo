@@ -653,22 +653,30 @@ export default function CheckFoodPage() {
               </div>
               
               {/* 🆕 SODIUM & SUGAR ROW with Warning Icons */}
-              <div className="grid grid-cols-2 gap-3 mt-3 pt-3 border-t border-white/20">
-                <div className={`rounded-lg px-3 py-2 backdrop-blur-sm ${baseResult.data.risk_analysis?.is_high_sodium ? 'bg-amber-500/40' : 'bg-white/20'}`}>
-                  <p className="text-white/80 text-[10px] font-bold flex items-center gap-1">
-                    Sodium
-                    {baseResult.data.risk_analysis?.is_high_sodium && <span title="High Sodium - Watch your salt intake!">⚠️</span>}
-                  </p>
-                  <p className="text-white font-black">{finalData.macros.sodium_mg || 0}<span className="text-xs font-medium ml-0.5">mg</span></p>
-                </div>
-                <div className={`rounded-lg px-3 py-2 backdrop-blur-sm ${baseResult.data.risk_analysis?.is_high_sugar ? 'bg-pink-500/40' : 'bg-white/20'}`}>
-                  <p className="text-white/80 text-[10px] font-bold flex items-center gap-1">
-                    Sugar
-                    {baseResult.data.risk_analysis?.is_high_sugar && <span title="High Sugar - Watch your sugar intake!">🍭</span>}
-                  </p>
-                  <p className="text-white font-black">{finalData.macros.sugar_g || 0}<span className="text-xs font-medium ml-0.5">g</span></p>
-                </div>
-              </div>
+              {(() => {
+                // Calculate warnings based on ACTUAL displayed values (not just API response)
+                const isHighSodium = (finalData.macros.sodium_mg || 0) > 800;
+                const isHighSugar = (finalData.macros.sugar_g || 0) > 15;
+                
+                return (
+                  <div className="grid grid-cols-2 gap-3 mt-3 pt-3 border-t border-white/20">
+                    <div className={`rounded-lg px-3 py-2 ${isHighSodium ? 'bg-amber-500 shadow-lg' : 'bg-white/20 backdrop-blur-sm'}`}>
+                      <p className="text-white/90 text-[10px] font-bold flex items-center gap-1">
+                        Sodium
+                        {isHighSodium && <span title="High Sodium - Watch your salt intake!">⚠️</span>}
+                      </p>
+                      <p className="text-white font-black">{finalData.macros.sodium_mg || 0}<span className="text-xs font-medium ml-0.5">mg</span></p>
+                    </div>
+                    <div className={`rounded-lg px-3 py-2 ${isHighSugar ? 'bg-amber-500 shadow-lg' : 'bg-white/20 backdrop-blur-sm'}`}>
+                      <p className="text-white/90 text-[10px] font-bold flex items-center gap-1">
+                        Sugar
+                        {isHighSugar && <span title="High Sugar - Watch your sugar intake!">🍭</span>}
+                      </p>
+                      <p className="text-white font-black">{finalData.macros.sugar_g || 0}<span className="text-xs font-medium ml-0.5">g</span></p>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           </div>
 
