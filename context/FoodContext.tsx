@@ -78,6 +78,17 @@ export const FoodProvider = ({ children }: { children: React.ReactNode }) => {
     manualOverride: null 
   });
 
+  // 🆔 Get or create unique user ID for multi-user support
+  const getUserId = () => {
+    if (typeof window === 'undefined') return null;
+    let userId = localStorage.getItem('boleh_makan_user_id');
+    if (!userId) {
+      userId = `user_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+      localStorage.setItem('boleh_makan_user_id', userId);
+    }
+    return userId;
+  };
+
   // 🔄 FETCH DATA FROM SUPABASE ON MOUNT
   useEffect(() => {
     const loadData = async () => {
@@ -87,10 +98,18 @@ export const FoodProvider = ({ children }: { children: React.ReactNode }) => {
         setUserProfile(JSON.parse(savedProfile));
       }
 
-      // 2. Load Meals from Supabase (Data)
+      // 🆔 Get current user's ID
+      const userId = getUserId();
+      if (!userId) {
+        setIsLoaded(true);
+        return;
+      }
+
+      // 2. Load Meals from Supabase (Data) - FILTERED BY USER_ID
       const { data, error } = await supabase
         .from('food_logs')
         .select('*')
+        .eq('user_id', userId)  // 🔑 Only fetch THIS user's meals
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -168,10 +187,11 @@ export const FoodProvider = ({ children }: { children: React.ReactNode }) => {
       ];
       const finalComponents = scanResult.components || componentList;
 
-      // 3. Insert into Database
+      // 3. Insert into Database - WITH USER_ID
       const { data, error } = await supabase
         .from('food_logs')
         .insert([{
+          user_id: getUserId(), // 🔑 Save with user's ID for multi-user support
           meal_name: scanResult.data.food_name, // 👈 FIXED: Maps to 'meal_name' column
           calories: macros.calories,
           protein: macros.protein_g,
@@ -219,11 +239,13 @@ export const FoodProvider = ({ children }: { children: React.ReactNode }) => {
 
   // 🗑️ DELETE MEAL
   const deleteMeal = async (id: string) => {
-    // 1. Delete from DB
+    // 1. Delete from DB - Also verify user_id for security
+    const userId = getUserId();
     const { error } = await supabase
       .from('food_logs')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .eq('user_id', userId); // 🔑 Only delete if belongs to this user
 
     if (error) {
       console.error("Delete failed:", error);

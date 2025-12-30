@@ -146,73 +146,56 @@ export default function HomePage() {
 
       {/* WEEKLY CHART - Always show, with overlay if locked */}
       <div className="px-4 mt-5">
-        <div className="relative">
+        <div className="relative overflow-hidden rounded-2xl">
           <WeeklyChart data={weeklyData} />
           
-          {/* Cool Lock Screen Overlay */}
+          {/* Cool Lock Screen Overlay - Contained within chart boundaries */}
           {shouldShowLockOverlay && (
-            <div className="absolute inset-0 bg-gradient-to-br from-slate-800/70 via-slate-900/60 to-teal-900/50 backdrop-blur-[3px] rounded-3xl flex flex-col items-center justify-center p-5 z-50">
-              {/* Glowing Lock Icon */}
-              <div className="relative mb-4">
-                <div className="absolute inset-0 bg-teal-500/30 rounded-full blur-xl animate-pulse"></div>
-                <div className="relative w-16 h-16 bg-gradient-to-br from-slate-700 to-slate-800 rounded-2xl flex items-center justify-center shadow-2xl border border-slate-600/50">
-                  <span className="text-3xl">🔐</span>
+            <div className="absolute inset-0 bg-gradient-to-br from-slate-800/80 via-slate-900/70 to-teal-900/60 backdrop-blur-[3px] flex flex-col items-center justify-center p-4 z-50 overflow-hidden">
+              {/* Glowing Lock Icon - Smaller */}
+              <div className="relative mb-2">
+                <div className="absolute inset-0 bg-teal-500/30 rounded-full blur-lg animate-pulse"></div>
+                <div className="relative w-12 h-12 bg-gradient-to-br from-slate-700 to-slate-800 rounded-xl flex items-center justify-center shadow-xl border border-slate-600/50">
+                  <span className="text-2xl">🔐</span>
                 </div>
               </div>
               
-              {/* Title */}
-              <h3 className="text-white font-bold text-lg mb-1">Weekly Insights</h3>
-              <p className="text-teal-300 text-xs font-semibold mb-3">🔒 LOCKED</p>
+              {/* Title - Compact */}
+              <h3 className="text-white font-bold text-base mb-0.5">Weekly Insights</h3>
+              <p className="text-teal-300 text-[10px] font-semibold mb-2">🔒 LOCKED</p>
               
-              {/* Dr. Reza Avatar + Message */}
-              <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-3 mb-4 max-w-[260px] border border-white/10">
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-teal-400/50 flex-shrink-0">
-                    <Image 
-                      src="/assets/avatar-header.png" 
-                      alt="Dr. Reza" 
-                      width={40} 
-                      height={40} 
-                      className="object-cover"
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-white/90 text-xs leading-relaxed">
-                      {daysTrackedCount === 0 && "\"Log your first meal to start your health journey with me!\""}
-                      {daysTrackedCount === 1 && "\"Good start! 2 more days and I can show you your trends.\""}
-                      {daysTrackedCount === 2 && "\"Almost there! One more day of logging!\""}
-                    </p>
-                    <p className="text-teal-400 text-[10px] font-bold mt-1">— Dr. Reza</p>
-                  </div>
-                </div>
+              {/* Dr. Reza Message - Compact */}
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl px-3 py-2 mb-2 max-w-[240px] border border-white/10">
+                <p className="text-white/90 text-[11px] leading-snug text-center">
+                  {daysTrackedCount === 0 && "Log your first meal to unlock!"}
+                  {daysTrackedCount === 1 && "2 more days to see trends!"}
+                  {daysTrackedCount === 2 && "Almost there! 1 more day!"}
+                </p>
               </div>
               
-              {/* Progress Dots */}
-              <div className="flex items-center gap-3 mb-3">
+              {/* Progress Dots - Smaller */}
+              <div className="flex items-center gap-2 mb-2">
                 {[0, 1, 2].map((i) => (
                   <div key={i} className="flex flex-col items-center">
                     <div 
-                      className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold transition-all duration-300 ${
+                      className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold transition-all duration-300 ${
                         i < daysTrackedCount 
-                          ? 'bg-gradient-to-br from-teal-400 to-teal-600 text-white shadow-lg shadow-teal-500/30 scale-110' 
+                          ? 'bg-gradient-to-br from-teal-400 to-teal-600 text-white shadow-md shadow-teal-500/30' 
                           : 'bg-slate-700/60 text-slate-400 border border-slate-600/50'
                       }`}
                     >
-                      {i < daysTrackedCount ? '✓' : `D${i + 1}`}
+                      {i < daysTrackedCount ? '✓' : `${i + 1}`}
                     </div>
-                    <span className={`text-[9px] mt-1 ${i < daysTrackedCount ? 'text-teal-400' : 'text-slate-500'}`}>
-                      {i < daysTrackedCount ? 'Done' : 'Log'}
-                    </span>
                   </div>
                 ))}
               </div>
               
-              {/* CTA */}
+              {/* CTA - Compact */}
               <Link 
                 href="/check-food" 
-                className="bg-gradient-to-r from-teal-500 to-teal-600 text-white text-xs font-bold px-5 py-2.5 rounded-full shadow-lg shadow-teal-500/30 hover:shadow-teal-500/50 transition-all"
+                className="bg-gradient-to-r from-teal-500 to-teal-600 text-white text-[11px] font-bold px-4 py-2 rounded-full shadow-md shadow-teal-500/30 hover:shadow-teal-500/50 transition-all"
               >
-                📸 Scan Your Next Meal
+                📸 Scan Meal
               </Link>
             </div>
           )}

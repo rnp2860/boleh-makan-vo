@@ -9,12 +9,12 @@ interface DateStripProps {
 }
 
 export const DateStrip = ({ selectedDate, onSelectDate }: DateStripProps) => {
-  // Generate last 5 days + Today + Next 2 days
+  // Generate 2 days before + Today + 2 days after (5 total, centered on today)
   const dates = [];
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   
-  for (let i = -5; i <= 2; i++) {
+  for (let i = -2; i <= 2; i++) {
     const date = new Date(today);
     date.setDate(today.getDate() + i);
     dates.push(date);
