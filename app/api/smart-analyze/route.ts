@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { createClient } from '@supabase/supabase-js';
-import { DR_REZA_ADVISOR_PROMPT, FOOD_IDENTIFICATION_PROMPT, AI_ANALYSIS_PROMPT } from '@/lib/advisorPrompts';
+import { DR_REZA_ADVISOR_PROMPT } from '@/lib/advisorPrompts';
+import { MALAYSIAN_FOOD_VISION_PROMPT, TEXT_INPUT_VALIDATION_PROMPT } from '@/lib/visionPrompts';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const supabase = createClient(
@@ -88,55 +89,92 @@ export async function POST(req: Request) {
   try {
     const { type, data, healthConditions } = await req.json();
     let foodName = '';
+    let visionCategory = 'Other'; // Category from vision analysis
+    let visionNutrition: any = null; // Nutrition estimates from vision
+    let visionConfidence = 0;
+    let isPotentiallyPork = false;
+    let detectedComponents: string[] = [];
 
-    // 🧠 STEP 1: IDENTIFY THE FOOD
+    // 🧠 STEP 1: IDENTIFY THE FOOD (Using comprehensive vision analysis)
     if (type === 'image') {
-      const idResponse = await openai.chat.completions.create({
+      console.log("🔍 Starting vision analysis...");
+      
+      const visionResponse = await openai.chat.completions.create({
         model: "gpt-4o-mini",
         messages: [
           {
             role: "system",
-            content: FOOD_IDENTIFICATION_PROMPT
+            content: MALAYSIAN_FOOD_VISION_PROMPT
           },
           {
             role: "user",
             content: [
-              { type: "text", text: "Identify this Malaysian food." },
+              { type: "text", text: "Analyze this Malaysian food image and return the required JSON." },
               { type: "image_url", image_url: { url: data, detail: "low" } }
             ]
           }
         ],
-        max_tokens: 50,
+        response_format: { type: "json_object" },
+        max_tokens: 500,
       });
-      foodName = idResponse.choices[0].message.content?.trim() || "Unknown Food";
       
+      // Parse the comprehensive vision response
+      const visionResult = JSON.parse(visionResponse.choices[0].message.content || '{}');
+      console.log("🔍 Vision result:", visionResult);
+      
+      foodName = visionResult.food_name || "Unknown Food";
+      visionCategory = visionResult.category || 'Other';
+      visionConfidence = visionResult.confidence_score || 0.5;
+      isPotentiallyPork = visionResult.is_potentially_pork || false;
+      visionNutrition = visionResult.nutrition || null;
+      detectedComponents = visionResult.detected_components || [];
+      
+      // 🐷 HALAL SAFETY: If potentially pork, use safe alternative
+      if (isPotentiallyPork) {
+        console.log("⚠️ Potentially non-halal detected, using safe alternative");
+        foodName = foodName.toLowerCase().includes('kuey teow') ? 'Kuey Teow Goreng' :
+                   foodName.toLowerCase().includes('mee') ? 'Mee Goreng' :
+                   foodName.toLowerCase().includes('nasi') ? 'Nasi Goreng' : 'Stir Fry Dish';
+        visionCategory = 'Other';
+      }
+      
+      // Additional pork keyword check
       for (const keyword of PORK_KEYWORDS) {
         if (foodName.toLowerCase().includes(keyword)) {
           foodName = foodName.toLowerCase().includes('kuey teow') ? 'Kuey Teow Goreng' :
                      foodName.toLowerCase().includes('mee') ? 'Mee Goreng' :
                      foodName.toLowerCase().includes('nasi') ? 'Nasi Goreng' : 'Stir Fry Dish';
+          visionCategory = 'Other';
           break;
         }
       }
     } else {
+      // 📝 TEXT INPUT: Use validation prompt
       const validationResponse = await openai.chat.completions.create({
         model: "gpt-4o-mini",
         messages: [
-          { role: "system", content: `Validate if text is food/drink. Return JSON: { "is_food": boolean, "cleaned_name": "name or null" }` },
-          { role: "user", content: `Is this food? "${data}"` }
+          { role: "system", content: TEXT_INPUT_VALIDATION_PROMPT },
+          { role: "user", content: `Validate this food input: "${data}"` }
         ],
         response_format: { type: "json_object" },
-        max_tokens: 100,
+        max_tokens: 150,
       });
       
       const validation = JSON.parse(validationResponse.choices[0].message.content || '{}');
       if (!validation.is_food) {
-        return NextResponse.json({ success: false, error: "Please enter a valid food or drink name", suggestion: "Try 'Nasi Lemak', 'Roti Canai', or 'Teh Tarik'" }, { status: 400 });
+        return NextResponse.json({ 
+          success: false, 
+          error: "Please enter a valid food or drink name", 
+          suggestion: "Try 'Nasi Lemak', 'Roti Canai', or 'Teh Tarik'" 
+        }, { status: 400 });
       }
+      
       foodName = validation.cleaned_name || data;
+      visionCategory = validation.category || 'Other';
+      visionConfidence = validation.confidence_score || 0.8;
     }
 
-    console.log("Identified food:", foodName);
+    console.log(`✅ Identified: "${foodName}" | Category: ${visionCategory} | Confidence: ${visionConfidence}`);
 
     // 🏦 STEP 2: CHECK SUPABASE DATABASE (including new columns: sodium_mg, sugar_g, health_tags)
     const { data: dbMatch } = await supabase
@@ -166,11 +204,12 @@ export async function POST(req: Request) {
         sodium: acc.sodium + (comp.macros?.sodium || 0),
       }), { sugar: 0, sodium: 0 });
 
-      // 🆕 Use new DB columns if available, otherwise use component totals
-      const finalSodiumForAdvice = dbMatch.sodium_mg ?? dbMatch.sodium ?? totalFromComponents.sodium ?? 400;
-      const finalSugarForAdvice = dbMatch.sugar_g ?? dbMatch.sugar ?? totalFromComponents.sugar ?? 5;
+      // 🆕 Use new DB columns if available, otherwise use component totals or vision estimates
+      const finalSodiumForAdvice = dbMatch.sodium_mg ?? dbMatch.sodium ?? visionNutrition?.sodium_mg ?? totalFromComponents.sodium ?? 400;
+      const finalSugarForAdvice = dbMatch.sugar_g ?? dbMatch.sugar ?? visionNutrition?.sugar_g ?? totalFromComponents.sugar ?? 5;
       const healthTagsForAdvice = dbMatch.health_tags || [];
-      const categoryForAdvice = dbMatch.category || 'Malay';
+      // Use DB category, then vision category, then default
+      const categoryForAdvice = dbMatch.category || visionCategory || 'Malay';
 
       // 🩺 DR. REZA - Using new comprehensive advisor prompt
       const drRezaResponse = await openai.chat.completions.create({
@@ -249,53 +288,91 @@ Give culturally relevant advice in MAX 40 words.`
       });
     }
 
-    // 🤖 STEP 3: AI FALLBACK
-    console.log("Not in database, using AI estimate");
+    // 🤖 STEP 3: AI FALLBACK (Using vision data + Dr. Reza advice)
+    console.log("Not in database, using vision data + AI advice");
     
-    // Build the AI analysis prompt with patient conditions
-    const aiPromptWithConditions = AI_ANALYSIS_PROMPT + (conditionContext ? `\n\nPATIENT INFO: ${conditionContext}` : '');
+    // Use vision nutrition if available, otherwise get typical components
+    const safeFoodName = cleanFoodName(foodName);
+    const halalCheck = checkHalalStatus(safeFoodName, []);
     
-    const response = await openai.chat.completions.create({
+    // Build macros from vision data or typical components
+    let finalMacros: any;
+    let components: any[];
+    
+    if (visionNutrition && visionNutrition.calories > 0) {
+      // Use vision-estimated nutrition
+      finalMacros = {
+        calories: visionNutrition.calories || 350,
+        protein_g: visionNutrition.protein_g || 12,
+        carbs_g: visionNutrition.carbs_g || 45,
+        fat_g: visionNutrition.fat_g || 12,
+        sugar_g: visionNutrition.sugar_g || 5,
+        sodium_mg: visionNutrition.sodium_mg || 400,
+      };
+      // Build components from detected items
+      components = detectedComponents.length > 0 
+        ? detectedComponents.map(name => ({
+            name,
+            calories: Math.round(finalMacros.calories / detectedComponents.length),
+            macros: { 
+              p: Math.round(finalMacros.protein_g / detectedComponents.length), 
+              c: Math.round(finalMacros.carbs_g / detectedComponents.length), 
+              f: Math.round(finalMacros.fat_g / detectedComponents.length),
+              sugar: Math.round(finalMacros.sugar_g / detectedComponents.length),
+              sodium: Math.round(finalMacros.sodium_mg / detectedComponents.length)
+            }
+          }))
+        : getTypicalComponents(safeFoodName, finalMacros);
+    } else {
+      // Fallback to typical components
+      components = getTypicalComponents(safeFoodName, { calories: 350, protein_g: 12, carbs_g: 45, fat_g: 12 });
+      finalMacros = components.reduce((acc: any, comp: any) => ({
+        calories: acc.calories + (comp.calories || 0),
+        protein_g: acc.protein_g + (comp.macros?.p || 0),
+        carbs_g: acc.carbs_g + (comp.macros?.c || 0),
+        fat_g: acc.fat_g + (comp.macros?.f || 0),
+        sugar_g: acc.sugar_g + (comp.macros?.sugar || 0),
+        sodium_mg: acc.sodium_mg + (comp.macros?.sodium || 0),
+      }), { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0, sugar_g: 0, sodium_mg: 0 });
+      
+      // Ensure minimums
+      if (finalMacros.calories === 0) {
+        finalMacros = { calories: 350, protein_g: 12, carbs_g: 45, fat_g: 12, sugar_g: 5, sodium_mg: 400 };
+      }
+    }
+
+    // Build health_tags from final macros
+    const aiHealthTags: string[] = [];
+    if (finalMacros.sodium_mg > 800) aiHealthTags.push('high_sodium');
+    if (finalMacros.sugar_g > 15) aiHealthTags.push('high_sugar');
+    if (finalMacros.protein_g > 25) aiHealthTags.push('high_protein');
+    if (finalMacros.fat_g > 30) aiHealthTags.push('high_fat');
+
+    // 🩺 Get Dr. Reza advice using vision category
+    const drRezaResponse = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         {
           role: "system",
-          content: aiPromptWithConditions
+          content: DR_REZA_ADVISOR_PROMPT
         },
         {
           role: "user",
-          content: type === 'image' 
-            ? [
-                { type: "text", text: `Analyze ${foodName}. Include sugar and sodium estimates. Patient conditions: ${conditions.length > 0 ? conditions.join(', ') : 'none'}.` },
-                { type: "image_url", image_url: { url: data, detail: "low" } }
-              ]
-            : `Analyze ${foodName}. Include sugar and sodium estimates. Patient conditions: ${conditions.length > 0 ? conditions.join(', ') : 'none'}.`
+          content: `Analyze this meal:
+- Food Name: ${safeFoodName}
+- Category: ${visionCategory}
+- Nutrition: Calories ${finalMacros.calories}kcal, Protein ${finalMacros.protein_g}g, Carbs ${finalMacros.carbs_g}g, Fat ${finalMacros.fat_g}g, Sodium ${finalMacros.sodium_mg}mg, Sugar ${finalMacros.sugar_g}g
+- Tags: ${aiHealthTags.length > 0 ? aiHealthTags.join(', ') : 'none'}
+- Patient Conditions: ${conditions.length > 0 ? conditions.join(', ') : 'none'}
+
+Give culturally relevant advice in MAX 40 words.`
         }
       ],
-      response_format: { type: "json_object" },
-      max_tokens: 700,
+      max_tokens: 100,
     });
-
-    const aiData = JSON.parse(response.choices[0].message.content || '{}');
-    const halalCheck = checkHalalStatus(aiData.food_name || foodName, aiData.components || []);
     
-    let safeFoodName = cleanFoodName(aiData.food_name || foodName);
-    for (const keyword of PORK_KEYWORDS) {
-      if (safeFoodName.toLowerCase().includes(keyword)) {
-        safeFoodName = safeFoodName.toLowerCase().includes('kuey teow') ? 'Kuey Teow Goreng' :
-                       safeFoodName.toLowerCase().includes('mee') ? 'Mee Goreng' : 'Stir Fry Dish';
-        break;
-      }
-    }
-    
-    const totalMacros = (aiData.components || []).reduce((acc: any, comp: any) => ({
-      calories: acc.calories + (comp.calories || 0),
-      protein_g: acc.protein_g + (comp.macros?.p || 0),
-      carbs_g: acc.carbs_g + (comp.macros?.c || 0),
-      fat_g: acc.fat_g + (comp.macros?.f || 0),
-      sugar_g: acc.sugar_g + (comp.macros?.sugar || 0),
-      sodium_mg: acc.sodium_mg + (comp.macros?.sodium || 0),
-    }), { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0, sugar_g: 0, sodium_mg: 0 });
+    const drRezaTip = drRezaResponse.choices[0].message.content?.trim() || 
+      `${safeFoodName} looks good! Enjoy in moderation ya. 🍽️`;
 
     const defaultLauk = [
       { name: "Telur Mata", calories: 70, protein: 6, carbs: 0, fat: 5 },
@@ -303,25 +380,18 @@ Give culturally relevant advice in MAX 40 words.`
       { name: "Ayam Goreng", calories: 250, protein: 20, carbs: 5, fat: 15 },
     ];
 
-    // Build health_tags from AI analysis
-    const aiHealthTags: string[] = [];
-    const finalMacros = totalMacros.calories > 0 ? totalMacros : { calories: 350, protein_g: 12, carbs_g: 45, fat_g: 12, sugar_g: 5, sodium_mg: 400 };
-    
-    if (finalMacros.sodium_mg > 800) aiHealthTags.push('high_sodium');
-    if (finalMacros.sugar_g > 15) aiHealthTags.push('high_sugar');
-    if (finalMacros.protein_g > 25) aiHealthTags.push('high_protein');
-
     return NextResponse.json({
       success: true,
-      source: 'ai_estimate',
+      source: 'vision_estimate',
       verified: false,
+      confidence: visionConfidence,
       data: {
         food_name: safeFoodName,
-        category: aiData.category || 'other',
-        components: aiData.components || getTypicalComponents(safeFoodName, totalMacros),
+        category: visionCategory,
+        components: components,
         macros: finalMacros,
         valid_lauk: defaultLauk,
-        analysis_content: aiData.analysis_content || "Enjoy your meal! Balance is key. 🍽️",
+        analysis_content: drRezaTip,
         halal_status: halalCheck,
         health_tags: aiHealthTags,
         risk_analysis: { 
