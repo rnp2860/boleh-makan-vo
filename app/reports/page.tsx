@@ -82,7 +82,7 @@ export default function NutritionReportPage() {
       const opt = {
         margin: [10, 10, 10, 10] as [number, number, number, number],
         filename: `Boleh_Makan_Report_${startDate}_to_${endDate}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
+        image: { type: 'jpeg' as const, quality: 0.98 },
         html2canvas: { 
           scale: 2, 
           useCORS: true,
@@ -90,9 +90,9 @@ export default function NutritionReportPage() {
           logging: false
         },
         jsPDF: { 
-          unit: 'mm', 
-          format: 'a4', 
-          orientation: 'portrait' 
+          unit: 'mm' as const, 
+          format: 'a4' as const, 
+          orientation: 'portrait' as const
         },
         enableLinks: true
       };
