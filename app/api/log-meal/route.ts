@@ -21,7 +21,8 @@ export async function POST(req: Request) {
       user_id,
       components,
       analysis_content,
-      health_tags
+      health_tags,
+      meal_type // NEW: Meal type for nutrition reports
     } = await req.json();
 
     let image_url = null;
@@ -59,7 +60,7 @@ export async function POST(req: Request) {
       }
     }
 
-    // Insert meal log into database (including sodium_mg and sugar_g)
+    // Insert meal log into database (including sodium_mg, sugar_g, and meal_type)
     const { data, error } = await supabase
       .from('food_logs')
       .insert({
@@ -75,6 +76,7 @@ export async function POST(req: Request) {
         user_id: user_id || null,
         components: components || null,
         analysis_data: analysis_content || null,
+        meal_type: meal_type || 'Other', // NEW: Meal type for nutrition reports
       })
       .select()
       .single();

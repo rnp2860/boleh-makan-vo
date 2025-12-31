@@ -99,6 +99,9 @@ export default function CheckFoodPage() {
   // 🔄 LOW CONFIDENCE CORRECTION
   const [correctionInput, setCorrectionInput] = useState('');
   const [isReanalyzing, setIsReanalyzing] = useState(false);
+  
+  // 🍽️ MEAL TYPE SELECTOR (for Nutrition Reports)
+  const [mealType, setMealType] = useState<'Breakfast' | 'Lunch' | 'Dinner' | 'Snack'>('Lunch');
 
   const { addMeal, userProfile } = useFood();
   const router = useRouter();
@@ -488,7 +491,7 @@ export default function CheckFoodPage() {
           components: finalData.components 
         }, processedImage);
 
-        // 2️⃣ Save to Supabase (cloud backup) - including sodium & sugar
+        // 2️⃣ Save to Supabase (cloud backup) - including sodium, sugar & meal_type
         try {
           await fetch('/api/log-meal', {
             method: 'POST',
@@ -506,10 +509,11 @@ export default function CheckFoodPage() {
               user_id: getUserId(),
               components: finalData.components,
               analysis_content: baseResult.data?.analysis_content,
-              health_tags: baseResult.data?.health_tags || []
+              health_tags: baseResult.data?.health_tags || [],
+              meal_type: mealType // NEW: Meal type for nutrition reports
             })
           });
-          console.log('✅ Meal saved to Supabase');
+          console.log('✅ Meal saved to Supabase with meal_type:', mealType);
         } catch (supabaseErr) {
           console.error('Supabase save failed (local save succeeded):', supabaseErr);
         }
@@ -1169,6 +1173,37 @@ export default function CheckFoodPage() {
             </div>
           )}
 
+          {/* 🍽️ MEAL TYPE SELECTOR - Only show when NOT low confidence */}
+          {!isLowConfidence() && (
+            <div className="bg-white rounded-2xl p-4 shadow-lg mb-4">
+              <p className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">🍽️ What meal is this?</p>
+              <div className="grid grid-cols-4 gap-2">
+                {(['Breakfast', 'Lunch', 'Dinner', 'Snack'] as const).map((type) => {
+                  const icons: Record<string, string> = {
+                    'Breakfast': '🌅',
+                    'Lunch': '☀️',
+                    'Dinner': '🌙',
+                    'Snack': '🍪'
+                  };
+                  return (
+                    <button
+                      key={type}
+                      onClick={() => setMealType(type)}
+                      className={`py-3 rounded-xl font-bold text-sm transition-all flex flex-col items-center gap-1 ${
+                        mealType === type 
+                          ? 'bg-teal-500 text-white shadow-lg shadow-teal-200 scale-105' 
+                          : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                      }`}
+                    >
+                      <span className="text-lg">{icons[type]}</span>
+                      <span className="text-xs">{type}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* 💾 SAVE BUTTONS - Only show Log Meal when NOT low confidence */}
           <div className="space-y-3 mb-6">
             {!isLowConfidence() && (
@@ -1177,7 +1212,7 @@ export default function CheckFoodPage() {
                 disabled={loading}
                 className="w-full bg-gradient-to-r from-green-500 to-emerald-500 text-white py-4 rounded-2xl font-bold text-lg shadow-xl shadow-green-200 active:scale-[0.98] transition-transform disabled:opacity-50"
               >
-                {loading ? 'Saving...' : `✅ Log This Meal (${finalData.macros.calories} kcal)`}
+                {loading ? 'Saving...' : `✅ Log ${mealType} (${finalData.macros.calories} kcal)`}
               </button>
             )}
             <button 
