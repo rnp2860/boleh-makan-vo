@@ -284,7 +284,7 @@ export default function NutritionReportPage() {
                         ))}
                       </Pie>
                       <Tooltip 
-                        formatter={(value: number, name: string) => [`${value} kcal`, name]}
+                        formatter={(value) => [`${value} kcal`]}
                         contentStyle={{ borderRadius: '8px', fontSize: '12px' }}
                       />
                     </PieChart>
@@ -324,9 +324,8 @@ export default function NutritionReportPage() {
                         <Cell fill={MACRO_COLORS.fat} />
                       </Pie>
                       <Tooltip 
-                        formatter={(value: number, name: string, props: any) => [
-                          `${props.payload.grams}g (${value} kcal)`, 
-                          name
+                        formatter={(value, name, props) => [
+                          `${props.payload.grams}g (${value} kcal)`
                         ]}
                         contentStyle={{ borderRadius: '8px', fontSize: '12px' }}
                       />
