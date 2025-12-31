@@ -67,6 +67,15 @@ export default function CheckFoodPage() {
   const [showAddIngredient, setShowAddIngredient] = useState(false);
   const [newIngredientName, setNewIngredientName] = useState('');
 
+  // 🐷 HALAL SAFETY VALVE
+  const [showHalalModal, setShowHalalModal] = useState(false);
+  const [pendingResult, setPendingResult] = useState<any>(null);
+  
+  // 📊 CONFIDENCE & EDITING
+  const [confidenceScore, setConfidenceScore] = useState<number>(1);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editedName, setEditedName] = useState('');
+
   const { addMeal, userProfile } = useFood();
   const router = useRouter();
 
@@ -191,7 +200,12 @@ export default function CheckFoodPage() {
         throw new Error(errorMsg);
       }
 
-      setBaseResult({
+      // Store confidence score
+      const confidence = result.confidence || result.data.confidence_score || 1;
+      setConfidenceScore(confidence);
+
+      // Build the result object
+      const processedResult = {
         data: {
           food_name: result.data.food_name,
           category: result.data.category || 'other',
@@ -200,18 +214,90 @@ export default function CheckFoodPage() {
             calories: result.data.macros.calories,
             macros: { p: result.data.macros.protein_g, c: result.data.macros.carbs_g, f: result.data.macros.fat_g }
           }],
+          macros: result.data.macros,
           analysis_content: result.data.analysis_content,
           risk_analysis: result.data.risk_analysis || { is_high_sodium: false, is_high_sugar: false },
-          valid_lauk: result.data.valid_lauk || []
+          valid_lauk: result.data.valid_lauk || [],
+          halal_status: result.data.halal_status,
+          health_tags: result.data.health_tags || [],
+          is_potentially_pork: result.data.is_potentially_pork || false
         },
         is_verified: result.verified,
         source: result.source
-      });
+      };
+
+      // 🐷 HALAL SAFETY VALVE: Check if potentially pork
+      if (result.data.is_potentially_pork) {
+        console.log("⚠️ Potentially pork detected - showing confirmation modal");
+        setPendingResult(processedResult);
+        setShowHalalModal(true);
+        setLoading(false);
+        return; // Stop here, wait for user confirmation
+      }
+
+      // Set result directly if no halal concerns
+      setBaseResult(processedResult);
+      setEditedName(result.data.food_name);
 
     } catch (err: any) {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+  
+  // 🐷 Handle Halal Modal Selection
+  const handleHalalConfirmation = (isChicken: boolean) => {
+    if (!pendingResult) return;
+    
+    if (isChicken) {
+      // Override to Halal chicken dish
+      const updatedResult = {
+        ...pendingResult,
+        data: {
+          ...pendingResult.data,
+          food_name: 'Ayam Madu/Merah',
+          is_potentially_pork: false,
+          halal_status: { status: 'halal' },
+          // Use typical chicken macros
+          macros: {
+            ...pendingResult.data.macros,
+            calories: pendingResult.data.macros?.calories || 350,
+            protein_g: 25,
+            fat_g: 15,
+          }
+        }
+      };
+      setBaseResult(updatedResult);
+      setEditedName('Ayam Madu/Merah');
+    } else {
+      // Keep as potentially non-halal
+      const updatedResult = {
+        ...pendingResult,
+        data: {
+          ...pendingResult.data,
+          halal_status: { status: 'non_halal', reason: 'User confirmed as pork' }
+        }
+      };
+      setBaseResult(updatedResult);
+      setEditedName(pendingResult.data.food_name);
+    }
+    
+    setShowHalalModal(false);
+    setPendingResult(null);
+  };
+  
+  // 📝 Handle Name Edit
+  const handleNameEdit = () => {
+    if (baseResult && editedName.trim()) {
+      setBaseResult({
+        ...baseResult,
+        data: {
+          ...baseResult.data,
+          food_name: editedName.trim()
+        }
+      });
+      setIsEditingName(false);
     }
   };
 
@@ -597,6 +683,12 @@ export default function CheckFoodPage() {
                   {!baseResult.is_verified && (
                     <span className="bg-amber-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">AI ESTIMATE</span>
                   )}
+                  {/* 📊 LOW CONFIDENCE BADGE */}
+                  {confidenceScore < 0.75 && (
+                    <span className="bg-orange-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                      ❓ {Math.round(confidenceScore * 100)}% SURE
+                    </span>
+                  )}
                   {/* 🕌 HALAL STATUS BADGE */}
                   {baseResult.data.halal_status?.status === 'non_halal' && (
                     <span className="bg-red-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
@@ -604,12 +696,52 @@ export default function CheckFoodPage() {
                     </span>
                   )}
                 </div>
-                <h2 className={`text-2xl font-black ${image ? 'text-white' : 'text-slate-800'}`}>
-                  {finalData.food_name}
-                </h2>
+                
+                {/* 📝 FOOD NAME - Editable if low confidence */}
+                {isEditingName ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={editedName}
+                      onChange={(e) => setEditedName(e.target.value)}
+                      className="flex-1 text-xl font-bold bg-white/20 backdrop-blur-sm rounded-lg px-3 py-1 text-white placeholder-white/50 outline-none border-2 border-white/30 focus:border-white"
+                      placeholder="Enter food name"
+                      autoFocus
+                    />
+                    <button
+                      onClick={handleNameEdit}
+                      className="bg-white/30 text-white px-3 py-1 rounded-lg font-bold text-sm"
+                    >
+                      ✓
+                    </button>
+                    <button
+                      onClick={() => { setIsEditingName(false); setEditedName(finalData.food_name); }}
+                      className="bg-white/20 text-white px-3 py-1 rounded-lg font-bold text-sm"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <h2 className={`text-2xl font-black ${image ? 'text-white' : 'text-slate-800'}`}>
+                      {confidenceScore < 0.75 ? `Is this ${finalData.food_name}?` : finalData.food_name}
+                    </h2>
+                    {/* Edit button - always show for low confidence, or on tap for others */}
+                    <button
+                      onClick={() => { setEditedName(finalData.food_name); setIsEditingName(true); }}
+                      className={`p-1.5 rounded-full ${image ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-600'} hover:bg-white/30 transition-colors`}
+                      title="Edit food name"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+                
                 {/* Show non-halal reason if applicable */}
                 {baseResult.data.halal_status?.status === 'non_halal' && (
-                  <p className="text-red-200 text-xs mt-1">
+                  <p className={`text-xs mt-1 ${image ? 'text-red-200' : 'text-red-500'}`}>
                     {baseResult.data.halal_status.reason}
                   </p>
                 )}
@@ -677,6 +809,28 @@ export default function CheckFoodPage() {
                   </div>
                 );
               })()}
+              
+              {/* 📏 QUICK PORTION SELECTOR */}
+              <div className="mt-3 pt-3 border-t border-white/20">
+                <div className="flex items-center justify-between">
+                  <p className="text-white/70 text-[10px] font-bold uppercase">Portion Size</p>
+                  <div className="flex gap-1">
+                    {([0.5, 1, 1.5] as const).map((size) => (
+                      <button
+                        key={size}
+                        onClick={() => setPortion(size)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                          portion === size 
+                            ? 'bg-white text-teal-600 shadow-md' 
+                            : 'bg-white/20 text-white/80 hover:bg-white/30'
+                        }`}
+                      >
+                        {size === 0.5 ? '½ Small' : size === 1 ? '1x Std' : '1.5x Large'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -1039,6 +1193,57 @@ export default function CheckFoodPage() {
                 className="flex-1 py-3 rounded-xl bg-teal-500 text-white font-bold disabled:opacity-50"
               >
                 Add Ingredient
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========== 🐷 HALAL SAFETY MODAL ========== */}
+      {showHalalModal && (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center backdrop-blur-sm p-4">
+          <div className="bg-white w-full max-w-sm rounded-3xl overflow-hidden animate-slideUp shadow-2xl">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-amber-500 to-orange-500 p-6 text-center">
+              <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                <span className="text-4xl">⚠️</span>
+              </div>
+              <h3 className="text-white text-xl font-bold">Halal Check</h3>
+              <p className="text-amber-100 text-sm mt-1">I detected a red glaze on the meat</p>
+            </div>
+            
+            {/* Content */}
+            <div className="p-6">
+              <p className="text-slate-600 text-center mb-6">
+                This could be <strong>Ayam Merah (Chicken)</strong> or <strong>Char Siu (Pork)</strong>. 
+                Please confirm:
+              </p>
+              
+              {/* Options */}
+              <div className="space-y-3">
+                <button
+                  onClick={() => handleHalalConfirmation(true)}
+                  className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold text-lg flex items-center justify-center gap-3 shadow-lg shadow-green-200 active:scale-[0.98] transition-transform"
+                >
+                  <span className="text-2xl">🐔</span>
+                  It's Chicken (Halal)
+                </button>
+                
+                <button
+                  onClick={() => handleHalalConfirmation(false)}
+                  className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-red-500 to-rose-500 text-white font-bold text-lg flex items-center justify-center gap-3 shadow-lg shadow-red-200 active:scale-[0.98] transition-transform"
+                >
+                  <span className="text-2xl">🐷</span>
+                  It's Pork (Non-Halal)
+                </button>
+              </div>
+              
+              {/* Cancel */}
+              <button
+                onClick={() => { setShowHalalModal(false); setPendingResult(null); handleReset(); }}
+                className="w-full mt-4 py-3 text-slate-400 font-medium"
+              >
+                Cancel & Retake Photo
               </button>
             </div>
           </div>
