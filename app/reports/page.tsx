@@ -80,7 +80,7 @@ export default function NutritionReportPage() {
       
       const element = reportRef.current;
       const opt = {
-        margin: [10, 10, 10, 10],
+        margin: [10, 10, 10, 10] as [number, number, number, number],
         filename: `Boleh_Makan_Report_${startDate}_to_${endDate}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { 
