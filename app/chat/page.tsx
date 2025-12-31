@@ -141,7 +141,7 @@ How can I help you today? You can ask me about:
       </div>
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 pb-32">
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 pb-48">
         {messages.map((message) => (
           <div
             key={message.id}
@@ -210,8 +210,8 @@ How can I help you today? You can ask me about:
         </div>
       )}
 
-      {/* Input Area */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-4 pb-6">
+      {/* Input Area - Raised above bottom nav */}
+      <div className="fixed bottom-20 left-0 right-0 bg-white border-t border-slate-200 p-3 z-40">
         <div className="max-w-md mx-auto flex gap-2">
           <input
             ref={inputRef}
