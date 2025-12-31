@@ -75,6 +75,10 @@ export default function CheckFoodPage() {
   const [confidenceScore, setConfidenceScore] = useState<number>(1);
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState('');
+  
+  // 🔄 LOW CONFIDENCE CORRECTION
+  const [correctionInput, setCorrectionInput] = useState('');
+  const [isReanalyzing, setIsReanalyzing] = useState(false);
 
   const { addMeal, userProfile } = useFood();
   const router = useRouter();
@@ -131,6 +135,31 @@ export default function CheckFoodPage() {
     setAddedIngredients([]);
     setError('');
     setTextInput('');
+    setCorrectionInput('');
+    setConfidenceScore(1);
+  };
+
+  // 🔍 Check if result is low confidence (Unknown OR < 60%)
+  const isLowConfidence = () => {
+    if (!baseResult) return false;
+    const foodName = baseResult.data?.food_name?.toLowerCase() || '';
+    return foodName === 'unknown' || confidenceScore < 0.6;
+  };
+
+  // 🔄 Handle correction input submission (re-analyze with text)
+  const handleCorrectionSubmit = async () => {
+    if (!correctionInput.trim()) return;
+    setIsReanalyzing(true);
+    
+    try {
+      // Re-analyze using text input - image is preserved automatically
+      await analyzeFood('text', correctionInput.trim());
+      setCorrectionInput('');
+    } catch (err) {
+      console.error('Re-analysis failed:', err);
+    } finally {
+      setIsReanalyzing(false);
+    }
   };
 
   // 📸 AUTO-ANALYZE ON IMAGE SELECT (with compression for speed)
@@ -677,16 +706,16 @@ export default function CheckFoodPage() {
               )}
               <div className={`${image ? 'absolute bottom-0 left-0 right-0' : ''} p-4`}>
                 <div className="flex items-center gap-2 mb-1 flex-wrap">
-                  {baseResult.is_verified && (
+                  {!isLowConfidence() && baseResult.is_verified && (
                     <span className="bg-green-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">✓ VERIFIED</span>
                   )}
-                  {!baseResult.is_verified && (
+                  {!isLowConfidence() && !baseResult.is_verified && (
                     <span className="bg-amber-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">AI ESTIMATE</span>
                   )}
-                  {/* 📊 LOW CONFIDENCE BADGE */}
-                  {confidenceScore < 0.75 && (
-                    <span className="bg-orange-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-                      ❓ {Math.round(confidenceScore * 100)}% SURE
+                  {/* 📊 LOW CONFIDENCE BADGE - Show when Unknown or < 60% */}
+                  {isLowConfidence() && (
+                    <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                      ❓ UNIDENTIFIED
                     </span>
                   )}
                   {/* 🕌 HALAL STATUS BADGE */}
@@ -697,8 +726,12 @@ export default function CheckFoodPage() {
                   )}
                 </div>
                 
-                {/* 📝 FOOD NAME - Editable if low confidence */}
-                {isEditingName ? (
+                {/* 📝 FOOD NAME - Show differently for low confidence */}
+                {isLowConfidence() ? (
+                  <h2 className={`text-2xl font-black ${image ? 'text-white' : 'text-slate-800'}`}>
+                    🤔 I couldn't identify this
+                  </h2>
+                ) : isEditingName ? (
                   <div className="flex items-center gap-2">
                     <input
                       type="text"
@@ -724,7 +757,7 @@ export default function CheckFoodPage() {
                 ) : (
                   <div className="flex items-center gap-2">
                     <h2 className={`text-2xl font-black ${image ? 'text-white' : 'text-slate-800'}`}>
-                      {confidenceScore < 0.75 ? `Is this ${finalData.food_name}?` : finalData.food_name}
+                      {finalData.food_name}
                     </h2>
                     {/* Edit button - always show for low confidence, or on tap for others */}
                     <button
@@ -758,202 +791,281 @@ export default function CheckFoodPage() {
               </button>
             </div>
 
-            {/* Calories Summary */}
-            <div className="p-4 bg-gradient-to-r from-teal-500 to-cyan-500 text-white">
-              <div className="flex justify-between items-center">
-                <div>
-                  <p className="text-teal-100 text-xs font-bold uppercase tracking-wider">Total Calories</p>
-                  <p className="text-4xl font-black">{finalData.macros.calories}<span className="text-lg font-medium ml-1">kcal</span></p>
-                </div>
-                <div className="grid grid-cols-3 gap-3 text-center">
-                  <div className="bg-white/20 rounded-lg px-3 py-2 backdrop-blur-sm">
-                    <p className="text-white/80 text-[10px] font-bold flex items-center justify-center gap-1">
-                      Protein
-                      {baseResult.data.risk_analysis?.is_high_protein && <span title="High Protein">💪</span>}
-                    </p>
-                    <p className="text-white font-black">{finalData.macros.protein_g}g</p>
+            {/* ========== LOW CONFIDENCE: CORRECTION INPUT ========== */}
+            {isLowConfidence() ? (
+              <div className="p-6 bg-gradient-to-br from-amber-50 to-orange-50 border-t-4 border-amber-400">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-12 h-12 rounded-full overflow-hidden flex-shrink-0 border-2 border-white shadow-lg">
+                    <Image src="/assets/avatar-header-thinking.png" alt="Dr Reza" width={48} height={48} className="object-cover" />
                   </div>
-                  <div className="bg-white/20 rounded-lg px-3 py-2 backdrop-blur-sm">
-                    <p className="text-white/80 text-[10px] font-bold">Carbs</p>
-                    <p className="text-white font-black">{finalData.macros.carbs_g}g</p>
-                  </div>
-                  <div className="bg-white/20 rounded-lg px-3 py-2 backdrop-blur-sm">
-                    <p className="text-white/80 text-[10px] font-bold">Fat</p>
-                    <p className="text-white font-black">{finalData.macros.fat_g}g</p>
+                  <div>
+                    <p className="text-amber-800 font-bold">Help me identify this!</p>
+                    <p className="text-amber-600 text-sm">What food is this?</p>
                   </div>
                 </div>
-              </div>
-              
-              {/* 🆕 SODIUM & SUGAR ROW with Warning Icons */}
-              {(() => {
-                // Calculate warnings based on ACTUAL displayed values (not just API response)
-                const isHighSodium = (finalData.macros.sodium_mg || 0) > 800;
-                const isHighSugar = (finalData.macros.sugar_g || 0) > 15;
                 
-                return (
-                  <div className="grid grid-cols-2 gap-3 mt-3 pt-3 border-t border-white/20">
-                    <div className={`rounded-lg px-3 py-2 ${isHighSodium ? 'bg-amber-500 shadow-lg' : 'bg-white/20 backdrop-blur-sm'}`}>
-                      <p className="text-white/90 text-[10px] font-bold flex items-center gap-1">
-                        Sodium
-                        {isHighSodium && <span title="High Sodium - Watch your salt intake!">⚠️</span>}
+                {/* Large Text Input for Correction */}
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={correctionInput}
+                    onChange={(e) => setCorrectionInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleCorrectionSubmit()}
+                    placeholder="e.g. Curry Puff, Nasi Lemak, Roti Canai..."
+                    disabled={isReanalyzing}
+                    className="w-full p-4 pr-12 bg-white rounded-2xl text-lg font-semibold text-slate-800 placeholder-slate-400 outline-none border-2 border-amber-200 focus:border-amber-500 transition-colors shadow-inner disabled:opacity-50"
+                    autoFocus
+                  />
+                  <button
+                    onClick={handleCorrectionSubmit}
+                    disabled={!correctionInput.trim() || isReanalyzing}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 bg-amber-500 hover:bg-amber-600 disabled:bg-slate-300 text-white p-2 rounded-xl transition-colors"
+                  >
+                    {isReanalyzing ? (
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    ) : (
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+                
+                <p className="text-amber-600 text-xs mt-3 text-center">
+                  Press <strong>Enter</strong> or tap the arrow to analyze
+                </p>
+              </div>
+            ) : (
+              /* ========== NORMAL: CALORIES SUMMARY ========== */
+              <div className="p-4 bg-gradient-to-r from-teal-500 to-cyan-500 text-white">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <p className="text-teal-100 text-xs font-bold uppercase tracking-wider">Total Calories</p>
+                    <p className="text-4xl font-black">{finalData.macros.calories}<span className="text-lg font-medium ml-1">kcal</span></p>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3 text-center">
+                    <div className="bg-white/20 rounded-lg px-3 py-2 backdrop-blur-sm">
+                      <p className="text-white/80 text-[10px] font-bold flex items-center justify-center gap-1">
+                        Protein
+                        {baseResult.data.risk_analysis?.is_high_protein && <span title="High Protein">💪</span>}
                       </p>
-                      <p className="text-white font-black">{finalData.macros.sodium_mg || 0}<span className="text-xs font-medium ml-0.5">mg</span></p>
+                      <p className="text-white font-black">{finalData.macros.protein_g}g</p>
                     </div>
-                    <div className={`rounded-lg px-3 py-2 ${isHighSugar ? 'bg-amber-500 shadow-lg' : 'bg-white/20 backdrop-blur-sm'}`}>
-                      <p className="text-white/90 text-[10px] font-bold flex items-center gap-1">
-                        Sugar
-                        {isHighSugar && <span title="High Sugar - Watch your sugar intake!">🍭</span>}
-                      </p>
-                      <p className="text-white font-black">{finalData.macros.sugar_g || 0}<span className="text-xs font-medium ml-0.5">g</span></p>
+                    <div className="bg-white/20 rounded-lg px-3 py-2 backdrop-blur-sm">
+                      <p className="text-white/80 text-[10px] font-bold">Carbs</p>
+                      <p className="text-white font-black">{finalData.macros.carbs_g}g</p>
+                    </div>
+                    <div className="bg-white/20 rounded-lg px-3 py-2 backdrop-blur-sm">
+                      <p className="text-white/80 text-[10px] font-bold">Fat</p>
+                      <p className="text-white font-black">{finalData.macros.fat_g}g</p>
                     </div>
                   </div>
-                );
-              })()}
-              
-              {/* 📏 QUICK PORTION SELECTOR */}
-              <div className="mt-3 pt-3 border-t border-white/20">
-                <div className="flex items-center justify-between">
-                  <p className="text-white/70 text-[10px] font-bold uppercase">Portion Size</p>
-                  <div className="flex gap-1">
-                    {([0.5, 1, 1.5] as const).map((size) => (
-                      <button
-                        key={size}
-                        onClick={() => setPortion(size)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                          portion === size 
-                            ? 'bg-white text-teal-600 shadow-md' 
-                            : 'bg-white/20 text-white/80 hover:bg-white/30'
-                        }`}
-                      >
-                        {size === 0.5 ? '½ Small' : size === 1 ? '1x Std' : '1.5x Large'}
-                      </button>
-                    ))}
+                </div>
+                
+                {/* 🆕 SODIUM & SUGAR ROW with Warning Icons */}
+                {(() => {
+                  // Calculate warnings based on ACTUAL displayed values (not just API response)
+                  const isHighSodium = (finalData.macros.sodium_mg || 0) > 800;
+                  const isHighSugar = (finalData.macros.sugar_g || 0) > 15;
+                  
+                  return (
+                    <div className="grid grid-cols-2 gap-3 mt-3 pt-3 border-t border-white/20">
+                      <div className={`rounded-lg px-3 py-2 ${isHighSodium ? 'bg-amber-500 shadow-lg' : 'bg-white/20 backdrop-blur-sm'}`}>
+                        <p className="text-white/90 text-[10px] font-bold flex items-center gap-1">
+                          Sodium
+                          {isHighSodium && <span title="High Sodium - Watch your salt intake!">⚠️</span>}
+                        </p>
+                        <p className="text-white font-black">{finalData.macros.sodium_mg || 0}<span className="text-xs font-medium ml-0.5">mg</span></p>
+                      </div>
+                      <div className={`rounded-lg px-3 py-2 ${isHighSugar ? 'bg-amber-500 shadow-lg' : 'bg-white/20 backdrop-blur-sm'}`}>
+                        <p className="text-white/90 text-[10px] font-bold flex items-center gap-1">
+                          Sugar
+                          {isHighSugar && <span title="High Sugar - Watch your sugar intake!">🍭</span>}
+                        </p>
+                        <p className="text-white font-black">{finalData.macros.sugar_g || 0}<span className="text-xs font-medium ml-0.5">g</span></p>
+                      </div>
+                    </div>
+                  );
+                })()}
+                
+                {/* 📏 QUICK PORTION SELECTOR */}
+                <div className="mt-3 pt-3 border-t border-white/20">
+                  <div className="flex items-center justify-between">
+                    <p className="text-white/70 text-[10px] font-bold uppercase">Portion Size</p>
+                    <div className="flex gap-1">
+                      {([0.5, 1, 1.5] as const).map((size) => (
+                        <button
+                          key={size}
+                          onClick={() => setPortion(size)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                            portion === size 
+                              ? 'bg-white text-teal-600 shadow-md' 
+                              : 'bg-white/20 text-white/80 hover:bg-white/30'
+                          }`}
+                        >
+                          {size === 0.5 ? '½ Small' : size === 1 ? '1x Std' : '1.5x Large'}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
 
-          {/* 🩺 DR. REZA'S TIP */}
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-2xl mb-4 flex gap-3 items-start border border-blue-100">
-            <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 border-2 border-white shadow">
-              <Image src="/assets/avatar-header.png" alt="Dr Reza" width={40} height={40} className="object-cover" />
+          {/* 🩺 DR. REZA'S TIP - Only show when NOT low confidence */}
+          {!isLowConfidence() && (
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-2xl mb-4 flex gap-3 items-start border border-blue-100">
+              <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 border-2 border-white shadow">
+                <Image src="/assets/avatar-header.png" alt="Dr Reza" width={40} height={40} className="object-cover" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-blue-600 mb-1">Dr. Reza says</p>
+                <p className="text-sm text-slate-700 leading-relaxed">
+                  {baseResult.data.analysis_content || "Looks good! Remember to stay hydrated 💧"}
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="text-xs font-bold text-blue-600 mb-1">Dr. Reza says</p>
-              <p className="text-sm text-slate-700 leading-relaxed">
-                {baseResult.data.analysis_content || "Looks good! Remember to stay hydrated 💧"}
-              </p>
-            </div>
-          </div>
+          )}
 
-          {/* 🎛️ TUNING SECTION */}
-          <div className="bg-white rounded-2xl p-4 shadow-lg mb-4">
-            
-            {/* PORTION SIZE - Cool Pills */}
-            <div className="mb-6">
-              <p className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">📏 Portion Size</p>
-              <div className="grid grid-cols-4 gap-2">
-                {([0.5, 1, 1.5, 2] as const).map((size) => (
-                  <button
-                    key={size}
-                    onClick={() => setPortion(size)}
-                    className={`py-3 rounded-xl font-bold text-sm transition-all ${
-                      portion === size 
-                        ? 'bg-teal-500 text-white shadow-lg shadow-teal-200 scale-105' 
-                        : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                    }`}
-                  >
-                    {size === 0.5 ? '½' : size === 1 ? '1x' : size === 1.5 ? '1.5x' : '2x'}
-                  </button>
-                ))}
-              </div>
-              <div className="flex justify-between text-[10px] text-slate-400 mt-2 px-1">
-                <span>Small</span>
-                <span>Regular</span>
-                <span>Large</span>
-                <span>XL</span>
-              </div>
-            </div>
-
-            {/* INGREDIENTS BREAKDOWN */}
-            <div className="mb-6">
-              <div className="flex justify-between items-center mb-3">
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">🥗 Ingredients Detected</p>
-                <button 
-                  onClick={() => setShowAddIngredient(true)}
-                  className="text-xs font-bold text-teal-600 hover:text-teal-700"
-                >
-                  + Add Missing
-                </button>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {/* AI/DB detected components */}
-                {baseResult.data.components?.map((comp: any, idx: number) => (
-                  <button 
-                    key={`comp-${idx}`}
-                    onClick={() => toggleComponent(comp.name)} 
-                    className={`px-3 py-2 rounded-xl text-xs font-bold border-2 transition-all ${
-                      !excludedComponents.includes(comp.name) 
-                        ? 'bg-emerald-50 border-emerald-200 text-emerald-700' 
-                        : 'bg-slate-100 border-slate-200 text-slate-400 line-through'
-                    }`}
-                  >
-                    {comp.name}
-                    <span className="ml-1 opacity-60">{comp.calories}kcal</span>
-                  </button>
-                ))}
-                {/* User-added ingredients */}
-                {addedIngredients.map((ing, idx) => (
-                  <button 
-                    key={`added-${idx}`}
-                    onClick={() => setAddedIngredients(prev => prev.filter((_, i) => i !== idx))}
-                    className="px-3 py-2 rounded-xl text-xs font-bold border-2 bg-teal-50 border-teal-200 text-teal-700 flex items-center gap-1"
-                  >
-                    {ing.name}
-                    <span className="opacity-60">{ing.calories}kcal</span>
-                    <span className="ml-1 text-teal-400">✕</span>
-                  </button>
-                ))}
-              </div>
-              <p className="text-[10px] text-slate-400 mt-2">Tap to exclude • Added items show in teal</p>
-            </div>
-
-            {/* LAUK TAMBAH - From API suggestions */}
-            {baseResult.data.valid_lauk && baseResult.data.valid_lauk.length > 0 && (
+          {/* 🎛️ TUNING SECTION - Only show when NOT low confidence */}
+          {!isLowConfidence() && (
+            <div className="bg-white rounded-2xl p-4 shadow-lg mb-4">
+              
+              {/* PORTION SIZE - Cool Pills */}
               <div className="mb-6">
-                <p className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">🥚 Add Side Dishes</p>
+                <p className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">📏 Portion Size</p>
+                <div className="grid grid-cols-4 gap-2">
+                  {([0.5, 1, 1.5, 2] as const).map((size) => (
+                    <button
+                      key={size}
+                      onClick={() => setPortion(size)}
+                      className={`py-3 rounded-xl font-bold text-sm transition-all ${
+                        portion === size 
+                          ? 'bg-teal-500 text-white shadow-lg shadow-teal-200 scale-105' 
+                          : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                      }`}
+                    >
+                      {size === 0.5 ? '½' : size === 1 ? '1x' : size === 1.5 ? '1.5x' : '2x'}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex justify-between text-[10px] text-slate-400 mt-2 px-1">
+                  <span>Small</span>
+                  <span>Regular</span>
+                  <span>Large</span>
+                  <span>XL</span>
+                </div>
+              </div>
+
+              {/* INGREDIENTS BREAKDOWN */}
+              <div className="mb-6">
+                <div className="flex justify-between items-center mb-3">
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">🥗 Ingredients Detected</p>
+                  <button 
+                    onClick={() => setShowAddIngredient(true)}
+                    className="text-xs font-bold text-teal-600 hover:text-teal-700"
+                  >
+                    + Add Missing
+                  </button>
+                </div>
                 <div className="flex flex-wrap gap-2">
-                  {baseResult.data.valid_lauk.slice(0, 5).map((item: any, idx: number) => {
-                    const isAdded = customItems.find(i => i.name === item.name);
+                  {/* AI/DB detected components */}
+                  {baseResult.data.components?.map((comp: any, idx: number) => (
+                    <button 
+                      key={`comp-${idx}`}
+                      onClick={() => toggleComponent(comp.name)} 
+                      className={`px-3 py-2 rounded-xl text-xs font-bold border-2 transition-all ${
+                        !excludedComponents.includes(comp.name) 
+                          ? 'bg-emerald-50 border-emerald-200 text-emerald-700' 
+                          : 'bg-slate-100 border-slate-200 text-slate-400 line-through'
+                      }`}
+                    >
+                      {comp.name}
+                      <span className="ml-1 opacity-60">{comp.calories}kcal</span>
+                    </button>
+                  ))}
+                  {/* User-added ingredients */}
+                  {addedIngredients.map((ing, idx) => (
+                    <button 
+                      key={`added-${idx}`}
+                      onClick={() => setAddedIngredients(prev => prev.filter((_, i) => i !== idx))}
+                      className="px-3 py-2 rounded-xl text-xs font-bold border-2 bg-teal-50 border-teal-200 text-teal-700 flex items-center gap-1"
+                    >
+                      {ing.name}
+                      <span className="opacity-60">{ing.calories}kcal</span>
+                      <span className="ml-1 text-teal-400">✕</span>
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[10px] text-slate-400 mt-2">Tap to exclude • Added items show in teal</p>
+              </div>
+
+              {/* LAUK TAMBAH - From API suggestions */}
+              {baseResult.data.valid_lauk && baseResult.data.valid_lauk.length > 0 && (
+                <div className="mb-6">
+                  <p className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">🥚 Add Side Dishes</p>
+                  <div className="flex flex-wrap gap-2">
+                    {baseResult.data.valid_lauk.slice(0, 5).map((item: any, idx: number) => {
+                      const isAdded = customItems.find(i => i.name === item.name);
+                      return (
+                        <button
+                          key={idx}
+                          onClick={() => {
+                            if (isAdded) {
+                              setCustomItems(prev => prev.filter(i => i.name !== item.name));
+                            } else {
+                              const newItem: FoodAnchor = {
+                                id: `lauk-${idx}`,
+                                name: item.name,
+                                calories: item.calories || 80,
+                                protein_g: item.protein || 5,
+                                carbs_g: item.carbs || 5,
+                                fat_g: item.fat || 3,
+                                sodium_mg: 100,
+                                fiber_g: 0,
+                                category: 'addon',
+                                source: 'Manual_Audit',
+                                serving_size: '1 serving',
+                                keywords: []
+                              };
+                              setCustomItems(prev => [...prev, newItem]);
+                            }
+                          }}
+                          className={`px-3 py-2 rounded-xl text-xs font-bold border-2 transition-all ${
+                            isAdded
+                              ? 'bg-orange-500 border-orange-500 text-white'
+                              : 'bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100'
+                          }`}
+                        >
+                          {isAdded ? '✓ ' : '+ '}{item.name}
+                        </button>
+                      );
+                    })}
+                    <button 
+                      onClick={() => openModal('addon')}
+                      className="px-3 py-2 rounded-xl text-xs font-bold border-2 border-dashed border-slate-300 text-slate-500 hover:border-teal-400 hover:text-teal-600"
+                    >
+                      🔍 More
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* DRINKS */}
+              <div className="mb-6">
+                <p className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">🥤 Add Drink</p>
+                <div className="flex flex-wrap gap-2">
+                  {MALAYSIAN_FOOD_ANCHORS.filter(i => i.category === 'drink').slice(0, 4).map(item => {
+                    const isAdded = customItems.find(i => i.id === item.id);
                     return (
-                      <button
-                        key={idx}
-                        onClick={() => {
-                          if (isAdded) {
-                            setCustomItems(prev => prev.filter(i => i.name !== item.name));
-                          } else {
-                            const newItem: FoodAnchor = {
-                              id: `lauk-${idx}`,
-                              name: item.name,
-                              calories: item.calories || 80,
-                              protein_g: item.protein || 5,
-                              carbs_g: item.carbs || 5,
-                              fat_g: item.fat || 3,
-                              sodium_mg: 100,
-                              fiber_g: 0,
-                              category: 'addon',
-                              source: 'Manual_Audit',
-                              serving_size: '1 serving',
-                              keywords: []
-                            };
-                            setCustomItems(prev => [...prev, newItem]);
-                          }
-                        }}
+                      <button 
+                        key={item.id} 
+                        onClick={() => toggleCustomItem(item)}
                         className={`px-3 py-2 rounded-xl text-xs font-bold border-2 transition-all ${
-                          isAdded
-                            ? 'bg-orange-500 border-orange-500 text-white'
-                            : 'bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100'
+                          isAdded 
+                            ? 'bg-purple-500 border-purple-500 text-white' 
+                            : 'bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100'
                         }`}
                       >
                         {isAdded ? '✓ ' : '+ '}{item.name}
@@ -961,81 +1073,54 @@ export default function CheckFoodPage() {
                     );
                   })}
                   <button 
-                    onClick={() => openModal('addon')}
+                    onClick={() => openModal('drink')}
                     className="px-3 py-2 rounded-xl text-xs font-bold border-2 border-dashed border-slate-300 text-slate-500 hover:border-teal-400 hover:text-teal-600"
                   >
                     🔍 More
                   </button>
                 </div>
               </div>
-            )}
 
-            {/* DRINKS */}
-            <div className="mb-6">
-              <p className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">🥤 Add Drink</p>
-              <div className="flex flex-wrap gap-2">
-                {MALAYSIAN_FOOD_ANCHORS.filter(i => i.category === 'drink').slice(0, 4).map(item => {
-                  const isAdded = customItems.find(i => i.id === item.id);
-                  return (
-                    <button 
-                      key={item.id} 
-                      onClick={() => toggleCustomItem(item)}
-                      className={`px-3 py-2 rounded-xl text-xs font-bold border-2 transition-all ${
-                        isAdded 
-                          ? 'bg-purple-500 border-purple-500 text-white' 
-                          : 'bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100'
-                      }`}
-                    >
-                      {isAdded ? '✓ ' : '+ '}{item.name}
-                    </button>
-                  );
-                })}
-                <button 
-                  onClick={() => openModal('drink')}
-                  className="px-3 py-2 rounded-xl text-xs font-bold border-2 border-dashed border-slate-300 text-slate-500 hover:border-teal-400 hover:text-teal-600"
-                >
-                  🔍 More
-                </button>
-              </div>
-            </div>
-
-            {/* KUAH LEVEL */}
-            {shouldShowKuah() && (
-              <div>
-                <p className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">🍛 Kuah Level</p>
-                <div className="grid grid-cols-3 gap-2">
-                  {(['asing', 'biasa', 'banjir'] as const).map((level) => (
-                    <button 
-                      key={level} 
-                      onClick={() => setKuahLevel(level)} 
-                      className={`py-3 rounded-xl text-sm font-bold capitalize transition-all ${
-                        kuahLevel === level 
-                          ? 'bg-amber-500 text-white shadow-lg' 
-                          : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                      }`}
-                    >
-                      {level === 'asing' ? '🥄 Asing' : level === 'biasa' ? '🍲 Biasa' : '🌊 Banjir'}
-                    </button>
-                  ))}
+              {/* KUAH LEVEL */}
+              {shouldShowKuah() && (
+                <div>
+                  <p className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">🍛 Kuah Level</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(['asing', 'biasa', 'banjir'] as const).map((level) => (
+                      <button 
+                        key={level} 
+                        onClick={() => setKuahLevel(level)} 
+                        className={`py-3 rounded-xl text-sm font-bold capitalize transition-all ${
+                          kuahLevel === level 
+                            ? 'bg-amber-500 text-white shadow-lg' 
+                            : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                        }`}
+                      >
+                        {level === 'asing' ? '🥄 Asing' : level === 'biasa' ? '🍲 Biasa' : '🌊 Banjir'}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
 
-          {/* 💾 SAVE BUTTONS */}
+          {/* 💾 SAVE BUTTONS - Only show Log Meal when NOT low confidence */}
           <div className="space-y-3 mb-6">
-            <button 
-              onClick={handleSave}
-              disabled={loading}
-              className="w-full bg-gradient-to-r from-green-500 to-emerald-500 text-white py-4 rounded-2xl font-bold text-lg shadow-xl shadow-green-200 active:scale-[0.98] transition-transform disabled:opacity-50"
-            >
-              {loading ? 'Saving...' : `✅ Log This Meal (${finalData.macros.calories} kcal)`}
-            </button>
+            {!isLowConfidence() && (
+              <button 
+                onClick={handleSave}
+                disabled={loading}
+                className="w-full bg-gradient-to-r from-green-500 to-emerald-500 text-white py-4 rounded-2xl font-bold text-lg shadow-xl shadow-green-200 active:scale-[0.98] transition-transform disabled:opacity-50"
+              >
+                {loading ? 'Saving...' : `✅ Log This Meal (${finalData.macros.calories} kcal)`}
+              </button>
+            )}
             <button 
               onClick={handleReset}
               className="w-full bg-white text-slate-400 py-3 rounded-2xl font-bold text-sm border border-slate-200 hover:bg-red-50 hover:text-red-500 hover:border-red-200 transition-colors"
             >
-              Discard & Start Over
+              {isLowConfidence() ? 'Cancel & Try Again' : 'Discard & Start Over'}
             </button>
           </div>
         </div>
