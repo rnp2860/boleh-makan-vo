@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { createClient } from '@supabase/supabase-js';
+import { DR_REZA_ADVISOR_PROMPT, FOOD_IDENTIFICATION_PROMPT, AI_ANALYSIS_PROMPT } from '@/lib/advisorPrompts';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const supabase = createClient(
@@ -95,7 +96,7 @@ export async function POST(req: Request) {
         messages: [
           {
             role: "system",
-            content: `You are a Malaysian Halal food expert. Return ONLY the simple dish name. NEVER use "babi" or "pork" unless 100% certain. No brand names.`
+            content: FOOD_IDENTIFICATION_PROMPT
           },
           {
             role: "user",
@@ -165,27 +166,33 @@ export async function POST(req: Request) {
         sodium: acc.sodium + (comp.macros?.sodium || 0),
       }), { sugar: 0, sodium: 0 });
 
-      // 🩺 DR. REZA - Health condition aware
+      // 🆕 Use new DB columns if available, otherwise use component totals
+      const finalSodiumForAdvice = dbMatch.sodium_mg ?? dbMatch.sodium ?? totalFromComponents.sodium ?? 400;
+      const finalSugarForAdvice = dbMatch.sugar_g ?? dbMatch.sugar ?? totalFromComponents.sugar ?? 5;
+      const healthTagsForAdvice = dbMatch.health_tags || [];
+      const categoryForAdvice = dbMatch.category || 'Malay';
+
+      // 🩺 DR. REZA - Using new comprehensive advisor prompt
       const drRezaResponse = await openai.chat.completions.create({
         model: "gpt-4o-mini",
         messages: [
           {
             role: "system",
-            content: `You are Dr. Reza, a Malaysian dietitian. Give a personalized health tip in Manglish (max 35 words).
-            
-${conditionContext}
-
-If patient has Diabetes: mention sugar/carb content and blood sugar impact.
-If patient has High Blood Pressure or Kidney Care: mention sodium/salt content.
-If patient has High Cholesterol: mention fat content.
-Be helpful, specific, and caring.`
+            content: DR_REZA_ADVISOR_PROMPT
           },
           {
             role: "user",
-            content: `Dietitian tip for ${cleanName}: ${dbMatch.calories} cal, ${dbMatch.carbs}g carbs, ${totalFromComponents.sugar}g sugar, ${totalFromComponents.sodium}mg sodium, ${dbMatch.fat}g fat.`
+            content: `Analyze this meal:
+- Food Name: ${cleanName}
+- Category: ${categoryForAdvice}
+- Nutrition: Calories ${dbMatch.calories}kcal, Protein ${dbMatch.protein}g, Carbs ${dbMatch.carbs}g, Fat ${dbMatch.fat}g, Sodium ${finalSodiumForAdvice}mg, Sugar ${finalSugarForAdvice}g
+- Tags: ${healthTagsForAdvice.length > 0 ? healthTagsForAdvice.join(', ') : 'none'}
+- Patient Conditions: ${conditions.length > 0 ? conditions.join(', ') : 'none'}
+
+Give culturally relevant advice in MAX 40 words.`
           }
         ],
-        max_tokens: 80,
+        max_tokens: 100,
       });
       
       const drRezaTip = drRezaResponse.choices[0].message.content?.trim() || 
@@ -208,15 +215,10 @@ Be helpful, specific, and caring.`
         ];
       }
 
-      // 🆕 Use new DB columns if available, otherwise use component totals
-      const finalSodium = dbMatch.sodium_mg ?? dbMatch.sodium ?? totalFromComponents.sodium ?? 400;
-      const finalSugar = dbMatch.sugar_g ?? dbMatch.sugar ?? totalFromComponents.sugar ?? 5;
-      const healthTags = dbMatch.health_tags || [];
-      
-      // Determine health warnings from tags or thresholds
-      const isHighSodium = healthTags.includes('high_sodium') || finalSodium > 800;
-      const isHighSugar = healthTags.includes('high_sugar') || finalSugar > 15;
-      const isHighProtein = healthTags.includes('high_protein') || (dbMatch.protein || 0) > 25;
+      // Determine health warnings from tags or thresholds (reuse values from above)
+      const isHighSodium = healthTagsForAdvice.includes('high_sodium') || finalSodiumForAdvice > 800;
+      const isHighSugar = healthTagsForAdvice.includes('high_sugar') || finalSugarForAdvice > 15;
+      const isHighProtein = healthTagsForAdvice.includes('high_protein') || (dbMatch.protein || 0) > 25;
 
       return NextResponse.json({
         success: true,
@@ -224,20 +226,20 @@ Be helpful, specific, and caring.`
         verified: true,
         data: {
           food_name: cleanName,
-          category: dbMatch.category || 'rice_dish',
+          category: categoryForAdvice,
           components: components,
           macros: {
             calories: dbMatch.calories || 0,
             protein_g: dbMatch.protein || 0,
             carbs_g: dbMatch.carbs || 0,
             fat_g: dbMatch.fat || 0,
-            sugar_g: finalSugar,
-            sodium_mg: finalSodium,
+            sugar_g: finalSugarForAdvice,
+            sodium_mg: finalSodiumForAdvice,
           },
           valid_lauk: enrichedLauk,
           analysis_content: drRezaTip,
           halal_status: halalCheck,
-          health_tags: healthTags,
+          health_tags: healthTagsForAdvice,
           risk_analysis: { 
             is_high_sodium: isHighSodium, 
             is_high_sugar: isHighSugar,
@@ -250,40 +252,24 @@ Be helpful, specific, and caring.`
     // 🤖 STEP 3: AI FALLBACK
     console.log("Not in database, using AI estimate");
     
+    // Build the AI analysis prompt with patient conditions
+    const aiPromptWithConditions = AI_ANALYSIS_PROMPT + (conditionContext ? `\n\nPATIENT INFO: ${conditionContext}` : '');
+    
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         {
           role: "system",
-          content: `You are Dr. Reza, a Malaysian Halal Nutritionist. Analyze food with ALL macros including SUGAR and SODIUM.
-
-${conditionContext}
-
-Return JSON:
-{
-  "food_name": "Clean dish name",
-  "category": "rice_dish|noodle_dish|soup|western|bread|dessert|drink|other",
-  "components": [
-    { "name": "Ingredient", "calories": number, "macros": { "p": protein, "c": carbs, "f": fat, "sugar": grams, "sodium": mg } }
-  ],
-  "analysis_content": "Personalized Manglish health tip based on patient's conditions (max 35 words)",
-  "risk_analysis": { "is_high_sodium": boolean, "is_high_sugar": boolean }
-}
-
-IMPORTANT:
-- Estimate sugar content (especially for drinks, sauces, sweetened foods)
-- Estimate sodium content (especially for soy sauce, sambal, processed foods)
-- If patient has Diabetes, warn about sugar
-- If patient has Kidney Care/High BP, warn about sodium`
+          content: aiPromptWithConditions
         },
         {
           role: "user",
           content: type === 'image' 
             ? [
-                { type: "text", text: `Analyze ${foodName}. Include sugar and sodium estimates.` },
+                { type: "text", text: `Analyze ${foodName}. Include sugar and sodium estimates. Patient conditions: ${conditions.length > 0 ? conditions.join(', ') : 'none'}.` },
                 { type: "image_url", image_url: { url: data, detail: "low" } }
               ]
-            : `Analyze ${foodName}. Include sugar and sodium estimates.`
+            : `Analyze ${foodName}. Include sugar and sodium estimates. Patient conditions: ${conditions.length > 0 ? conditions.join(', ') : 'none'}.`
         }
       ],
       response_format: { type: "json_object" },
