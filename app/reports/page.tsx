@@ -62,6 +62,12 @@ export default function NutritionReportPage() {
   // 📤 Export States
   const [isExporting, setIsExporting] = useState(false);
   const reportRef = useRef<HTMLDivElement>(null);
+  
+  // 🎯 PRESCRIPTION STATES
+  const [prescription, setPrescription] = useState<any>(null);
+  const [prescriptionLoading, setPrescriptionLoading] = useState(false);
+  const [goalSaved, setGoalSaved] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
 
   // 📄 DOWNLOAD PDF FUNCTION
   const handleDownloadPDF = async () => {
@@ -133,6 +139,71 @@ ${insight ? `🩺 *Dr. Reza says:*\n"${insight}"` : ''}
     window.open(`https://wa.me/?text=${encodedMessage}`, '_blank');
   };
 
+  // 🎯 FETCH PRESCRIPTION FROM DR. REZA
+  const fetchPrescription = async (reportSummary: any) => {
+    setPrescriptionLoading(true);
+    setPrescription(null);
+    setGoalSaved(false);
+    
+    try {
+      const response = await fetch('/api/goals/generate-prescription', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: getUserId(),
+          report_summary: reportSummary
+        })
+      });
+      
+      const result = await response.json();
+      if (result.success) {
+        setPrescription(result.data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch prescription:', err);
+    } finally {
+      setPrescriptionLoading(false);
+    }
+  };
+
+  // 💾 ACCEPT CHALLENGE - SAVE GOAL
+  const handleAcceptChallenge = async () => {
+    if (!prescription) return;
+    
+    try {
+      const response = await fetch('/api/goals/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: getUserId(),
+          goal_description: prescription.suggested_goal_text,
+          metric_target: prescription.target_metric || {}
+        })
+      });
+      
+      const result = await response.json();
+      if (result.success) {
+        setGoalSaved(true);
+        setShowConfetti(true);
+        
+        // Hide confetti after 3 seconds
+        setTimeout(() => setShowConfetti(false), 3000);
+      } else {
+        alert('Failed to save goal. Please try again.');
+      }
+    } catch (err) {
+      console.error('Failed to save goal:', err);
+      alert('Failed to save goal. Please try again.');
+    }
+  };
+
+  // 🔄 REGENERATE PRESCRIPTION
+  const handleRegeneratePrescription = () => {
+    if (reportData) {
+      fetchPrescription(reportData);
+    }
+  };
+
   // 📥 Fetch Report Data
   const generateReport = async () => {
     setLoading(true);
@@ -157,9 +228,10 @@ ${insight ? `🩺 *Dr. Reza says:*\n"${insight}"` : ''}
       
       setReportData(result.data);
       
-      // Fetch Dr. Reza's insight if we have data
+      // Fetch Dr. Reza's insight and prescription if we have data
       if (result.data.total_logs > 0) {
         fetchInsight(result.data);
+        fetchPrescription(result.data);
       }
       
     } catch (err: any) {
@@ -619,8 +691,128 @@ ${insight ? `🩺 *Dr. Reza says:*\n"${insight}"` : ''}
                 </div>
               </div>
             </div>
+
+            {/* 🎯 DR. REZA'S PRESCRIPTION FOR NEXT WEEK */}
+            <div className="bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 rounded-2xl p-4 shadow-sm border-2 border-amber-200 mb-4 relative overflow-hidden">
+              {/* Prescription Header */}
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-amber-300 shadow">
+                  <Image src="/assets/avatar-header.png" alt="Dr Reza" width={40} height={40} className="object-cover" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-amber-800">📋 Dr. Reza's Prescription</p>
+                  <p className="text-xs text-amber-600">Your challenge for next week</p>
+                </div>
+              </div>
+
+              {/* Loading State */}
+              {prescriptionLoading && (
+                <div className="py-8 text-center">
+                  <div className="w-8 h-8 border-3 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+                  <p className="text-amber-600 text-sm font-medium">Dr. Reza is analyzing your report...</p>
+                </div>
+              )}
+
+              {/* Prescription Content */}
+              {prescription && !prescriptionLoading && (
+                <>
+                  {/* Problem Identified */}
+                  <div className="bg-white/60 rounded-xl p-3 mb-3 border border-amber-200">
+                    <p className="text-xs font-bold text-amber-700 mb-1">🔍 Issue Found:</p>
+                    <p className="text-sm text-slate-700">{prescription.problem_identified}</p>
+                  </div>
+
+                  {/* The Goal - Styled like a prescription */}
+                  <div className="bg-white rounded-xl p-4 mb-3 border-2 border-dashed border-amber-300 relative">
+                    <div className="absolute -top-2 left-4 bg-amber-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                      ℞ MICRO-GOAL
+                    </div>
+                    <p className="text-base font-bold text-slate-800 leading-relaxed mt-2">
+                      {prescription.suggested_goal_text}
+                    </p>
+                    
+                    {/* Target Metric Badge */}
+                    {prescription.target_metric?.target_value && (
+                      <div className="mt-3 inline-flex items-center gap-2 bg-teal-50 border border-teal-200 rounded-lg px-3 py-1.5">
+                        <span className="text-teal-600 text-xs font-bold">🎯 Target:</span>
+                        <span className="text-teal-800 font-bold">
+                          {prescription.target_metric.target_value} {prescription.target_metric.unit}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Motivation */}
+                  <p className="text-sm text-amber-700 italic text-center mb-4">
+                    "{prescription.motivation}"
+                  </p>
+
+                  {/* Action Buttons */}
+                  {!goalSaved ? (
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        onClick={handleRegeneratePrescription}
+                        disabled={prescriptionLoading}
+                        className="py-3 bg-white border-2 border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 transition-colors flex items-center justify-center gap-2"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                        </svg>
+                        <span className="text-sm">Easier one</span>
+                      </button>
+                      <button
+                        onClick={handleAcceptChallenge}
+                        className="py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold rounded-xl shadow-lg shadow-green-200/50 active:scale-[0.98] transition-transform flex items-center justify-center gap-2"
+                      >
+                        <span>🎯</span>
+                        <span>Accept Challenge!</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="bg-green-100 border-2 border-green-300 rounded-xl p-4 text-center">
+                      <span className="text-3xl mb-2 block">🎉</span>
+                      <p className="text-green-800 font-bold">Challenge Accepted!</p>
+                      <p className="text-green-600 text-sm">Good luck with your goal this week!</p>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Empty State */}
+              {!prescription && !prescriptionLoading && (
+                <div className="py-6 text-center">
+                  <span className="text-3xl mb-2 block">📋</span>
+                  <p className="text-amber-600 text-sm">Generate a report to get your personalized prescription!</p>
+                </div>
+              )}
+            </div>
           </div>
         )}
+
+        {/* 🎊 CONFETTI ANIMATION */}
+        {showConfetti && (
+          <div className="fixed inset-0 pointer-events-none z-[100]">
+            {[...Array(50)].map((_, i) => (
+              <div
+                key={i}
+                className="absolute animate-confetti"
+                style={{
+                  left: `${Math.random() * 100}%`,
+                  top: '-10px',
+                  animationDelay: `${Math.random() * 0.5}s`,
+                  animationDuration: `${2 + Math.random() * 2}s`
+                }}
+              >
+                <div 
+                  className="w-3 h-3 rounded-sm"
+                  style={{
+                    backgroundColor: ['#F59E0B', '#10B981', '#6366F1', '#EC4899', '#EF4444'][Math.floor(Math.random() * 5)],
+                    transform: `rotate(${Math.random() * 360}deg)`
+                  }}
+                />
+              </div>
+            ))}
+          </div>
 
         {/* ========== EMPTY STATE (before generating) ========== */}
         {!reportData && !loading && !error && (
