@@ -39,6 +39,26 @@ const compressImage = (base64Str: string, maxWidth = 512, quality = 0.6) => {
   });
 };
 
+// 🐷 FRONTEND SAFETY NET - Non-Halal Keyword Detection
+const NON_HALAL_KEYWORDS = [
+  'pork', 'babi', 'char siu', 'char siew', 'siew yoke', 'siew yuk', 'siu yuk',
+  'bak kut teh', 'lap cheong', 'lap cheung', 'bacon', 'ham', 'lard',
+  'chinese sausage', 'bbq pork', 'roast pork', 'pork belly', 'pork ribs'
+];
+
+// 🎯 GENERIC LABELS that may hide pork (the "Stir Fry Trap")
+const GENERIC_FOOD_LABELS = [
+  'stir fry', 'stir-fry', 'stirfry', 'mixed rice', 'economy rice', 
+  'chap fan', 'noodles', 'noodle dish', 'fried rice', 'rice dish',
+  'meat dish', 'asian dish', 'chinese dish'
+];
+
+// 🔍 Check if text contains any keywords (case-insensitive)
+const containsKeyword = (text: string, keywords: string[]): boolean => {
+  const lowerText = text.toLowerCase();
+  return keywords.some(keyword => lowerText.includes(keyword.toLowerCase()));
+};
+
 export default function CheckFoodPage() {
   const [image, setImage] = useState<string | null>(null);
   const [baseResult, setBaseResult] = useState<any>(null);
@@ -233,7 +253,49 @@ export default function CheckFoodPage() {
       const confidence = result.confidence || result.data.confidence_score || 1;
       setConfidenceScore(confidence);
 
-      // Build the result object
+      // ╔══════════════════════════════════════════════════════════════╗
+      // ║  🛡️ FRONTEND SAFETY NET - Additional Halal Checks          ║
+      // ╚══════════════════════════════════════════════════════════════╝
+      
+      const foodName = result.data.food_name || '';
+      const category = result.data.category || 'other';
+      const analysisContent = result.data.analysis_content || '';
+      const visualNotes = result.data.visual_notes || '';
+      const apiIsPotentiallyPork = result.data.is_potentially_pork || false;
+      
+      // 1️⃣ KEYWORD CHECK: Scan food name + analysis for non-halal terms
+      const textToScan = `${foodName} ${analysisContent} ${visualNotes}`.toLowerCase();
+      const isKeywordDetected = containsKeyword(textToScan, NON_HALAL_KEYWORDS);
+      
+      if (isKeywordDetected) {
+        console.log("🚨 SAFETY NET: Non-halal keyword detected in:", textToScan);
+      }
+      
+      // 2️⃣ THE "STIR FRY TRAP": Generic label + Chinese + Low confidence = suspicious
+      const hasGenericLabel = containsKeyword(foodName, GENERIC_FOOD_LABELS);
+      const isChinese = category.toLowerCase() === 'chinese';
+      const isLowConfidenceGeneric = confidence < 0.85;
+      const isStirFryTrap = hasGenericLabel && isChinese && isLowConfidenceGeneric;
+      
+      if (isStirFryTrap) {
+        console.log("🚨 SAFETY NET: Stir Fry Trap triggered!", {
+          foodName,
+          category,
+          confidence,
+          hasGenericLabel,
+          isChinese,
+          isLowConfidenceGeneric
+        });
+      }
+      
+      // 3️⃣ FINAL DECISION: Override API if our safety checks trigger
+      const finalIsPotentiallyPork = apiIsPotentiallyPork || isKeywordDetected || isStirFryTrap;
+      
+      if (finalIsPotentiallyPork && !apiIsPotentiallyPork) {
+        console.log("⚠️ SAFETY NET OVERRIDE: Frontend flagged as potentially pork (API said safe)");
+      }
+
+      // Build the result object with safety net applied
       const processedResult = {
         data: {
           food_name: result.data.food_name,
@@ -249,14 +311,16 @@ export default function CheckFoodPage() {
           valid_lauk: result.data.valid_lauk || [],
           halal_status: result.data.halal_status,
           health_tags: result.data.health_tags || [],
-          is_potentially_pork: result.data.is_potentially_pork || false
+          is_potentially_pork: finalIsPotentiallyPork, // 🛡️ Use safety-net enhanced value
+          detected_protein: result.data.detected_protein || 'none',
+          safety_net_triggered: isKeywordDetected || isStirFryTrap // Track if safety net caught it
         },
         is_verified: result.verified,
         source: result.source
       };
 
-      // 🐷 HALAL SAFETY VALVE: Check if potentially pork
-      if (result.data.is_potentially_pork) {
+      // 🐷 HALAL SAFETY VALVE: Check if potentially pork (using safety-net enhanced value)
+      if (finalIsPotentiallyPork) {
         console.log("⚠️ Potentially pork detected - showing confirmation modal");
         setPendingResult(processedResult);
         setShowHalalModal(true);

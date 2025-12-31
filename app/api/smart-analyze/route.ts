@@ -94,6 +94,7 @@ export async function POST(req: Request) {
     let visionConfidence = 0;
     let isPotentiallyPork = false;
     let detectedComponents: string[] = [];
+    let detectedProtein = 'none'; // NEW: Track detected protein type
 
     // 🧠 STEP 1: IDENTIFY THE FOOD (Using comprehensive vision analysis)
     if (type === 'image') {
@@ -128,23 +129,39 @@ export async function POST(req: Request) {
       isPotentiallyPork = visionResult.is_potentially_pork || false;
       visionNutrition = visionResult.nutrition || null;
       detectedComponents = visionResult.detected_components || [];
+      detectedProtein = visionResult.detected_protein || 'none';
       
-      // 🐷 HALAL SAFETY: If potentially pork, use safe alternative
-      if (isPotentiallyPork) {
-        console.log("⚠️ Potentially non-halal detected, using safe alternative");
-        foodName = foodName.toLowerCase().includes('kuey teow') ? 'Kuey Teow Goreng' :
-                   foodName.toLowerCase().includes('mee') ? 'Mee Goreng' :
-                   foodName.toLowerCase().includes('nasi') ? 'Nasi Goreng' : 'Stir Fry Dish';
-        visionCategory = 'Other';
+      // 🐷 AGGRESSIVE PORK FLAGGING based on detected_protein
+      // If model detected pork or ambiguous red meat, ALWAYS flag as potentially pork
+      if (detectedProtein === 'pork' || detectedProtein === 'ambiguous_red_meat') {
+        console.log(`⚠️ Detected protein: ${detectedProtein} - forcing pork flag`);
+        isPotentiallyPork = true;
       }
       
-      // Additional pork keyword check
+      // 🚨 CATCH GENERIC LABELS - If model returned a banned generic label with meat
+      const genericLabels = ['stir fry', 'fried rice', 'noodle dish', 'rice dish', 'mixed rice', 'economy rice', 'meat dish', 'asian dish', 'chinese dish'];
+      const foodNameLower = foodName.toLowerCase();
+      const hasGenericLabel = genericLabels.some(label => foodNameLower.includes(label) || foodNameLower === label);
+      
+      if (hasGenericLabel && detectedProtein !== 'none' && detectedProtein !== 'chicken' && detectedProtein !== 'seafood' && detectedProtein !== 'egg' && detectedProtein !== 'tofu') {
+        // Model used a generic label despite having a non-chicken protein - this is suspicious
+        console.log(`⚠️ Generic label "${foodName}" with protein "${detectedProtein}" - flagging as potentially pork`);
+        isPotentiallyPork = true;
+      }
+      
+      // 🐷 HALAL SAFETY: If potentially pork, keep original name but flag it for user confirmation
+      // Don't auto-rename anymore - let the halal modal handle it
+      if (isPotentiallyPork) {
+        console.log("⚠️ Potentially non-halal detected - will trigger halal confirmation modal");
+        // Keep the original food name so user can see what was detected
+        // The frontend halal modal will handle confirmation
+      }
+      
+      // Additional pork keyword check - flag but don't rename
       for (const keyword of PORK_KEYWORDS) {
         if (foodName.toLowerCase().includes(keyword)) {
-          foodName = foodName.toLowerCase().includes('kuey teow') ? 'Kuey Teow Goreng' :
-                     foodName.toLowerCase().includes('mee') ? 'Mee Goreng' :
-                     foodName.toLowerCase().includes('nasi') ? 'Nasi Goreng' : 'Stir Fry Dish';
-          visionCategory = 'Other';
+          console.log(`⚠️ Pork keyword "${keyword}" found in "${foodName}" - flagging`);
+          isPotentiallyPork = true;
           break;
         }
       }
@@ -263,6 +280,7 @@ Give culturally relevant advice in MAX 40 words.`
         success: true,
         source: 'database',
         verified: true,
+        confidence: visionConfidence || 0.9,
         data: {
           food_name: cleanName,
           category: categoryForAdvice,
@@ -283,7 +301,9 @@ Give culturally relevant advice in MAX 40 words.`
             is_high_sodium: isHighSodium, 
             is_high_sugar: isHighSugar,
             is_high_protein: isHighProtein
-          }
+          },
+          is_potentially_pork: isPotentiallyPork,
+          detected_protein: detectedProtein
         }
       });
     }
@@ -398,7 +418,9 @@ Give culturally relevant advice in MAX 40 words.`
           is_high_sodium: finalMacros.sodium_mg > 800, 
           is_high_sugar: finalMacros.sugar_g > 15,
           is_high_protein: finalMacros.protein_g > 25
-        }
+        },
+        is_potentially_pork: isPotentiallyPork,
+        detected_protein: detectedProtein
       }
     });
 
