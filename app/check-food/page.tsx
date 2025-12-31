@@ -101,7 +101,17 @@ export default function CheckFoodPage() {
   const [isReanalyzing, setIsReanalyzing] = useState(false);
   
   // 🍽️ MEAL TYPE SELECTOR (for Nutrition Reports)
-  const [mealType, setMealType] = useState<'Breakfast' | 'Lunch' | 'Dinner' | 'Snack'>('Lunch');
+  // Auto-select based on current time
+  const getDefaultMealType = (): 'Breakfast' | 'Lunch' | 'Dinner' | 'Snack' => {
+    const hour = new Date().getHours();
+    if (hour >= 5 && hour < 10) return 'Breakfast';      // 5am - 10am
+    if (hour >= 10 && hour < 12) return 'Snack';          // 10am - 12pm (morning snack)
+    if (hour >= 12 && hour < 15) return 'Lunch';          // 12pm - 3pm
+    if (hour >= 15 && hour < 18) return 'Snack';          // 3pm - 6pm (afternoon snack)
+    if (hour >= 18 && hour < 22) return 'Dinner';         // 6pm - 10pm
+    return 'Snack';                                        // 10pm - 5am (late night snack)
+  };
+  const [mealType, setMealType] = useState<'Breakfast' | 'Lunch' | 'Dinner' | 'Snack'>(getDefaultMealType);
 
   const { addMeal, userProfile } = useFood();
   const router = useRouter();
@@ -688,8 +698,8 @@ export default function CheckFoodPage() {
 
       {/* ========== TEXT INPUT MODAL ========== */}
       {showTextInput && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center backdrop-blur-sm">
-          <div className="bg-white w-full rounded-t-3xl p-6 animate-slideUp">
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-end justify-center backdrop-blur-sm">
+          <div className="bg-white w-full rounded-t-3xl p-6 pb-28 animate-slideUp">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-full overflow-hidden">
                 <Image src="/assets/avatar-header.png" alt="Dr. Reza" width={40} height={40} className="object-cover" />
@@ -708,14 +718,14 @@ export default function CheckFoodPage() {
             <div className="flex gap-3 mt-4">
               <button 
                 onClick={() => setShowTextInput(false)} 
-                className="flex-1 py-3 rounded-xl bg-slate-100 text-slate-500 font-bold"
+                className="flex-1 py-4 rounded-xl bg-slate-100 text-slate-500 font-bold text-lg"
               >
                 Cancel
               </button>
               <button 
                 onClick={handleTextSubmit}
                 disabled={!textInput.trim()}
-                className="flex-1 py-3 rounded-xl bg-teal-500 text-white font-bold disabled:opacity-50"
+                className="flex-1 py-4 rounded-xl bg-teal-500 text-white font-bold text-lg disabled:opacity-50"
               >
                 Analyze
               </button>
