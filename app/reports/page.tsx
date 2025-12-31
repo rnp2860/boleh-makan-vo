@@ -813,6 +813,7 @@ ${insight ? `🩺 *Dr. Reza says:*\n"${insight}"` : ''}
               </div>
             ))}
           </div>
+        )}
 
         {/* ========== EMPTY STATE (before generating) ========== */}
         {!reportData && !loading && !error && (
