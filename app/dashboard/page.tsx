@@ -4,6 +4,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { createClient } from '@supabase/supabase-js';
 import { DateStrip } from '@/components/DateStrip';
 import { WeeklyChart } from '@/components/WeeklyChart';
 import { DailyProgress } from '@/components/DailyProgress';
@@ -11,7 +12,13 @@ import MealDetailsModal from '@/components/MealDetailsModal';
 import DaySummaryShare from '@/components/DaySummaryShare';
 import LogVitalsModal from '@/components/LogVitalsModal';
 import BolehScoreWidget from '@/components/BolehScoreWidget';
+import RiskChart, { FoodLogEntry, VitalEntry } from '@/components/RiskChart';
 import { useFood } from '@/context/FoodContext';
+
+// Initialize Supabase client
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export default function DashboardPage() {
   const { meals, userProfile, dailyBudget, deleteMeal, getWeeklyStats, streak, isLoaded } = useFood();
@@ -20,6 +27,11 @@ export default function DashboardPage() {
   const [showDayShare, setShowDayShare] = useState(false);
   const [isVitalsOpen, setIsVitalsOpen] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  
+  // Risk Chart data
+  const [riskChartFoodLogs, setRiskChartFoodLogs] = useState<FoodLogEntry[]>([]);
+  const [riskChartVitals, setRiskChartVitals] = useState<VitalEntry[]>([]);
+  const [riskChartLoading, setRiskChartLoading] = useState(true);
 
   // Get user ID for Boleh Score
   useEffect(() => {
@@ -32,6 +44,59 @@ export default function DashboardPage() {
       setUserId(id);
     }
   }, []);
+
+  // Fetch Risk Chart data when date or userId changes
+  useEffect(() => {
+    const fetchRiskChartData = async () => {
+      if (!userId) return;
+      
+      setRiskChartLoading(true);
+      
+      // Get start and end of selected day
+      const startOfDay = new Date(selectedDate);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(selectedDate);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      try {
+        // Fetch food logs for the selected date
+        const { data: foodData, error: foodError } = await supabase
+          .from('food_logs')
+          .select('id, meal_name, calories, image_url, created_at, meal_context, preparation_style')
+          .eq('user_id', userId)
+          .gte('created_at', startOfDay.toISOString())
+          .lte('created_at', endOfDay.toISOString())
+          .order('created_at', { ascending: true });
+
+        if (foodError) {
+          console.error('Error fetching food logs for chart:', foodError);
+        } else {
+          setRiskChartFoodLogs(foodData || []);
+        }
+
+        // Fetch vitals for the selected date
+        const { data: vitalsData, error: vitalsError } = await supabase
+          .from('user_vitals')
+          .select('id, vital_type, reading_value, unit, context_tag, measured_at')
+          .eq('user_id', userId)
+          .gte('measured_at', startOfDay.toISOString())
+          .lte('measured_at', endOfDay.toISOString())
+          .order('measured_at', { ascending: true });
+
+        if (vitalsError) {
+          console.error('Error fetching vitals for chart:', vitalsError);
+        } else {
+          setRiskChartVitals(vitalsData || []);
+        }
+      } catch (err) {
+        console.error('Failed to fetch risk chart data:', err);
+      } finally {
+        setRiskChartLoading(false);
+      }
+    };
+
+    fetchRiskChartData();
+  }, [userId, selectedDate]);
   
   if (!userProfile) {
     return (
@@ -152,6 +217,28 @@ export default function DashboardPage() {
       {/* 🎯 BOLEH SCORE - HERO POSITION */}
       <div className="px-4 mt-5">
         <BolehScoreWidget userId={userId} />
+      </div>
+
+      {/* 📊 RISK CORRELATION CHART */}
+      <div className="px-4 mt-4">
+        {riskChartLoading ? (
+          <div className="bg-white rounded-2xl p-6 shadow-lg border border-slate-100">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-slate-200 rounded-xl animate-pulse"></div>
+              <div className="space-y-2">
+                <div className="h-4 bg-slate-200 rounded w-32 animate-pulse"></div>
+                <div className="h-3 bg-slate-100 rounded w-24 animate-pulse"></div>
+              </div>
+            </div>
+            <div className="h-48 bg-slate-100 rounded-xl animate-pulse"></div>
+          </div>
+        ) : (
+          <RiskChart 
+            foodLogs={riskChartFoodLogs} 
+            vitals={riskChartVitals}
+            date={selectedDate}
+          />
+        )}
       </div>
 
       {/* DAILY PROGRESS RING */}
