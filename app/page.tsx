@@ -1,5 +1,6 @@
 // src/app/page.tsx
 import Link from 'next/link';
+import Logo from '@/components/Logo';
 
 export default function LandingPage() {
   return (
@@ -8,10 +9,8 @@ export default function LandingPage() {
       <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-100">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           {/* Logo */}
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-gradient-to-br from-teal-500 to-emerald-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">BM</span>
-            </div>
+          <div className="flex items-center gap-2.5">
+            <Logo className="h-9 w-9" />
             <span className="font-bold text-slate-900 text-lg tracking-tight">Boleh Makan Intelligence</span>
           </div>
           
@@ -217,9 +216,7 @@ export default function LandingPage() {
         <div className="max-w-6xl mx-auto px-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2">
-              <div className="w-6 h-6 bg-gradient-to-br from-teal-500 to-emerald-600 rounded-md flex items-center justify-center">
-                <span className="text-white font-bold text-xs">BM</span>
-              </div>
+              <Logo className="h-7 w-7" />
               <span className="font-semibold text-slate-700">Boleh Makan Intelligence</span>
             </div>
             <div className="text-slate-500 text-sm">
