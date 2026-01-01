@@ -128,13 +128,13 @@ export const MEAL_CONTEXT_OPTIONS: { value: MealContext; label: string; emoji: s
 ];
 
 export const PREPARATION_STYLE_OPTIONS: { value: PreparationStyle; label: string; emoji: string; hint?: string }[] = [
-  { value: 'stir_fried', label: 'Stir Fried', emoji: '🥡', hint: 'Wok tossed with oil' },
-  { value: 'deep_fried', label: 'Deep Fried', emoji: '🍗', hint: 'Submerged in oil (e.g. Ayam Goreng)' },
-  { value: 'steamed', label: 'Steamed', emoji: '🥟', hint: 'No oil (e.g. Dim Sum)' },
-  { value: 'grilled', label: 'Grilled', emoji: '🔥', hint: 'Dry heat (e.g. Satay, Bakar)' },
-  { value: 'soup_boiled', label: 'Soupy', emoji: '🍲', hint: 'Water broth (e.g. Sup)' },
-  { value: 'gravy_curry', label: 'Gravy/Curry', emoji: '🍛', hint: 'Thick sauce (e.g. Nasi Kandar)' },
-  { value: 'raw_fresh', label: 'Raw / Fresh', emoji: '🥗', hint: 'Uncooked (e.g. Salad)' },
+  { value: 'stir_fried', label: 'Stir/Pan Fried', emoji: '🥡', hint: 'Wok or Flat Pan with oil (e.g., Roti Canai, Thosai, Nasi Goreng, Char Kuey Teow)' },
+  { value: 'deep_fried', label: 'Deep Fried', emoji: '🍗', hint: 'Submerged in oil (e.g., Ayam Goreng, Keropok, Pisang Goreng)' },
+  { value: 'steamed', label: 'Steamed', emoji: '🥟', hint: 'Steam cooking (e.g., Nasi Lemak Rice, Dim Sum, White Rice)' },
+  { value: 'grilled', label: 'Grilled', emoji: '🔥', hint: 'Dry heat / Toast (e.g., Satay, Roti Bakar, Tandoori)' },
+  { value: 'soup_boiled', label: 'Soupy', emoji: '🍲', hint: 'Water-based broth (e.g., Oats, Porridge, Sup Ayam, Tom Yam)' },
+  { value: 'gravy_curry', label: 'Gravy/Curry', emoji: '🍛', hint: 'Thick/Coconut sauce (e.g., Nasi Kandar, Masak Lemak, Curry Mee)' },
+  { value: 'raw_fresh', label: 'Raw / Fresh', emoji: '🥗', hint: 'Uncooked (e.g., Salad, Ulam, Kerabu)' },
   { value: 'unknown', label: 'Unknown', emoji: '❓' },
 ];
 

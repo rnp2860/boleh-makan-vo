@@ -544,7 +544,7 @@ export default function CheckFoodPage() {
               sugar: finalData.macros.sugar_g,
               portion_size: portion,
               image_base64: processedImage,
-              user_id: getUserId(),
+              user_id: String(getUserId() || ''),
               components: finalData.components,
               analysis_content: baseResult.data?.analysis_content,
               health_tags: baseResult.data?.health_tags || [],

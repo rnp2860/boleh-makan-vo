@@ -102,6 +102,9 @@ export default function LogVitalsModal({ isOpen, onClose, onSuccess }: LogVitals
       setError('User session not found. Please refresh the page.');
       return;
     }
+    
+    // Ensure user_id is a string (safety check for database compatibility)
+    const safeUserId = String(userId);
 
     setIsSaving(true);
     setError('');
@@ -113,7 +116,7 @@ export default function LogVitalsModal({ isOpen, onClose, onSuccess }: LogVitals
         // Insert BOTH systolic and diastolic readings
         const vitalsToInsert: UserVitalInsert[] = [
           {
-            user_id: userId,
+            user_id: safeUserId,
             vital_type: 'bp_systolic',
             reading_value: parseFloat(bpSystolic),
             unit: 'mmHg',
@@ -121,7 +124,7 @@ export default function LogVitalsModal({ isOpen, onClose, onSuccess }: LogVitals
             measured_at: measuredAt,
           },
           {
-            user_id: userId,
+            user_id: safeUserId,
             vital_type: 'bp_diastolic',
             reading_value: parseFloat(bpDiastolic),
             unit: 'mmHg',
@@ -141,7 +144,7 @@ export default function LogVitalsModal({ isOpen, onClose, onSuccess }: LogVitals
         // Single value insert
         const config = VITAL_TYPE_CONFIG[selectedType];
         const vitalData: UserVitalInsert = {
-          user_id: userId,
+          user_id: safeUserId,
           vital_type: selectedType,
           reading_value: parseFloat(readingValue),
           unit: config.unit,

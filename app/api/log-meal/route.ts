@@ -68,6 +68,9 @@ export async function POST(req: Request) {
       }
     }
 
+    // Ensure user_id is a string (safety check for database compatibility)
+    const safeUserId = user_id ? String(user_id) : null;
+
     // Insert meal log into database (including sodium_mg, sugar_g, meal_type & enterprise fields)
     const { data, error } = await supabase
       .from('food_logs')
@@ -81,7 +84,7 @@ export async function POST(req: Request) {
         sugar: sugar ? Math.round(sugar * 10) / 10 : null, // Keep 1 decimal for sugar
         portion_size: portion_size || 1.0,
         image_url,
-        user_id: user_id || null,
+        user_id: safeUserId,
         components: components || null,
         analysis_data: analysis_content || null,
         meal_type: meal_type || 'Other',
