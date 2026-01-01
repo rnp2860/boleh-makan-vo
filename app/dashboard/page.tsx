@@ -1,0 +1,461 @@
+// src/app/dashboard/page.tsx
+'use client';
+
+import { useState, useMemo, useEffect } from 'react';
+import Link from 'next/link';
+import Image from 'next/image';
+import { DateStrip } from '@/components/DateStrip';
+import { WeeklyChart } from '@/components/WeeklyChart';
+import { DailyProgress } from '@/components/DailyProgress';
+import MealDetailsModal from '@/components/MealDetailsModal';
+import DaySummaryShare from '@/components/DaySummaryShare';
+import LogVitalsModal from '@/components/LogVitalsModal';
+import BolehScoreWidget from '@/components/BolehScoreWidget';
+import { useFood } from '@/context/FoodContext';
+
+export default function DashboardPage() {
+  const { meals, userProfile, dailyBudget, deleteMeal, getWeeklyStats, streak, isLoaded } = useFood();
+  const [selectedMeal, setSelectedMeal] = useState<any>(null);
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [showDayShare, setShowDayShare] = useState(false);
+  const [isVitalsOpen, setIsVitalsOpen] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
+
+  // Get user ID for Boleh Score
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      let id = localStorage.getItem('boleh_makan_user_id');
+      if (!id) {
+        id = `user_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+        localStorage.setItem('boleh_makan_user_id', id);
+      }
+      setUserId(id);
+    }
+  }, []);
+  
+  if (!userProfile) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-teal-50 to-white">
+        <div className="w-20 h-20 relative mb-4 rounded-full overflow-hidden border-4 border-white shadow-xl animate-bounce">
+          <Image 
+            src="/assets/avatar-header.png" 
+            alt="Dr. Reza" 
+            fill 
+            className="object-cover" 
+          />
+        </div>
+        <div className="text-teal-600 font-bold animate-pulse">Loading Dr. Reza...</div>
+      </div>
+    );
+  }
+
+  // Filter meals by selected date
+  const filteredMeals = useMemo(() => {
+    const startOfDay = new Date(selectedDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(selectedDate);
+    endOfDay.setHours(23, 59, 59, 999);
+    
+    return meals.filter(meal => {
+      const mealDate = new Date(meal.timestamp);
+      return mealDate >= startOfDay && mealDate <= endOfDay;
+    }).sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+  }, [meals, selectedDate]);
+
+  // Calculate stats for selected day
+  const dayStats = useMemo(() => {
+    return filteredMeals.reduce((acc, meal) => ({
+      calories: acc.calories + (meal.calories || 0),
+      protein: acc.protein + (meal.protein || 0),
+      carbs: acc.carbs + (meal.carbs || 0),
+      fat: acc.fat + (meal.fat || 0),
+    }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
+  }, [filteredMeals]);
+
+  const budget = dailyBudget || 2000;
+  const rawRemaining = budget - dayStats.calories;
+  const isOverBudget = rawRemaining < 0;
+  const isToday = selectedDate.toDateString() === new Date().toDateString();
+
+  // User greeting
+  const firstName = userProfile.name && userProfile.name.trim() !== '' 
+    ? userProfile.name.split(' ')[0] 
+    : 'Foodie';
+
+  const getGoalLabel = () => {
+    if (userProfile.goal === 'lose_weight') return "Nak Kurus";
+    if (userProfile.goal === 'build_muscle') return "Kasi Sado";
+    return "Maintain Je";
+  };
+
+  // Chart logic - only unlock after data is loaded AND user has 3+ days of data
+  const weeklyData = getWeeklyStats();
+  const daysTrackedCount = weeklyData.filter(day => day.calories > 0).length;
+  // Chart stays locked until: loaded + has 3+ days tracked
+  // Use explicit variable to avoid any hydration issues
+  const shouldShowLockOverlay = !isLoaded || daysTrackedCount < 3;
+
+  const getTimeGap = (current: Date, previous: Date) => {
+    const diffMs = current.getTime() - previous.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const hours = Math.floor(diffMins / 60);
+    const mins = diffMins % 60;
+    if (hours > 0) return `${hours}h ${mins}m gap`;
+    return `${mins}m gap`;
+  };
+
+  // Date display
+  const getDateTitle = () => {
+    if (isToday) return "Today";
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    if (selectedDate.toDateString() === yesterday.toDateString()) return "Yesterday";
+    return selectedDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  };
+
+  return (
+    <div className="bg-slate-50 min-h-screen pb-24">
+      
+      {/* HEADER */}
+      <div className="bg-white px-5 pt-6 pb-4 border-b border-slate-100">
+        <div className="flex justify-between items-center mb-4">
+          {/* Left: Avatar + Greeting */}
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 relative rounded-full overflow-hidden border-2 border-teal-100 shadow-sm bg-teal-50">
+              <Image 
+                src="/assets/avatar-header.png" 
+                alt="Dr. Reza" 
+                fill 
+                className="object-cover"
+              />
+            </div>
+            <div>
+              <h1 className="text-xl font-black text-slate-900 leading-none">{getDateTitle()}</h1>
+              <p className="text-xs text-slate-500 font-medium mt-1">Welcome back, {firstName}</p>
+            </div>
+          </div>
+          
+          {/* Right: Streak + Goal */}
+          <div className="flex flex-col items-end">
+            <div className="flex items-center gap-1 bg-orange-50 px-3 py-1 rounded-full border border-orange-100">
+              <span className="text-base">🔥</span>
+              <span className="text-xs font-bold text-orange-600">{streak}</span>
+            </div>
+            <p className="text-[9px] text-slate-300 mt-1 font-bold uppercase">{getGoalLabel()}</p>
+          </div>
+        </div>
+        
+        {/* Date Strip */}
+        <DateStrip selectedDate={selectedDate} onSelectDate={setSelectedDate} />
+      </div>
+
+      {/* 🎯 BOLEH SCORE - HERO POSITION */}
+      <div className="px-4 mt-5">
+        <BolehScoreWidget userId={userId} />
+      </div>
+
+      {/* DAILY PROGRESS RING */}
+      <div className="px-4 mt-4">
+        <DailyProgress 
+          consumed={dayStats.calories}
+          budget={budget}
+          protein={dayStats.protein}
+          carbs={dayStats.carbs}
+          fat={dayStats.fat}
+        />
+      </div>
+
+      {/* QUICK ACTIONS */}
+      <div className="px-4 mt-5">
+        <div className="grid grid-cols-2 gap-3">
+          {/* Log Food */}
+          <Link 
+            href="/check-food"
+            className="bg-gradient-to-br from-teal-500 to-emerald-600 p-4 rounded-2xl shadow-lg shadow-teal-200/50 flex items-center gap-3 active:scale-[0.98] transition-transform"
+          >
+            <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-white font-bold text-sm">Log Food</p>
+              <p className="text-teal-100 text-xs">Scan or type</p>
+            </div>
+          </Link>
+
+          {/* Log Vitals */}
+          <button 
+            onClick={() => setIsVitalsOpen(true)}
+            className="bg-gradient-to-br from-rose-500 to-pink-600 p-4 rounded-2xl shadow-lg shadow-rose-200/50 flex items-center gap-3 active:scale-[0.98] transition-transform text-left"
+          >
+            <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
+              {/* Heart Pulse Icon */}
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h2l1-3 2 6 1-3h2" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-white font-bold text-sm">Log Vitals</p>
+              <p className="text-rose-100 text-xs">Glucose, BP, Weight</p>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      {/* WEEKLY CHART - Always show, with overlay if locked */}
+      <div className="px-4 mt-5">
+        <div className="relative overflow-hidden rounded-2xl">
+          <WeeklyChart data={weeklyData} />
+          
+          {/* Lock Screen Overlay - Centered, no lock icon */}
+          {shouldShowLockOverlay && (
+            <div className="absolute inset-0 bg-gradient-to-br from-slate-800/85 via-slate-900/75 to-teal-900/65 backdrop-blur-[3px] flex flex-col items-center justify-center p-4 z-50 overflow-hidden">
+              
+              {/* Title */}
+              <h3 className="text-white font-bold text-lg mb-1">Weekly Insights</h3>
+              
+              {/* Message */}
+              <p className="text-teal-300 text-xs font-medium mb-4 text-center">
+                Log your first 3 days to unlock!
+              </p>
+              
+              {/* Progress Checkboxes - Day 1, 2, 3 */}
+              <div className="flex items-center gap-3 mb-4">
+                {[1, 2, 3].map((day) => {
+                  const isCompleted = day <= daysTrackedCount;
+                  return (
+                    <div key={day} className="flex flex-col items-center">
+                      <div 
+                        className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold transition-all duration-300 relative ${
+                          isCompleted 
+                            ? 'bg-gradient-to-br from-teal-400 to-teal-600 text-white shadow-lg shadow-teal-500/40' 
+                            : 'bg-slate-700/50 text-slate-400 border-2 border-slate-600/50'
+                        }`}
+                      >
+                        {/* Day number */}
+                        <span className={isCompleted ? 'opacity-70' : ''}>{day}</span>
+                        {/* Strikethrough line when completed */}
+                        {isCompleted && (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="w-6 h-0.5 bg-white rounded-full transform -rotate-45"></div>
+                          </div>
+                        )}
+                      </div>
+                      <span className={`text-[10px] mt-1.5 font-medium ${isCompleted ? 'text-teal-400' : 'text-slate-500'}`}>
+                        Day {day}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+              
+              {/* CTA Button */}
+              <Link 
+                href="/check-food" 
+                className="bg-gradient-to-r from-teal-500 to-teal-600 text-white text-xs font-bold px-5 py-2.5 rounded-full shadow-lg shadow-teal-500/30 hover:shadow-teal-500/50 transition-all"
+              >
+                📸 Log Today's Meal
+              </Link>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* HEALTH CONDITION BADGES */}
+      {userProfile.healthConditions.length > 0 && (
+        <div className="px-4 mt-4">
+          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+            {userProfile.healthConditions.map(c => (
+              <span key={c} className="bg-teal-50 text-teal-700 text-[10px] font-bold px-3 py-1 rounded-full border border-teal-100 capitalize whitespace-nowrap">
+                {c.replace('_', ' ')}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* MEAL LIST HEADER */}
+      <div className="px-4 mt-6 flex justify-between items-center">
+        <h3 className="font-bold text-slate-800">
+          {isToday ? "Today's Meals" : `Meals on ${selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}
+        </h3>
+        {filteredMeals.length > 0 && (
+          <button 
+            onClick={() => setShowDayShare(true)}
+            className="text-xs font-bold text-teal-600 flex items-center gap-1"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z" />
+            </svg>
+            Share Day
+          </button>
+        )}
+      </div>
+
+      {/* MEAL LIST */}
+      <div className="px-4 mt-3">
+        {filteredMeals.length === 0 ? (
+          <div className="bg-white rounded-2xl p-8 text-center border border-dashed border-slate-200">
+            <div className="text-4xl mb-3">🍽️</div>
+            <p className="text-slate-500 font-medium">No meals tracked {isToday ? 'today' : 'on this day'}.</p>
+            {isToday && (
+              <div className="mt-4">
+                {/* Prominent CTA for first-time users */}
+                <div className="bg-gradient-to-r from-blue-50 to-teal-50 rounded-xl p-4 border border-blue-100">
+                  <p className="text-blue-700 font-bold text-sm mb-2">
+                    Ready to start your health journey?
+                  </p>
+                  <p className="text-slate-500 text-xs">
+                    Tap the camera button below to log your first meal!
+                  </p>
+                </div>
+                
+                {/* Animated Arrow Pointing Down */}
+                <div className="flex flex-col items-center mt-5">
+                  <div className="animate-bounce">
+                    {/* Cool double-line arrow with gradient effect */}
+                    <div className="relative">
+                      <svg 
+                        xmlns="http://www.w3.org/2000/svg" 
+                        className="h-16 w-16 text-blue-500 drop-shadow-lg" 
+                        fill="none" 
+                        viewBox="0 0 24 24" 
+                        stroke="url(#arrowGradient)"
+                        strokeWidth={2}
+                      >
+                        <defs>
+                          <linearGradient id="arrowGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" stopColor="#3B82F6" />
+                            <stop offset="100%" stopColor="#14B8A6" />
+                          </linearGradient>
+                        </defs>
+                        {/* Main arrow shaft */}
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v14" />
+                        {/* Arrow head - wider chevron */}
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l7 7 7-7" />
+                        {/* Second chevron for depth */}
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M8 10l4 4 4-4" opacity="0.5" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {filteredMeals.map((meal, index) => {
+              const previousMeal = filteredMeals[index - 1];
+              const timeGapLabel = previousMeal 
+                ? getTimeGap(new Date(meal.timestamp), new Date(previousMeal.timestamp))
+                : "First meal";
+
+              return (
+                <div key={meal.id} className="relative">
+                  {/* Timeline Connector */}
+                  {index < filteredMeals.length - 1 && (
+                    <div className="absolute left-7 top-16 bottom-[-16px] w-0.5 bg-slate-100 z-0"></div>
+                  )}
+                  
+                  {/* MEAL CARD */}
+                  <div 
+                    onClick={() => setSelectedMeal(meal)}
+                    className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex gap-3 z-10 relative cursor-pointer active:scale-[0.98] transition-transform"
+                  >
+                    {/* Image */}
+                    <div className="h-14 w-14 bg-slate-100 rounded-xl overflow-hidden flex-shrink-0">
+                      {meal.image ? (
+                        <img src={meal.image} alt={meal.name} className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="h-full w-full flex items-center justify-center text-xl bg-gradient-to-br from-teal-100 to-emerald-100">🥗</div>
+                      )}
+                    </div>
+                    
+                    {/* Content */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-start">
+                        <div className="min-w-0 flex-1">
+                          <h4 className="font-bold text-slate-800 text-sm truncate">{meal.name}</h4>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-[10px] text-slate-400 font-medium bg-slate-50 px-2 py-0.5 rounded">
+                              {new Date(meal.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                            <span className="text-[10px] text-teal-600 font-bold">{timeGapLabel}</span>
+                          </div>
+                        </div>
+                        <div className="text-right flex-shrink-0 ml-2">
+                          <span className="font-black text-slate-900 text-base">{meal.calories}</span>
+                          <span className="text-[10px] text-slate-400 font-bold ml-0.5">kcal</span>
+                        </div>
+                      </div>
+                      
+                      {/* Macro Pills - Full labels */}
+                      <div className="flex gap-1.5 mt-2">
+                        <span className="bg-green-50 text-green-600 text-[9px] font-bold px-2 py-1 rounded-lg">
+                          Protein {meal.protein}g
+                        </span>
+                        <span className="bg-orange-50 text-orange-500 text-[9px] font-bold px-2 py-1 rounded-lg">
+                          Carbs {meal.carbs}g
+                        </span>
+                        <span className="bg-amber-50 text-amber-500 text-[9px] font-bold px-2 py-1 rounded-lg">
+                          Fat {meal.fat || 0}g
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* PDF REPORT BUTTON (if chart unlocked) */}
+      {!shouldShowLockOverlay && (
+        <div className="px-4 mt-6">
+          <Link 
+            href="/report"
+            className="block w-full py-4 bg-gradient-to-r from-slate-800 to-slate-900 text-white font-bold text-center rounded-2xl shadow-lg"
+          >
+            📄 Generate Weekly Report
+          </Link>
+        </div>
+      )}
+
+      {/* MEAL DETAILS MODAL */}
+      <MealDetailsModal 
+        meal={selectedMeal} 
+        onClose={() => setSelectedMeal(null)} 
+        onDelete={deleteMeal} 
+      />
+
+      {/* DAY SUMMARY SHARE MODAL */}
+      {showDayShare && (
+        <DaySummaryShare
+          meals={filteredMeals}
+          date={selectedDate}
+          totalCalories={dayStats.calories}
+          totalProtein={dayStats.protein}
+          totalCarbs={dayStats.carbs}
+          totalFat={dayStats.fat}
+          userName={firstName}
+          onClose={() => setShowDayShare(false)}
+        />
+      )}
+
+      {/* LOG VITALS MODAL */}
+      <LogVitalsModal 
+        isOpen={isVitalsOpen}
+        onClose={() => setIsVitalsOpen(false)}
+        onSuccess={() => {
+          // Optional: Show success toast or refresh data
+          console.log('✅ Vital logged successfully');
+        }}
+      />
+    </div>
+  );
+}
+

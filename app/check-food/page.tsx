@@ -8,6 +8,12 @@ import Image from 'next/image';
 import { VitalityHUD } from '@/components/VitalityHUD';
 import { useFood } from '@/context/FoodContext';
 import { MALAYSIAN_FOOD_ANCHORS, FoodAnchor, FoodCategory } from '@/data/malaysian_food_anchors';
+import { 
+  MealContext, 
+  PreparationStyle, 
+  MEAL_CONTEXT_OPTIONS, 
+  PREPARATION_STYLE_OPTIONS 
+} from '@/types/database';
 
 // 🗜️ IMAGE COMPRESSION - Optimized for API speed
 const compressImage = (base64Str: string, maxWidth = 512, quality = 0.6) => {
@@ -113,6 +119,10 @@ export default function CheckFoodPage() {
   };
   const [mealType, setMealType] = useState<'Breakfast' | 'Lunch' | 'Dinner' | 'Snack'>(getDefaultMealType);
 
+  // 🏪 MEAL CONTEXT & PREPARATION (Enterprise Features)
+  const [mealContext, setMealContext] = useState<MealContext>('hawker_stall');
+  const [preparationStyle, setPreparationStyle] = useState<PreparationStyle>('unknown');
+
   const { addMeal, userProfile } = useFood();
   const router = useRouter();
 
@@ -170,6 +180,8 @@ export default function CheckFoodPage() {
     setTextInput('');
     setCorrectionInput('');
     setConfidenceScore(1);
+    setMealContext('hawker_stall');
+    setPreparationStyle('unknown');
   };
 
   // 🔍 Check if result is low confidence (Unknown OR < 60%)
@@ -501,7 +513,7 @@ export default function CheckFoodPage() {
           components: finalData.components 
         }, processedImage);
 
-        // 2️⃣ Save to Supabase (cloud backup) - including sodium, sugar & meal_type
+        // 2️⃣ Save to Supabase (cloud backup) - including sodium, sugar, meal_type & enterprise fields
         try {
           await fetch('/api/log-meal', {
             method: 'POST',
@@ -520,10 +532,15 @@ export default function CheckFoodPage() {
               components: finalData.components,
               analysis_content: baseResult.data?.analysis_content,
               health_tags: baseResult.data?.health_tags || [],
-              meal_type: mealType // NEW: Meal type for nutrition reports
+              meal_type: mealType,
+              // Enterprise fields
+              meal_context: mealContext,
+              preparation_style: preparationStyle,
+              sugar_source_detected: (finalData.macros.sugar_g || 0) > 10,
+              is_ramadan_log: false // Can be enhanced later with date detection
             })
           });
-          console.log('✅ Meal saved to Supabase with meal_type:', mealType);
+          console.log('✅ Meal saved to Supabase with enterprise fields:', { mealType, mealContext, preparationStyle });
         } catch (supabaseErr) {
           console.error('Supabase save failed (local save succeeded):', supabaseErr);
         }
@@ -1210,6 +1227,53 @@ export default function CheckFoodPage() {
                     </button>
                   );
                 })}
+              </div>
+            </div>
+          )}
+
+          {/* 🏪 MEAL CONTEXT & PREPARATION - Enterprise Data Collection */}
+          {!isLowConfidence() && (
+            <div className="bg-white rounded-2xl p-4 shadow-lg mb-4">
+              {/* Meal Context */}
+              <div className="mb-5">
+                <p className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">🏪 Where did you get this?</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {MEAL_CONTEXT_OPTIONS.map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => setMealContext(option.value)}
+                      className={`py-2.5 px-2 rounded-xl font-bold text-xs transition-all flex flex-col items-center gap-1 ${
+                        mealContext === option.value 
+                          ? 'bg-amber-500 text-white shadow-lg shadow-amber-200' 
+                          : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                      }`}
+                    >
+                      <span className="text-base">{option.emoji}</span>
+                      <span className="text-[10px] leading-tight text-center">{option.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Preparation Style */}
+              <div>
+                <p className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">👨‍🍳 How was it prepared?</p>
+                <div className="grid grid-cols-4 gap-2">
+                  {PREPARATION_STYLE_OPTIONS.map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => setPreparationStyle(option.value)}
+                      className={`py-2.5 px-1 rounded-xl font-bold text-xs transition-all flex flex-col items-center gap-1 ${
+                        preparationStyle === option.value 
+                          ? 'bg-orange-500 text-white shadow-lg shadow-orange-200' 
+                          : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                      }`}
+                    >
+                      <span className="text-base">{option.emoji}</span>
+                      <span className="text-[9px] leading-tight text-center">{option.label}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           )}
