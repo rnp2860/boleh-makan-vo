@@ -2,19 +2,12 @@
 'use client';
 
 import { useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
 import { 
   VitalType, 
   VitalContextTag, 
-  UserVitalInsert,
   VITAL_TYPE_CONFIG, 
   VITAL_CONTEXT_OPTIONS 
 } from '@/types/database';
-
-// Initialize Supabase client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 interface LogVitalsModalProps {
   isOpen: boolean;
@@ -112,61 +105,80 @@ export default function LogVitalsModal({ isOpen, onClose, onSuccess }: LogVitals
     try {
       const measuredAt = new Date().toISOString();
       
+      // Build request body based on vital type
+      let requestBody: Record<string, any>;
+      
       if (isBP) {
-        // Insert BOTH systolic and diastolic readings
-        const vitalsToInsert: UserVitalInsert[] = [
-          {
-            user_id: safeUserId,
-            vital_type: 'bp_systolic',
-            reading_value: parseFloat(bpSystolic),
-            unit: 'mmHg',
-            context_tag: contextTag,
-            measured_at: measuredAt,
-          },
-          {
-            user_id: safeUserId,
-            vital_type: 'bp_diastolic',
-            reading_value: parseFloat(bpDiastolic),
-            unit: 'mmHg',
-            context_tag: contextTag,
-            measured_at: measuredAt,
-          }
-        ];
-        
-        const { error: insertError } = await supabase
-          .from('user_vitals')
-          .insert(vitalsToInsert);
-
-        if (insertError) {
-          throw new Error(insertError.message);
-        }
+        // Blood Pressure - send both values
+        requestBody = {
+          user_id: safeUserId,
+          vital_type: 'blood_pressure',
+          bp_systolic: bpSystolic,
+          bp_diastolic: bpDiastolic,
+          context_tag: contextTag,
+          measured_at: measuredAt,
+        };
       } else {
-        // Single value insert
+        // Single value vital
         const config = VITAL_TYPE_CONFIG[selectedType];
-        const vitalData: UserVitalInsert = {
+        requestBody = {
           user_id: safeUserId,
           vital_type: selectedType,
-          reading_value: parseFloat(readingValue),
+          reading_value: readingValue,
           unit: config.unit,
           context_tag: contextTag,
           measured_at: measuredAt,
         };
+      }
 
-        const { error: insertError } = await supabase
-          .from('user_vitals')
-          .insert([vitalData]);
+      console.log('📊 Saving vital:', requestBody);
 
-        if (insertError) {
-          throw new Error(insertError.message);
+      // Call the API endpoint
+      const response = await fetch('/api/log-vital', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
+      });
+
+      // Check if response is OK
+      if (!response.ok) {
+        const statusText = response.statusText || 'Unknown error';
+        console.error(`❌ API Error: ${response.status} ${statusText}`);
+        
+        // Try to get error details from response body
+        try {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `Server error: ${response.status}`);
+        } catch {
+          throw new Error(`Server error: ${response.status} ${statusText}`);
         }
       }
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to save vital');
+      }
+
+      console.log('✅ Vital saved successfully:', result);
 
       // Success - reset and close
       handleClose();
       onSuccess?.();
     } catch (err: any) {
-      console.error('Failed to save vital:', err);
-      setError(err.message || 'Failed to save. Please try again.');
+      console.error('❌ Failed to save vital:', err);
+      
+      // Provide user-friendly error messages
+      let userMessage = 'Failed to save. Please try again.';
+      if (err.message.includes('fetch')) {
+        userMessage = 'Network error. Check your connection and try again.';
+      } else if (err.message.includes('404')) {
+        userMessage = 'Service unavailable. Please try again later.';
+      } else if (err.message) {
+        userMessage = err.message;
+      }
+      
+      setError(userMessage);
     } finally {
       setIsSaving(false);
     }
