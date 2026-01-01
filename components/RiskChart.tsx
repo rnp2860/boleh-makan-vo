@@ -12,7 +12,6 @@ import {
   Tooltip,
   ResponsiveContainer,
   ReferenceLine,
-  TooltipProps,
 } from 'recharts';
 
 // ============================================
@@ -82,10 +81,15 @@ const getGlucoseColor = (value: number): string => {
 // CUSTOM TOOLTIP
 // ============================================
 
-const CustomTooltip = ({ active, payload }: TooltipProps<number, string>) => {
+interface CustomTooltipProps {
+  active?: boolean;
+  payload?: Array<{ payload: ChartDataPoint }>;
+}
+
+const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
   if (!active || !payload || payload.length === 0) return null;
 
-  const data = payload[0].payload as ChartDataPoint;
+  const data = payload[0].payload;
 
   // Meal Tooltip
   if (data.isMeal && data.meal) {
