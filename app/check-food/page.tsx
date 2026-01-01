@@ -4,7 +4,9 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import Image from 'next/image';
+import { ArrowLeft } from 'lucide-react';
 import { VitalityHUD } from '@/components/VitalityHUD';
 import { useFood } from '@/context/FoodContext';
 import { MALAYSIAN_FOOD_ANCHORS, FoodAnchor, FoodCategory } from '@/data/malaysian_food_anchors';
@@ -627,7 +629,16 @@ export default function CheckFoodPage() {
   // 🎨 RENDER
   // ============================================
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 pb-32">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 pb-32 relative">
+      
+      {/* 🔙 BACK TO DASHBOARD - Exit Hatch */}
+      <Link
+        href="/dashboard"
+        className="absolute top-4 left-4 z-50 w-10 h-10 bg-white/90 backdrop-blur-md rounded-full shadow-lg flex items-center justify-center hover:bg-white hover:scale-105 transition-all active:scale-95 border border-slate-200/50"
+        aria-label="Back to Dashboard"
+      >
+        <ArrowLeft className="w-5 h-5 text-slate-700" />
+      </Link>
       
       {/* ========== WELCOME SCREEN ========== */}
       {!image && !baseResult && !loading && (
