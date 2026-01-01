@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { BolehScoreInfo } from './InfoModal';
 
 interface ScoreData {
   score: number;
@@ -204,6 +205,7 @@ export default function BolehScoreWidget({ userId }: BolehScoreWidgetProps) {
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-gradient-to-r from-teal-400 to-emerald-500 animate-pulse"></div>
           <span className="text-[11px] font-medium text-slate-400">Today's Health Score</span>
+          <BolehScoreInfo />
         </div>
         <span className="text-[10px] font-bold text-slate-300 uppercase">Powered by Boleh AI</span>
       </div>

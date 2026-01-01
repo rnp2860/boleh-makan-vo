@@ -13,6 +13,7 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from 'recharts';
+import { RiskCorrelationInfo } from './InfoModal';
 
 // ============================================
 // TYPES
@@ -236,9 +237,12 @@ export default function RiskChart({ foodLogs, vitals, date }: RiskChartProps) {
           <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
             <span className="text-white text-lg">📊</span>
           </div>
-          <div>
-            <h3 className="font-bold text-slate-800">Risk Correlation</h3>
-            <p className="text-xs text-slate-500">Meals & Glucose Timeline</p>
+          <div className="flex items-center gap-2">
+            <div>
+              <h3 className="font-bold text-slate-800">Risk Correlation</h3>
+              <p className="text-xs text-slate-500">Meals & Glucose Timeline</p>
+            </div>
+            <RiskCorrelationInfo />
           </div>
         </div>
         
@@ -259,11 +263,14 @@ export default function RiskChart({ foodLogs, vitals, date }: RiskChartProps) {
           <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-200/50">
             <span className="text-white text-lg">📊</span>
           </div>
-          <div>
-            <h3 className="font-bold text-slate-800">Risk Correlation</h3>
-            <p className="text-xs text-slate-500">
-              {date ? date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Today'} • Meals & Glucose
-            </p>
+          <div className="flex items-center gap-2">
+            <div>
+              <h3 className="font-bold text-slate-800">Risk Correlation</h3>
+              <p className="text-xs text-slate-500">
+                {date ? date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Today'} • Meals & Glucose
+              </p>
+            </div>
+            <RiskCorrelationInfo />
           </div>
         </div>
         
