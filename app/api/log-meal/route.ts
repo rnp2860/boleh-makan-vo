@@ -27,7 +27,10 @@ export async function POST(req: Request) {
       meal_context,
       preparation_style,
       sugar_source_detected,
-      is_ramadan_log
+      is_ramadan_log,
+      // 🔄 RLHF fields - Human Feedback for AI improvement
+      ai_suggested_name,
+      was_user_corrected
     } = await req.json();
 
     let image_url = null;
@@ -87,6 +90,9 @@ export async function POST(req: Request) {
         preparation_style: preparation_style || 'unknown',
         sugar_source_detected: sugar_source_detected || false,
         is_ramadan_log: is_ramadan_log || false,
+        // 🔄 RLHF fields - Human Feedback for AI improvement
+        ai_suggested_name: ai_suggested_name || meal_name, // Original AI suggestion
+        was_user_corrected: was_user_corrected || false,   // Did user correct the name?
       })
       .select()
       .single();

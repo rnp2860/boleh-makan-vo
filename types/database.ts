@@ -45,6 +45,10 @@ export interface FoodLog {
   preparation_style: PreparationStyle;
   sugar_source_detected: boolean;
   is_ramadan_log: boolean;
+  
+  // 🔄 RLHF columns - Human Feedback for AI improvement
+  ai_suggested_name: string | null;  // Original name AI suggested
+  was_user_corrected: boolean;       // Did user edit the name?
 }
 
 export interface FoodLogInsert {
@@ -67,6 +71,10 @@ export interface FoodLogInsert {
   preparation_style?: PreparationStyle;
   sugar_source_detected?: boolean;
   is_ramadan_log?: boolean;
+  
+  // 🔄 RLHF columns - Human Feedback for AI improvement
+  ai_suggested_name?: string;
+  was_user_corrected?: boolean;
 }
 
 // ============================================

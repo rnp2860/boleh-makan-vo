@@ -102,6 +102,9 @@ export default function CheckFoodPage() {
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState('');
   
+  // 🔄 RLHF: Track original AI suggestion vs user correction
+  const [aiSuggestedName, setAiSuggestedName] = useState<string>('');
+  
   // 🔄 LOW CONFIDENCE CORRECTION
   const [correctionInput, setCorrectionInput] = useState('');
   const [isReanalyzing, setIsReanalyzing] = useState(false);
@@ -350,12 +353,16 @@ export default function CheckFoodPage() {
         setPendingResult(processedResult);
         setShowHalalModal(true);
         setLoading(false);
+        // 🔄 RLHF: Capture original AI suggestion before modal
+        setAiSuggestedName(result.data.food_name);
         return; // Stop here, wait for user confirmation
       }
 
       // Set result directly if no halal concerns
       setBaseResult(processedResult);
       setEditedName(result.data.food_name);
+      // 🔄 RLHF: Capture original AI suggestion
+      setAiSuggestedName(result.data.food_name);
 
     } catch (err: any) {
       setError(err.message);
@@ -515,6 +522,15 @@ export default function CheckFoodPage() {
 
         // 2️⃣ Save to Supabase (cloud backup) - including sodium, sugar, meal_type & enterprise fields
         try {
+          // 🔄 RLHF: Check if user corrected the AI's suggestion
+          const wasUserCorrected = aiSuggestedName && finalData.food_name !== aiSuggestedName;
+          if (wasUserCorrected) {
+            console.log('🔄 RLHF: User corrected food name', { 
+              original: aiSuggestedName, 
+              corrected: finalData.food_name 
+            });
+          }
+          
           await fetch('/api/log-meal', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -537,10 +553,18 @@ export default function CheckFoodPage() {
               meal_context: mealContext,
               preparation_style: preparationStyle,
               sugar_source_detected: (finalData.macros.sugar_g || 0) > 10,
-              is_ramadan_log: false // Can be enhanced later with date detection
+              is_ramadan_log: false, // Can be enhanced later with date detection
+              // 🔄 RLHF: Track AI suggestion vs user correction
+              ai_suggested_name: aiSuggestedName || finalData.food_name,
+              was_user_corrected: wasUserCorrected
             })
           });
-          console.log('✅ Meal saved to Supabase with enterprise fields:', { mealType, mealContext, preparationStyle });
+          console.log('✅ Meal saved to Supabase with RLHF tracking:', { 
+            mealType, mealContext, preparationStyle,
+            aiSuggested: aiSuggestedName,
+            finalName: finalData.food_name,
+            wasUserCorrected
+          });
         } catch (supabaseErr) {
           console.error('Supabase save failed (local save succeeded):', supabaseErr);
         }
