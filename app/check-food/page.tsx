@@ -1287,17 +1287,24 @@ export default function CheckFoodPage() {
                     <button
                       key={option.value}
                       onClick={() => setPreparationStyle(option.value)}
-                      className={`py-2.5 px-1 rounded-xl font-bold text-xs transition-all flex flex-col items-center gap-1 ${
+                      className={`py-2.5 px-1 rounded-xl font-bold text-xs transition-all flex flex-col items-center gap-1 relative group ${
                         preparationStyle === option.value 
                           ? 'bg-orange-500 text-white shadow-lg shadow-orange-200' 
                           : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
                       }`}
+                      title={option.hint}
                     >
                       <span className="text-base">{option.emoji}</span>
                       <span className="text-[9px] leading-tight text-center">{option.label}</span>
                     </button>
                   ))}
                 </div>
+                {/* Helper text for selected preparation */}
+                {preparationStyle && preparationStyle !== 'unknown' && (
+                  <p className="text-[10px] text-slate-400 mt-2 text-center italic">
+                    {PREPARATION_STYLE_OPTIONS.find(o => o.value === preparationStyle)?.hint}
+                  </p>
+                )}
               </div>
             </div>
           )}

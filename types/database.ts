@@ -127,14 +127,14 @@ export const MEAL_CONTEXT_OPTIONS: { value: MealContext; label: string; emoji: s
   { value: 'unknown', label: 'Other', emoji: '❓' },
 ];
 
-export const PREPARATION_STYLE_OPTIONS: { value: PreparationStyle; label: string; emoji: string }[] = [
-  { value: 'stir_fried', label: 'Stir Fried', emoji: '🥡' },
-  { value: 'deep_fried', label: 'Deep Fried', emoji: '🍗' },
-  { value: 'steamed', label: 'Steamed', emoji: '🥟' },
-  { value: 'grilled', label: 'Grilled', emoji: '🔥' },
-  { value: 'soup_boiled', label: 'Soup / Boiled', emoji: '🍲' },
-  { value: 'gravy_curry', label: 'Gravy / Curry', emoji: '🍛' },
-  { value: 'raw_fresh', label: 'Raw / Fresh', emoji: '🥗' },
+export const PREPARATION_STYLE_OPTIONS: { value: PreparationStyle; label: string; emoji: string; hint?: string }[] = [
+  { value: 'stir_fried', label: 'Stir Fried', emoji: '🥡', hint: 'Wok tossed with oil' },
+  { value: 'deep_fried', label: 'Deep Fried', emoji: '🍗', hint: 'Submerged in oil (e.g. Ayam Goreng)' },
+  { value: 'steamed', label: 'Steamed', emoji: '🥟', hint: 'No oil (e.g. Dim Sum)' },
+  { value: 'grilled', label: 'Grilled', emoji: '🔥', hint: 'Dry heat (e.g. Satay, Bakar)' },
+  { value: 'soup_boiled', label: 'Soupy', emoji: '🍲', hint: 'Water broth (e.g. Sup)' },
+  { value: 'gravy_curry', label: 'Gravy/Curry', emoji: '🍛', hint: 'Thick sauce (e.g. Nasi Kandar)' },
+  { value: 'raw_fresh', label: 'Raw / Fresh', emoji: '🥗', hint: 'Uncooked (e.g. Salad)' },
   { value: 'unknown', label: 'Unknown', emoji: '❓' },
 ];
 

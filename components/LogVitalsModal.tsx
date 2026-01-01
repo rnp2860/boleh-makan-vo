@@ -26,8 +26,11 @@ export default function LogVitalsModal({ isOpen, onClose, onSuccess }: LogVitals
   const [step, setStep] = useState<'type' | 'value'>('type');
   const [selectedType, setSelectedType] = useState<VitalType | null>(null);
   const [readingValue, setReadingValue] = useState('');
+  // Blood Pressure needs two values
+  const [bpSystolic, setBpSystolic] = useState('');
+  const [bpDiastolic, setBpDiastolic] = useState('');
   const [contextTag, setContextTag] = useState<VitalContextTag>('general');
-  const [loading, setSaving] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
 
   // Get user ID from localStorage
@@ -45,6 +48,8 @@ export default function LogVitalsModal({ isOpen, onClose, onSuccess }: LogVitals
     setSelectedType(type);
     setStep('value');
     setReadingValue('');
+    setBpSystolic('');
+    setBpDiastolic('');
     setError('');
     
     // Default context based on vital type
@@ -56,15 +61,40 @@ export default function LogVitalsModal({ isOpen, onClose, onSuccess }: LogVitals
   };
 
   const handleSave = async () => {
-    if (!selectedType || !readingValue) return;
+    if (!selectedType) return;
 
-    const config = VITAL_TYPE_CONFIG[selectedType];
-    const numValue = parseFloat(readingValue);
-
-    // Validate value range
-    if (isNaN(numValue) || numValue < config.min || numValue > config.max) {
-      setError(`Please enter a valid ${config.label} between ${config.min} and ${config.max} ${config.unit}`);
-      return;
+    // Special handling for Blood Pressure (two values)
+    const isBP = selectedType === 'bp_systolic';
+    
+    if (isBP) {
+      // Validate both BP values
+      const systolicNum = parseFloat(bpSystolic);
+      const diastolicNum = parseFloat(bpDiastolic);
+      const systolicConfig = VITAL_TYPE_CONFIG['bp_systolic'];
+      const diastolicConfig = VITAL_TYPE_CONFIG['bp_diastolic'];
+      
+      if (isNaN(systolicNum) || systolicNum < systolicConfig.min || systolicNum > systolicConfig.max) {
+        setError(`Systolic must be between ${systolicConfig.min} and ${systolicConfig.max} mmHg`);
+        return;
+      }
+      if (isNaN(diastolicNum) || diastolicNum < diastolicConfig.min || diastolicNum > diastolicConfig.max) {
+        setError(`Diastolic must be between ${diastolicConfig.min} and ${diastolicConfig.max} mmHg`);
+        return;
+      }
+      if (diastolicNum >= systolicNum) {
+        setError('Diastolic should be lower than Systolic');
+        return;
+      }
+    } else {
+      // Standard single-value validation
+      if (!readingValue) return;
+      const config = VITAL_TYPE_CONFIG[selectedType];
+      const numValue = parseFloat(readingValue);
+      
+      if (isNaN(numValue) || numValue < config.min || numValue > config.max) {
+        setError(`Please enter a valid ${config.label} between ${config.min} and ${config.max} ${config.unit}`);
+        return;
+      }
     }
 
     const userId = getUserId();
@@ -73,25 +103,59 @@ export default function LogVitalsModal({ isOpen, onClose, onSuccess }: LogVitals
       return;
     }
 
-    setSaving(true);
+    setIsSaving(true);
     setError('');
 
     try {
-      const vitalData: UserVitalInsert = {
-        user_id: userId,
-        vital_type: selectedType,
-        reading_value: numValue,
-        unit: config.unit,
-        context_tag: contextTag,
-        measured_at: new Date().toISOString(),
-      };
+      const measuredAt = new Date().toISOString();
+      
+      if (isBP) {
+        // Insert BOTH systolic and diastolic readings
+        const vitalsToInsert: UserVitalInsert[] = [
+          {
+            user_id: userId,
+            vital_type: 'bp_systolic',
+            reading_value: parseFloat(bpSystolic),
+            unit: 'mmHg',
+            context_tag: contextTag,
+            measured_at: measuredAt,
+          },
+          {
+            user_id: userId,
+            vital_type: 'bp_diastolic',
+            reading_value: parseFloat(bpDiastolic),
+            unit: 'mmHg',
+            context_tag: contextTag,
+            measured_at: measuredAt,
+          }
+        ];
+        
+        const { error: insertError } = await supabase
+          .from('user_vitals')
+          .insert(vitalsToInsert);
 
-      const { error: insertError } = await supabase
-        .from('user_vitals')
-        .insert([vitalData]);
+        if (insertError) {
+          throw new Error(insertError.message);
+        }
+      } else {
+        // Single value insert
+        const config = VITAL_TYPE_CONFIG[selectedType];
+        const vitalData: UserVitalInsert = {
+          user_id: userId,
+          vital_type: selectedType,
+          reading_value: parseFloat(readingValue),
+          unit: config.unit,
+          context_tag: contextTag,
+          measured_at: measuredAt,
+        };
 
-      if (insertError) {
-        throw new Error(insertError.message);
+        const { error: insertError } = await supabase
+          .from('user_vitals')
+          .insert([vitalData]);
+
+        if (insertError) {
+          throw new Error(insertError.message);
+        }
       }
 
       // Success - reset and close
@@ -101,7 +165,7 @@ export default function LogVitalsModal({ isOpen, onClose, onSuccess }: LogVitals
       console.error('Failed to save vital:', err);
       setError(err.message || 'Failed to save. Please try again.');
     } finally {
-      setSaving(false);
+      setIsSaving(false);
     }
   };
 
@@ -109,6 +173,8 @@ export default function LogVitalsModal({ isOpen, onClose, onSuccess }: LogVitals
     setStep('type');
     setSelectedType(null);
     setReadingValue('');
+    setBpSystolic('');
+    setBpDiastolic('');
     setContextTag('general');
     setError('');
     onClose();
@@ -216,32 +282,96 @@ export default function LogVitalsModal({ isOpen, onClose, onSuccess }: LogVitals
                 <span className="text-sm font-medium">Back</span>
               </button>
 
-              {/* Value Input */}
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">
-                  {config.label} Reading
-                </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    step="0.1"
-                    min={config.min}
-                    max={config.max}
-                    value={readingValue}
-                    onChange={(e) => setReadingValue(e.target.value)}
-                    placeholder={`e.g. ${selectedType === 'glucose' ? '5.5' : selectedType === 'bp_systolic' ? '120' : selectedType === 'weight' ? '65' : '80'}`}
-                    className="w-full p-4 pr-16 text-2xl font-bold text-slate-800 bg-slate-50 border-2 border-slate-200 rounded-2xl outline-none focus:border-rose-400 focus:bg-white transition-colors"
-                    autoFocus
-                  />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-medium">
-                    {config.unit}
-                  </span>
+              {/* Blood Pressure - Two Inputs */}
+              {selectedType === 'bp_systolic' ? (
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">
+                    Blood Pressure Reading
+                  </label>
+                  <p className="text-xs text-slate-400 mb-3">
+                    📟 Enter the reading from your BP Cuff
+                  </p>
+                  
+                  <div className="flex items-center gap-3">
+                    {/* Systolic */}
+                    <div className="flex-1">
+                      <label className="block text-xs font-medium text-rose-600 mb-1">Systolic (Top)</label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          value={bpSystolic}
+                          onChange={(e) => setBpSystolic(e.target.value)}
+                          placeholder="120"
+                          className="w-full p-4 text-2xl font-bold text-slate-800 bg-slate-50 border-2 border-slate-200 rounded-2xl outline-none focus:border-rose-400 focus:bg-white transition-colors text-center"
+                          autoFocus
+                        />
+                      </div>
+                    </div>
+                    
+                    <span className="text-2xl text-slate-300 font-bold pt-5">/</span>
+                    
+                    {/* Diastolic */}
+                    <div className="flex-1">
+                      <label className="block text-xs font-medium text-pink-600 mb-1">Diastolic (Bottom)</label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          value={bpDiastolic}
+                          onChange={(e) => setBpDiastolic(e.target.value)}
+                          placeholder="80"
+                          className="w-full p-4 text-2xl font-bold text-slate-800 bg-slate-50 border-2 border-slate-200 rounded-2xl outline-none focus:border-pink-400 focus:bg-white transition-colors text-center"
+                        />
+                      </div>
+                    </div>
+                    
+                    <span className="text-slate-400 font-medium pt-5">mmHg</span>
+                  </div>
+                  
+                  <p className="text-xs text-slate-400 mt-2">
+                    Normal: 120/80 mmHg • High: &gt;130/80 mmHg
+                  </p>
                 </div>
-                <p className="text-xs text-slate-400 mt-2">
-                  Valid range: {config.min} - {config.max} {config.unit}
-                </p>
-              </div>
+              ) : (
+                /* Standard Single Value Input */
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">
+                    {config.label} Reading
+                  </label>
+                  {/* UX Hint based on type */}
+                  <p className="text-xs text-slate-400 mb-3">
+                    {selectedType === 'glucose' && '🩸 Enter the reading from your Glucometer'}
+                    {selectedType === 'weight' && '⚖️ Use a weighing scale for best accuracy'}
+                    {selectedType === 'waist_circumference' && '📏 Measure at belly button level'}
+                  </p>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      step="0.1"
+                      min={config.min}
+                      max={config.max}
+                      value={readingValue}
+                      onChange={(e) => setReadingValue(e.target.value)}
+                      placeholder={
+                        selectedType === 'glucose' ? 'e.g., 5.5' : 
+                        selectedType === 'weight' ? 'e.g., 75.5' : 
+                        'e.g., 85'
+                      }
+                      className="w-full p-4 pr-16 text-2xl font-bold text-slate-800 bg-slate-50 border-2 border-slate-200 rounded-2xl outline-none focus:border-rose-400 focus:bg-white transition-colors"
+                      autoFocus
+                    />
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-medium">
+                      {config.unit}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-2">
+                    Valid range: {config.min} - {config.max} {config.unit}
+                    {selectedType === 'glucose' && ' • Target: 4.0-7.0 (fasting)'}
+                  </p>
+                </div>
+              )}
 
               {/* Context Selector - Only for Glucose */}
               {selectedType === 'glucose' && (
@@ -277,16 +407,16 @@ export default function LogVitalsModal({ isOpen, onClose, onSuccess }: LogVitals
               {/* Save Button */}
               <button
                 onClick={handleSave}
-                disabled={!readingValue || loading}
+                disabled={selectedType === 'bp_systolic' ? (!bpSystolic || !bpDiastolic || isSaving) : (!readingValue || isSaving)}
                 className="w-full py-4 bg-gradient-to-r from-rose-500 to-pink-500 text-white font-bold text-lg rounded-2xl shadow-lg shadow-rose-200 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-xl transition-all active:scale-[0.98]"
               >
-                {loading ? (
+                {isSaving ? (
                   <span className="flex items-center justify-center gap-2">
                     <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                     Saving...
                   </span>
                 ) : (
-                  `Save ${config.label}`
+                  `Save ${selectedType === 'bp_systolic' ? 'Blood Pressure' : config.label}`
                 )}
               </button>
             </div>
