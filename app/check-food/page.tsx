@@ -545,13 +545,13 @@ export default function CheckFoodPage() {
           console.error('Supabase save failed (local save succeeded):', supabaseErr);
         }
         
-        router.push('/');
+        router.push('/dashboard');
       } catch (err) {
         console.error("Storage error", err);
         if ((err as any).name === 'QuotaExceededError') {
           alert("Storage full! Saving without photo.");
           addMeal({ data: finalData, is_verified: baseResult.is_verified, components: finalData.components }, undefined);
-          router.push('/');
+          router.push('/dashboard');
         }
       } finally {
         setLoading(false);

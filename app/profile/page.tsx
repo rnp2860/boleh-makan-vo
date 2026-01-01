@@ -64,7 +64,7 @@ export default function ProfilePage() {
             </h1>
           </div>
           <button 
-            onClick={() => router.push('/')} 
+            onClick={() => router.push('/dashboard')} 
             className="bg-white/20 backdrop-blur px-3 py-1.5 rounded-lg text-sm font-bold text-white border border-white/30"
           >
             Done
