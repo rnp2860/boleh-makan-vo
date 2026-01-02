@@ -171,10 +171,23 @@ const GlucoseDot = (props: any) => {
   
   return (
     <g>
-      {/* Outer glow */}
-      <circle cx={cx} cy={cy} r={10} fill={`${color}30`} />
-      {/* Main dot */}
-      <circle cx={cx} cy={cy} r={6} fill={color} stroke="#fff" strokeWidth={2} />
+      {/* Outer glow - larger */}
+      <circle cx={cx} cy={cy} r={14} fill={`${color}25`} />
+      {/* Middle ring */}
+      <circle cx={cx} cy={cy} r={10} fill={`${color}50`} />
+      {/* Main dot - larger */}
+      <circle cx={cx} cy={cy} r={7} fill={color} stroke="#fff" strokeWidth={2} />
+      {/* Value label */}
+      <text 
+        x={cx} 
+        y={cy - 16} 
+        textAnchor="middle" 
+        fontSize={9} 
+        fontWeight="bold"
+        fill={color}
+      >
+        {payload.glucose}
+      </text>
     </g>
   );
 };
@@ -184,18 +197,30 @@ const GlucoseDot = (props: any) => {
 // ============================================
 
 export default function RiskChart({ foodLogs, vitals, date }: RiskChartProps) {
+  // 🐛 DEBUG: Log incoming data
+  console.log('📊 RiskChart received:', {
+    foodLogs: foodLogs.length,
+    vitals: vitals.length,
+    vitalsData: vitals,
+    date: date?.toISOString(),
+  });
+
   // Process data for the chart
   const chartData: ChartDataPoint[] = [];
   
   // Add glucose readings
   const glucoseReadings = vitals.filter(v => v.vital_type === 'glucose');
+  
+  // 🐛 DEBUG: Log glucose readings specifically
+  console.log('🩸 Glucose readings found:', glucoseReadings.length, glucoseReadings);
+  
   glucoseReadings.forEach(reading => {
     const minutes = timeToMinutes(reading.measured_at);
     chartData.push({
       time: minutes,
       timeLabel: minutesToTime(minutes),
       glucose: reading.reading_value,
-      glucoseContext: reading.context_tag.replace('_', ' '),
+      glucoseContext: reading.context_tag?.replace('_', ' ') || 'general',
       isGlucose: true,
     });
   });
@@ -216,11 +241,14 @@ export default function RiskChart({ foodLogs, vitals, date }: RiskChartProps) {
 
   // Sort by time
   chartData.sort((a, b) => a.time - b.time);
+  
+  // 🐛 DEBUG: Log final chart data
+  console.log('📈 Chart data points:', chartData.length, chartData);
 
   // Calculate Y-axis domain for glucose
   const glucoseValues = glucoseReadings.map(r => r.reading_value);
-  const minGlucose = Math.min(...glucoseValues, 3);
-  const maxGlucose = Math.max(...glucoseValues, 10);
+  const minGlucose = glucoseValues.length > 0 ? Math.min(...glucoseValues, 3) : 3;
+  const maxGlucose = glucoseValues.length > 0 ? Math.max(...glucoseValues, 10) : 12;
 
   // Check if we have data
   const hasData = chartData.length > 0;
@@ -288,11 +316,11 @@ export default function RiskChart({ foodLogs, vitals, date }: RiskChartProps) {
       </div>
 
       {/* Chart */}
-      <div className="h-56">
+      <div className="h-64">
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart
             data={chartData}
-            margin={{ top: 20, right: 10, left: -20, bottom: 10 }}
+            margin={{ top: 20, right: 15, left: 5, bottom: 30 }}
           >
             <CartesianGrid 
               strokeDasharray="3 3" 
@@ -309,66 +337,76 @@ export default function RiskChart({ foodLogs, vitals, date }: RiskChartProps) {
               axisLine={{ stroke: '#CBD5E1' }}
               tickLine={{ stroke: '#CBD5E1' }}
               tick={{ fontSize: 10, fill: '#94A3B8' }}
+              label={{ 
+                value: 'Time of Day', 
+                position: 'bottom',
+                offset: 15,
+                style: { fontSize: 11, fill: '#64748B', fontWeight: 500 }
+              }}
             />
             
             <YAxis
+              yAxisId="glucose"
+              orientation="left"
               domain={[minGlucose - 1, maxGlucose + 2]}
-              axisLine={{ stroke: '#CBD5E1' }}
-              tickLine={{ stroke: '#CBD5E1' }}
-              tick={{ fontSize: 10, fill: '#94A3B8' }}
+              axisLine={{ stroke: '#3B82F6' }}
+              tickLine={{ stroke: '#3B82F6' }}
+              tick={{ fontSize: 10, fill: '#3B82F6' }}
               tickFormatter={(value) => `${value}`}
               label={{ 
-                value: 'mmol/L', 
+                value: 'Glucose (mmol/L)', 
                 angle: -90, 
                 position: 'insideLeft',
-                style: { fontSize: 10, fill: '#94A3B8' },
+                style: { fontSize: 10, fill: '#3B82F6', fontWeight: 500 },
                 offset: 10
               }}
             />
 
             {/* Reference lines for glucose zones */}
             <ReferenceLine 
+              yAxisId="glucose"
               y={7} 
               stroke="#F59E0B" 
               strokeDasharray="4 4" 
               strokeWidth={1}
               label={{ 
-                value: 'Target', 
+                value: 'Target 7.0', 
                 position: 'right', 
                 fontSize: 9, 
                 fill: '#F59E0B' 
               }}
             />
             <ReferenceLine 
+              yAxisId="glucose"
               y={8} 
               stroke="#EF4444" 
               strokeDasharray="4 4" 
               strokeWidth={1}
               label={{ 
-                value: 'High', 
+                value: 'High 8.0', 
                 position: 'right', 
                 fontSize: 9, 
                 fill: '#EF4444' 
               }}
             />
 
-            {/* Glucose Line */}
-            {hasGlucose && (
-              <Line
-                type="monotone"
-                dataKey="glucose"
-                stroke="#3B82F6"
-                strokeWidth={2}
-                dot={<GlucoseDot />}
-                activeDot={{ r: 8, fill: '#3B82F6' }}
-                connectNulls
-              />
-            )}
+            {/* Glucose Line - Bright Blue, Thick */}
+            <Line
+              yAxisId="glucose"
+              type="monotone"
+              dataKey="glucose"
+              stroke="#3B82F6"
+              strokeWidth={3}
+              dot={<GlucoseDot />}
+              activeDot={{ r: 10, fill: '#3B82F6', stroke: '#fff', strokeWidth: 2 }}
+              connectNulls
+            />
 
-            {/* Meal Scatter Points */}
+            {/* Meal Scatter Points - Positioned at Y=5 for visibility */}
             {hasMeals && (
               <Scatter
-                dataKey="mealCalories"
+                yAxisId="glucose"
+                dataKey={(entry: ChartDataPoint) => entry.isMeal ? 5 : undefined}
                 shape={<MealDot />}
               />
             )}

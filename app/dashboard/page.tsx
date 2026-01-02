@@ -71,6 +71,7 @@ export default function DashboardPage() {
         if (foodError) {
           console.error('Error fetching food logs for chart:', foodError);
         } else {
+          console.log('📊 Dashboard: Food logs fetched for chart:', foodData?.length, foodData);
           setRiskChartFoodLogs(foodData || []);
         }
 
@@ -86,6 +87,7 @@ export default function DashboardPage() {
         if (vitalsError) {
           console.error('Error fetching vitals for chart:', vitalsError);
         } else {
+          console.log('📊 Dashboard: Vitals fetched for chart:', vitalsData?.length, vitalsData);
           setRiskChartVitals(vitalsData || []);
         }
       } catch (err) {
