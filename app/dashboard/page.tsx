@@ -4,6 +4,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 import { DateStrip } from '@/components/DateStrip';
 import { WeeklyChart } from '@/components/WeeklyChart';
@@ -22,6 +23,7 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export default function DashboardPage() {
   const { meals, userProfile, dailyBudget, deleteMeal, getWeeklyStats, streak, isLoaded } = useFood();
+  const router = useRouter();
   const [selectedMeal, setSelectedMeal] = useState<any>(null);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showDayShare, setShowDayShare] = useState(false);
@@ -44,6 +46,27 @@ export default function DashboardPage() {
       setUserId(id);
     }
   }, []);
+
+  // Check if user needs onboarding (new user without profile setup)
+  useEffect(() => {
+    if (typeof window !== 'undefined' && isLoaded) {
+      const onboardingComplete = localStorage.getItem('boleh_makan_onboarding_complete');
+      
+      // Redirect to onboarding if:
+      // 1. Onboarding not marked complete AND
+      // 2. User profile is missing key data (no goal set or no physical details)
+      const needsOnboarding = !onboardingComplete && userProfile && (
+        !userProfile.goal ||
+        !userProfile.details?.age ||
+        !userProfile.details?.height ||
+        !userProfile.details?.weight
+      );
+      
+      if (needsOnboarding) {
+        router.push('/onboarding');
+      }
+    }
+  }, [isLoaded, userProfile, router]);
 
   // State to force chart refetch (increments after delete)
   const [chartRefreshKey, setChartRefreshKey] = useState(0);
