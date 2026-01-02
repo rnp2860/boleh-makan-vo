@@ -225,33 +225,48 @@ interface MiniShareButtonProps {
 }
 
 export function MiniShareButton({ referralUrl, className = '' }: MiniShareButtonProps) {
+  const copyToClipboard = async (text: string) => {
+    try {
+      // Modern clipboard API
+      if (window.navigator?.clipboard?.writeText) {
+        await window.navigator.clipboard.writeText(text);
+        alert('Link copied to clipboard!');
+        return;
+      }
+      
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      textArea.style.position = 'fixed';
+      textArea.style.left = '-9999px';
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      alert('Link copied to clipboard!');
+    } catch (err) {
+      console.error('Failed to copy:', err);
+      alert('Failed to copy link');
+    }
+  };
+
   const handleShare = async () => {
-    if (typeof navigator !== 'undefined' && 'share' in navigator) {
+    // Check for Web Share API support
+    if (typeof window !== 'undefined' && window.navigator?.share) {
       try {
-        await navigator.share({
+        await window.navigator.share({
           title: 'Join the CGM Waitlist',
           text: 'Auto-sync your glucose readings with Boleh Makan!',
           url: referralUrl,
         });
       } catch (err) {
-        // User cancelled or share failed
-        console.log('Share cancelled');
+        // User cancelled or share failed - fallback to copy
+        console.log('Share cancelled, falling back to clipboard');
+        await copyToClipboard(referralUrl);
       }
     } else {
       // Fallback: copy to clipboard
-      if (typeof navigator !== 'undefined' && navigator.clipboard) {
-        await navigator.clipboard.writeText(referralUrl);
-        alert('Link copied to clipboard!');
-      } else {
-        // Final fallback for older browsers
-        const textArea = document.createElement('textarea');
-        textArea.value = referralUrl;
-        document.body.appendChild(textArea);
-        textArea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textArea);
-        alert('Link copied to clipboard!');
-      }
+      await copyToClipboard(referralUrl);
     }
   };
 
