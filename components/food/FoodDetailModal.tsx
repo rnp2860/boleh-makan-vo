@@ -208,7 +208,7 @@ export function FoodDetailModal({
                 value={adjustedNutrients.sugarG} 
                 unit="g"
                 dailyPercent={adjustedNutrients.sugarG ? Math.round((adjustedNutrients.sugarG / DAILY_LIMITS.sugar) * 100) : undefined}
-                warning={adjustedNutrients.sugarG && adjustedNutrients.sugarG > 15}
+                warning={adjustedNutrients.sugarG !== undefined && adjustedNutrients.sugarG > 15}
               />
               <NutrientItem 
                 label="Protein" 
@@ -225,14 +225,14 @@ export function FoodDetailModal({
                 value={adjustedNutrients.saturatedFatG} 
                 unit="g"
                 dailyPercent={adjustedNutrients.saturatedFatG ? Math.round((adjustedNutrients.saturatedFatG / DAILY_LIMITS.saturatedFat) * 100) : undefined}
-                warning={adjustedNutrients.saturatedFatG && adjustedNutrients.saturatedFatG > 7}
+                warning={adjustedNutrients.saturatedFatG !== undefined && adjustedNutrients.saturatedFatG > 7}
               />
               <NutrientItem 
                 label="Sodium" 
                 value={adjustedNutrients.sodiumMg} 
                 unit="mg"
                 dailyPercent={adjustedNutrients.sodiumMg ? Math.round((adjustedNutrients.sodiumMg / DAILY_LIMITS.sodium) * 100) : undefined}
-                warning={adjustedNutrients.sodiumMg && adjustedNutrients.sodiumMg > 600}
+                warning={adjustedNutrients.sodiumMg !== undefined && adjustedNutrients.sodiumMg > 600}
               />
               <NutrientItem 
                 label="Kolesterol" 
