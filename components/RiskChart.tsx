@@ -55,6 +55,7 @@ interface ChartDataPoint {
   mealId?: string;
   isMeal?: boolean;
   isGlucose?: boolean;
+  mealY?: number; // Fixed Y position for meal icons
 }
 
 // ============================================
@@ -205,55 +206,59 @@ export default function RiskChart({ foodLogs, vitals, date }: RiskChartProps) {
     date: date?.toISOString(),
   });
 
-  // Process data for the chart
-  const chartData: ChartDataPoint[] = [];
+  // ============================================
+  // SEPARATE DATA LAYERS
+  // ============================================
   
-  // Add glucose readings
+  // Layer 1: Glucose readings from vitals table
   const glucoseReadings = vitals.filter(v => v.vital_type === 'glucose');
   
-  // 🐛 DEBUG: Log glucose readings specifically
-  console.log('🩸 Glucose readings found:', glucoseReadings.length, glucoseReadings);
+  // 🐛 DEBUG: Log glucose readings
+  console.log('🩸 Glucose readings from vitals:', glucoseReadings.length, glucoseReadings);
   
-  glucoseReadings.forEach(reading => {
-    const minutes = timeToMinutes(reading.measured_at);
-    chartData.push({
-      time: minutes,
-      timeLabel: minutesToTime(minutes),
-      glucose: reading.reading_value,
-      glucoseContext: reading.context_tag?.replace('_', ' ') || 'general',
-      isGlucose: true,
-    });
+  // Create glucose data points
+  const glucoseData: ChartDataPoint[] = glucoseReadings.map(reading => ({
+    time: timeToMinutes(reading.measured_at),
+    timeLabel: minutesToTime(timeToMinutes(reading.measured_at)),
+    glucose: reading.reading_value,
+    glucoseContext: reading.context_tag?.replace('_', ' ') || 'general',
+    isGlucose: true,
+  }));
+
+  // Layer 2: Meal data points (positioned at bottom for visibility)
+  const mealData: ChartDataPoint[] = foodLogs.map(meal => ({
+    time: timeToMinutes(meal.created_at),
+    timeLabel: minutesToTime(timeToMinutes(meal.created_at)),
+    meal: meal.meal_name,
+    mealCalories: meal.calories,
+    mealImage: meal.image_url,
+    mealId: meal.id,
+    isMeal: true,
+    mealY: 2, // Fixed Y position at bottom of chart for meals
+  }));
+
+  // Combined data for chart (meals first, then glucose on top)
+  const chartData: ChartDataPoint[] = [...mealData, ...glucoseData].sort((a, b) => a.time - b.time);
+  
+  // 🐛 DEBUG: Log processed data
+  console.log('📈 Chart data:', { 
+    glucosePoints: glucoseData.length, 
+    mealPoints: mealData.length,
+    totalPoints: chartData.length 
   });
 
-  // Add meal logs
-  foodLogs.forEach(meal => {
-    const minutes = timeToMinutes(meal.created_at);
-    chartData.push({
-      time: minutes,
-      timeLabel: minutesToTime(minutes),
-      meal: meal.meal_name,
-      mealCalories: meal.calories,
-      mealImage: meal.image_url,
-      mealId: meal.id,
-      isMeal: true,
-    });
-  });
-
-  // Sort by time
-  chartData.sort((a, b) => a.time - b.time);
-  
-  // 🐛 DEBUG: Log final chart data
-  console.log('📈 Chart data points:', chartData.length, chartData);
-
-  // Calculate Y-axis domain for glucose
-  const glucoseValues = glucoseReadings.map(r => r.reading_value);
-  const minGlucose = glucoseValues.length > 0 ? Math.min(...glucoseValues, 3) : 3;
-  const maxGlucose = glucoseValues.length > 0 ? Math.max(...glucoseValues, 10) : 12;
+  // Calculate Y-axis domain for glucose (with room for meal icons at bottom)
+  const glucoseValues = glucoseData.map(d => d.glucose!).filter(v => v !== undefined);
+  const minGlucose = 1; // Fixed minimum to show meal icons at y=2
+  const maxGlucose = glucoseValues.length > 0 ? Math.max(...glucoseValues, 10) + 1 : 12;
 
   // Check if we have data
   const hasData = chartData.length > 0;
-  const hasGlucose = glucoseReadings.length > 0;
-  const hasMeals = foodLogs.length > 0;
+  const hasGlucose = glucoseData.length > 0;
+  const hasMeals = mealData.length > 0;
+  
+  // Total glucose reading count (for display)
+  const glucoseReadingCount = glucoseData.length;
 
   // Generate time ticks (every 4 hours)
   const timeTicks = [0, 240, 480, 720, 960, 1200, 1440]; // 00:00, 04:00, 08:00, 12:00, 16:00, 20:00, 24:00
@@ -320,7 +325,7 @@ export default function RiskChart({ foodLogs, vitals, date }: RiskChartProps) {
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart
             data={chartData}
-            margin={{ top: 20, right: 15, left: 5, bottom: 30 }}
+            margin={{ top: 15, right: 50, left: -15, bottom: 25 }}
           >
             <CartesianGrid 
               strokeDasharray="3 3" 
@@ -336,33 +341,27 @@ export default function RiskChart({ foodLogs, vitals, date }: RiskChartProps) {
               tickFormatter={(value) => minutesToTime(value)}
               axisLine={{ stroke: '#CBD5E1' }}
               tickLine={{ stroke: '#CBD5E1' }}
-              tick={{ fontSize: 10, fill: '#94A3B8' }}
+              tick={{ fontSize: 9, fill: '#94A3B8' }}
               label={{ 
-                value: 'Time of Day', 
+                value: 'Time', 
                 position: 'bottom',
-                offset: 15,
-                style: { fontSize: 11, fill: '#64748B', fontWeight: 500 }
+                offset: 10,
+                style: { fontSize: 10, fill: '#64748B', fontWeight: 500 }
               }}
             />
             
             <YAxis
               yAxisId="glucose"
               orientation="left"
-              domain={[minGlucose - 1, maxGlucose + 2]}
+              domain={[minGlucose, maxGlucose]}
               axisLine={{ stroke: '#3B82F6' }}
               tickLine={{ stroke: '#3B82F6' }}
-              tick={{ fontSize: 10, fill: '#3B82F6' }}
+              tick={{ fontSize: 9, fill: '#3B82F6' }}
               tickFormatter={(value) => `${value}`}
-              label={{ 
-                value: 'Glucose (mmol/L)', 
-                angle: -90, 
-                position: 'insideLeft',
-                style: { fontSize: 10, fill: '#3B82F6', fontWeight: 500 },
-                offset: 10
-              }}
+              width={30}
             />
 
-            {/* Reference lines for glucose zones */}
+            {/* Reference lines for glucose zones - shortened labels */}
             <ReferenceLine 
               yAxisId="glucose"
               y={7} 
@@ -370,10 +369,11 @@ export default function RiskChart({ foodLogs, vitals, date }: RiskChartProps) {
               strokeDasharray="4 4" 
               strokeWidth={1}
               label={{ 
-                value: 'Target 7.0', 
-                position: 'right', 
-                fontSize: 9, 
-                fill: '#F59E0B' 
+                value: '7 Target', 
+                position: 'insideTopRight', 
+                fontSize: 8, 
+                fill: '#F59E0B',
+                offset: 5
               }}
             />
             <ReferenceLine 
@@ -383,31 +383,50 @@ export default function RiskChart({ foodLogs, vitals, date }: RiskChartProps) {
               strokeDasharray="4 4" 
               strokeWidth={1}
               label={{ 
-                value: 'High 8.0', 
-                position: 'right', 
-                fontSize: 9, 
-                fill: '#EF4444' 
+                value: '8 High', 
+                position: 'insideTopRight', 
+                fontSize: 8, 
+                fill: '#EF4444',
+                offset: 5
+              }}
+            />
+            
+            {/* Meal zone indicator line */}
+            <ReferenceLine 
+              yAxisId="glucose"
+              y={2.5} 
+              stroke="#14B8A6" 
+              strokeDasharray="2 2" 
+              strokeWidth={0.5}
+              label={{ 
+                value: '🍽️ Meals', 
+                position: 'insideTopLeft', 
+                fontSize: 8, 
+                fill: '#14B8A6',
               }}
             />
 
             {/* Glucose Line - Bright Blue, Thick */}
-            <Line
-              yAxisId="glucose"
-              type="monotone"
-              dataKey="glucose"
-              stroke="#3B82F6"
-              strokeWidth={3}
-              dot={<GlucoseDot />}
-              activeDot={{ r: 10, fill: '#3B82F6', stroke: '#fff', strokeWidth: 2 }}
-              connectNulls
-            />
+            {hasGlucose && (
+              <Line
+                yAxisId="glucose"
+                type="monotone"
+                dataKey="glucose"
+                stroke="#3B82F6"
+                strokeWidth={3}
+                dot={<GlucoseDot />}
+                activeDot={{ r: 10, fill: '#3B82F6', stroke: '#fff', strokeWidth: 2 }}
+                connectNulls
+              />
+            )}
 
-            {/* Meal Scatter Points - Positioned at Y=5 for visibility */}
+            {/* Meal Scatter Points - Positioned at Y=2 (bottom zone) */}
             {hasMeals && (
               <Scatter
                 yAxisId="glucose"
-                dataKey={(entry: ChartDataPoint) => entry.isMeal ? 5 : undefined}
+                dataKey="mealY"
                 shape={<MealDot />}
+                data={mealData}
               />
             )}
 
@@ -421,15 +440,15 @@ export default function RiskChart({ foodLogs, vitals, date }: RiskChartProps) {
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-1.5">
             <span className="text-sm">🍽️</span>
-            <span className="text-xs font-bold text-slate-600">{foodLogs.length} meals</span>
+            <span className="text-xs font-bold text-slate-600">{mealData.length} meals</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="text-sm">🩸</span>
-            <span className="text-xs font-bold text-slate-600">{glucoseReadings.length} readings</span>
+            <span className="text-xs font-bold text-slate-600">{glucoseReadingCount} readings</span>
           </div>
         </div>
         
-        {hasGlucose && (
+        {hasGlucose && glucoseValues.length > 0 && (
           <div className="text-xs text-slate-400">
             Avg: <span className="font-bold text-slate-600">
               {(glucoseValues.reduce((a, b) => a + b, 0) / glucoseValues.length).toFixed(1)} mmol/L
