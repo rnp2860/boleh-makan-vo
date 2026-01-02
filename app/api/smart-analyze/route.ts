@@ -186,6 +186,14 @@ export async function POST(req: Request) {
     let isPotentiallyPork = false;
     let detectedComponents: string[] = [];
     let detectedProtein = 'none'; // NEW: Track detected protein type
+    
+    // 📏 Portion estimation variables
+    let portionEstimation = {
+      size_category: 'regular' as 'small' | 'regular' | 'large' | 'extra_large' | 'sharing',
+      multiplier: 1.0,
+      visual_reasoning: 'Default portion assumption'
+    };
+    let baseNutrition: any = null;
 
     // 🧠 STEP 1: IDENTIFY THE FOOD (Using comprehensive vision analysis)
     if (type === 'image') {
@@ -226,7 +234,24 @@ export async function POST(req: Request) {
       visionCategory = visionResult.category || 'Other';
       visionConfidence = visionResult.confidence_score || 0.5;
       isPotentiallyPork = visionResult.is_potentially_pork || false;
-      visionNutrition = visionResult.nutrition || null;
+      
+      // 📏 Use ADJUSTED nutrition (with portion multiplier) if available, otherwise fall back
+      visionNutrition = visionResult.adjusted_nutrition || visionResult.base_nutrition || visionResult.nutrition || null;
+      
+      // Store portion estimation for response
+      if (visionResult.portion_estimation) {
+        portionEstimation = {
+          size_category: visionResult.portion_estimation.size_category || 'regular',
+          multiplier: visionResult.portion_estimation.multiplier || 1.0,
+          visual_reasoning: visionResult.portion_estimation.visual_reasoning || 'Default portion assumption'
+        };
+      }
+      
+      // Store base nutrition for reference
+      baseNutrition = visionResult.base_nutrition || visionResult.nutrition || null;
+      
+      console.log(`📏 Portion: ${portionEstimation.size_category} (${portionEstimation.multiplier}x) - ${portionEstimation.visual_reasoning}`);
+      
       detectedComponents = visionResult.detected_components || [];
       detectedProtein = visionResult.detected_protein || 'none';
       
@@ -487,6 +512,15 @@ export async function POST(req: Request) {
         ? (type === 'image' ? 'database_verified' : 'database')
         : 'database';
 
+      // 📏 Apply portion multiplier to database nutrition if it's an image with portion estimation
+      const portionMultiplier = type === 'image' ? portionEstimation.multiplier : 1.0;
+      const adjustedCalories = Math.round((finalDbMatch.calories || 0) * portionMultiplier);
+      const adjustedProtein = Math.round((finalDbMatch.protein || 0) * portionMultiplier);
+      const adjustedCarbs = Math.round((finalDbMatch.carbs || 0) * portionMultiplier);
+      const adjustedFat = Math.round((finalDbMatch.fat || 0) * portionMultiplier);
+      const adjustedSugar = Math.round(finalSugarForAdvice * portionMultiplier);
+      const adjustedSodium = Math.round(finalSodiumForAdvice * portionMultiplier);
+
       return NextResponse.json({
         success: true,
         source: dataSource,
@@ -497,12 +531,26 @@ export async function POST(req: Request) {
           category: categoryForAdvice,
           components: components,
           macros: {
+            calories: adjustedCalories,
+            protein_g: adjustedProtein,
+            carbs_g: adjustedCarbs,
+            fat_g: adjustedFat,
+            sugar_g: adjustedSugar,
+            sodium_mg: adjustedSodium,
+          },
+          // 📏 Include base nutrition and portion estimation
+          base_nutrition: {
             calories: finalDbMatch.calories || 0,
             protein_g: finalDbMatch.protein || 0,
             carbs_g: finalDbMatch.carbs || 0,
             fat_g: finalDbMatch.fat || 0,
             sugar_g: finalSugarForAdvice,
             sodium_mg: finalSodiumForAdvice,
+          },
+          portion_estimation: type === 'image' ? portionEstimation : {
+            size_category: 'regular',
+            multiplier: 1.0,
+            visual_reasoning: 'Text input - using standard serving'
           },
           serving_size: finalDbMatch.serving_size || '1 serving',
           valid_lauk: enrichedLauk,
@@ -638,6 +686,9 @@ export async function POST(req: Request) {
         category: visionCategory,
         components: components,
         macros: finalMacros,
+        // 📏 Include base nutrition and portion estimation for vision fallback
+        base_nutrition: baseNutrition || finalMacros,
+        portion_estimation: portionEstimation,
         valid_lauk: defaultLauk,
         // Include structured Dr. Reza response for advanced UI features
         dr_reza_analysis: fallbackDrRezaParsed || null,

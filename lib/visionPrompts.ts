@@ -353,6 +353,55 @@ Classify into ONE category:
 - "Other": Anything else
 
 ╔══════════════════════════════════════════════════════════════════╗
+║  📏 PORTION SIZE ESTIMATION (The 'Plate' Analysis)               ║
+╚══════════════════════════════════════════════════════════════════╝
+
+Estimate portion size by analyzing visual cues. This is CRITICAL for accurate calorie counting.
+
+1. PLATE/BOWL SIZE INDICATORS:
+   - Standard Malaysian hawker plate = ~25cm diameter
+   - Small bowl (soup) = ~300ml
+   - Large bowl (noodle soup) = ~450-500ml
+   - Rice plate coverage: <50% = small, 50-75% = regular, >75% = large
+
+2. PORTION MULTIPLIERS:
+   - "small" = 0.7x standard serving (less rice, diet portion)
+   - "regular" = 1.0x standard serving (default assumption)
+   - "large" = 1.3x standard serving (generous portion)
+   - "extra_large" = 1.6x standard serving (double portion)
+   - "sharing" = 2.0x+ (clearly for multiple people)
+
+3. VISUAL CUES FOR SIZE:
+   - Hand/utensil visible for scale reference
+   - Rice pile height relative to plate rim
+   - Number of protein pieces visible (1 piece small, 2+ pieces large)
+   - Noodle density in bowl
+   - "Banjir" (flooded) style = typically 1.3x (extra gravy + rice)
+   - Takeaway container size (small, regular, large boxes)
+
+4. MALAYSIAN PORTION PATTERNS:
+   - "Nasi Kandar biasa" = regular (1.0x)
+   - "Nasi Kandar banjir" = large (1.3x) - rice flooded with gravy
+   - "Tambah nasi" (extra rice) = large (1.3x)
+   - "Nasi sikit" (less rice) = small (0.7x)
+   - Hawker "Economic" portions = regular (1.0x)
+   - Restaurant portions = typically large (1.2-1.3x)
+   - Food court portions = regular to large (1.0-1.2x)
+   - Buffet/self-serve = varies widely
+
+5. PROTEIN PORTION ESTIMATION:
+   - 1 chicken thigh = regular protein portion
+   - 2 chicken thighs = large protein portion
+   - Whole fish = sharing/large (1.5-2.0x)
+   - Single satay stick = small, 5+ sticks = regular
+   - 1 egg = small protein, 2 eggs = regular
+
+INCLUDE portion_estimation IN YOUR JSON OUTPUT with:
+- size_category: "small" | "regular" | "large" | "extra_large" | "sharing"
+- multiplier: Number (0.7, 1.0, 1.3, 1.6, 2.0)
+- visual_reasoning: Brief explanation of why this portion size was chosen
+
+╔══════════════════════════════════════════════════════════════════╗
 ║  🏪 CONTEXT DETECTION (The 'Plate' Rule) - ENTERPRISE            ║
 ╚══════════════════════════════════════════════════════════════════╝
 
@@ -485,27 +534,56 @@ SET sugar_source_detected = FALSE if:
 
 You MUST return this EXACT JSON structure:
 {
-  "food_name": "CULTURAL DISH NAME - Use specific Malaysian/regional name (e.g., 'Nasi Kandar Ayam Goreng', 'Mee Rebus', 'Laksa Penang'), NOT generic names like 'Chicken Rice' or 'Curry Noodles'",
-  "category": "Mamak|Malay|Chinese|Indian|Western|Beverage|Dessert|Other",
-  "detected_protein": "pork|chicken|beef|seafood|egg|tofu|none|ambiguous_red_meat",
-  "is_potentially_pork": true,
+  "food_name": "Nasi Kandar Ayam Goreng",
+  "category": "Mamak",
+  "detected_protein": "chicken",
+  "is_potentially_pork": false,
   "confidence_score": 0.85,
-  "nutrition": {
-    "calories": 550,
-    "protein_g": 20,
-    "carbs_g": 65,
-    "fat_g": 22,
-    "sodium_mg": 850,
-    "sugar_g": 5
-  },
-  "detected_components": ["Char Siu", "Rice", "Vegetables"],
-  "visual_notes": "Red-glazed sliced meat with visible fat marbling, served over rice",
   
-  // ═══ ENTERPRISE FIELDS (REQUIRED) ═══
-  "meal_context": "hawker_stall|home_cooked|restaurant|fast_food|office_canteen|unknown",
-  "preparation_style": "deep_fried|stir_fried|steamed|soup_boiled|gravy_curry|raw_fresh|grilled|unknown",
+  "base_nutrition": {
+    "calories": 650,
+    "protein_g": 20,
+    "carbs_g": 72,
+    "fat_g": 32,
+    "sugar_g": 5,
+    "sodium_mg": 950,
+    "reference_serving": "1 plate (400g)"
+  },
+  
+  "portion_estimation": {
+    "size_category": "regular",
+    "multiplier": 1.0,
+    "visual_reasoning": "Standard hawker plate, rice at normal level, single protein piece"
+  },
+  
+  "adjusted_nutrition": {
+    "calories": 650,
+    "protein_g": 20,
+    "carbs_g": 72,
+    "fat_g": 32,
+    "sugar_g": 5,
+    "sodium_mg": 950
+  },
+  
+  "detected_components": ["Ayam Goreng", "Rice", "Kuah Campur"],
+  "visual_notes": "Fried chicken piece on rice with mixed curry gravy",
+  
+  "meal_context": "hawker_stall",
+  "preparation_style": "deep_fried",
   "sugar_source_detected": false
 }
+
+CRITICAL NUTRITION CALCULATION:
+1. First estimate BASE nutrition for a REGULAR (1.0x) serving
+2. Then determine portion_estimation.multiplier based on visual cues
+3. Calculate adjusted_nutrition = base_nutrition × multiplier
+4. Return BOTH base_nutrition and adjusted_nutrition
+
+PORTION EXAMPLES:
+- Small Nasi Lemak: base=500cal × 0.7 multiplier = 350cal adjusted
+- Regular Nasi Kandar: base=650cal × 1.0 multiplier = 650cal adjusted
+- Large Nasi Kandar Banjir: base=650cal × 1.3 multiplier = 845cal adjusted
+- Extra Large "Tambah Nasi": base=650cal × 1.6 multiplier = 1040cal adjusted
 
 ENTERPRISE FIELD EXAMPLES:
 - Nasi Lemak from hawker: meal_context="hawker_stall", preparation_style="stir_fried" (sambal), sugar_source_detected=false
@@ -513,6 +591,13 @@ ENTERPRISE FIELD EXAMPLES:
 - Ayam Goreng from home: meal_context="home_cooked", preparation_style="deep_fried", sugar_source_detected=false
 - Laksa from restaurant: meal_context="restaurant", preparation_style="soup_boiled", sugar_source_detected=false
 - Sirap Bandung: meal_context=based_on_setting, preparation_style="unknown", sugar_source_detected=true (pink syrup)
+
+PORTION ESTIMATION EXAMPLES:
+- Small portion (0.7x): "Rice covers only 40% of plate, small protein piece" → multiplier=0.7
+- Regular portion (1.0x): "Standard hawker serving, rice at normal level" → multiplier=1.0
+- Large portion (1.3x): "Generous rice heap, multiple protein pieces, banjir style" → multiplier=1.3
+- Extra large (1.6x): "Double portion visible, rice overflowing" → multiplier=1.6
+- Sharing size (2.0x): "Large platter clearly for 2+ people" → multiplier=2.0
 
 ╔══════════════════════════════════════════════════════════════════╗
 ║  ⚠️ CRITICAL VALIDATION RULES                                   ║
@@ -540,6 +625,15 @@ BEFORE returning your response, verify:
 □ If drink has visible layers or condensed milk → sugar_source_detected = true
 □ If food has crispy/oily texture → consider "deep_fried" or "stir_fried"
 □ If orange plastic plates visible → meal_context = "hawker_stall"
+
+=== PORTION ESTIMATION VALIDATION ===
+□ portion_estimation.size_category MUST be one of: "small", "regular", "large", "extra_large", "sharing"
+□ portion_estimation.multiplier MUST match size_category: small=0.7, regular=1.0, large=1.3, extra_large=1.6, sharing=2.0
+□ portion_estimation.visual_reasoning MUST explain WHY this portion size was chosen (plate coverage, protein count, rice level)
+□ adjusted_nutrition values MUST equal base_nutrition values × multiplier (rounded to nearest integer)
+□ If rice is "banjir" (flooded with gravy) → use "large" (1.3x) multiplier
+□ If portion looks diet-sized or "nasi sikit" → use "small" (0.7x) multiplier
+□ If unsure about portion → default to "regular" (1.0x)
 
 === CONFIDENCE SCORING ===
 - 0.9-1.0: Very confident, clear recognizable dish
