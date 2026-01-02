@@ -103,6 +103,7 @@ export default function CheckFoodPage() {
   const [confidenceScore, setConfidenceScore] = useState<number>(1);
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState('');
+  const [isRecalculating, setIsRecalculating] = useState(false);
   
   // 🔄 RLHF: Track original AI suggestion vs user correction
   const [aiSuggestedName, setAiSuggestedName] = useState<string>('');
@@ -414,17 +415,101 @@ export default function CheckFoodPage() {
     setPendingResult(null);
   };
   
-  // 📝 Handle Name Edit
-  const handleNameEdit = () => {
-    if (baseResult && editedName.trim()) {
+  // 📝 Handle Name Edit with Smart Recalculation
+  const handleNameEdit = async () => {
+    if (!baseResult || !editedName.trim()) return;
+    
+    const newName = editedName.trim();
+    const oldName = baseResult.data.food_name;
+    
+    // If name hasn't changed significantly, just update the label
+    if (newName.toLowerCase() === oldName.toLowerCase()) {
+      setIsEditingName(false);
+      return;
+    }
+    
+    // 🔄 Trigger recalculation for new food name
+    setIsRecalculating(true);
+    setIsEditingName(false);
+    
+    try {
+      console.log('🔄 Recalculating nutrition for:', newName);
+      
+      const response = await fetch('/api/recalculate-nutrition', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          food_name: newName,
+          original_name: oldName,
+          user_profile: userProfile,
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        // Update with new nutrition data
+        const newData = result.data;
+        
+        setBaseResult({
+          ...baseResult,
+          data: {
+            ...baseResult.data,
+            food_name: newData.food_name || newName,
+            category: newData.category || baseResult.data.category,
+            components: newData.components || baseResult.data.components,
+            macros: {
+              ...baseResult.data.macros,
+              calories: newData.macros?.calories || baseResult.data.macros.calories,
+              protein_g: newData.macros?.protein_g || baseResult.data.macros.protein_g,
+              carbs_g: newData.macros?.carbs_g || baseResult.data.macros.carbs_g,
+              fat_g: newData.macros?.fat_g || baseResult.data.macros.fat_g,
+              sodium_mg: newData.macros?.sodium_mg || baseResult.data.macros.sodium_mg,
+              sugar_g: newData.macros?.sugar_g || baseResult.data.macros.sugar_g,
+            },
+            analysis_content: newData.analysis_content || baseResult.data.analysis_content,
+            risk_analysis: newData.risk_analysis || baseResult.data.risk_analysis,
+          },
+        });
+        
+        // Update preparation style if provided
+        if (newData.preparation_style && newData.preparation_style !== 'unknown') {
+          setPreparationStyle(newData.preparation_style);
+        }
+        if (newData.meal_context && newData.meal_context !== 'unknown') {
+          setMealContext(newData.meal_context);
+        }
+        
+        console.log('✅ Nutrition updated:', {
+          food: newName,
+          calories: newData.macros?.calories,
+        });
+      } else {
+        // Fallback: just update the name
+        setBaseResult({
+          ...baseResult,
+          data: {
+            ...baseResult.data,
+            food_name: newName,
+          },
+        });
+      }
+    } catch (error) {
+      console.error('❌ Recalculation failed:', error);
+      // Fallback: just update the name without recalculation
       setBaseResult({
         ...baseResult,
         data: {
           ...baseResult.data,
-          food_name: editedName.trim()
-        }
+          food_name: newName,
+        },
       });
-      setIsEditingName(false);
+    } finally {
+      setIsRecalculating(false);
     }
   };
 
@@ -861,25 +946,38 @@ export default function CheckFoodPage() {
                   <h2 className={`text-2xl font-black ${image ? 'text-white' : 'text-slate-800'}`}>
                     🤔 I couldn't identify this
                   </h2>
-                ) : isEditingName ? (
+                ) : isRecalculating ? (
                   <div className="flex items-center gap-2">
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <h2 className={`text-xl font-bold ${image ? 'text-white' : 'text-slate-800'}`}>
+                      Updating nutrition...
+                    </h2>
+                  </div>
+                ) : isEditingName ? (
+                  <div className="flex items-center gap-2 w-full max-w-full">
                     <input
                       type="text"
                       value={editedName}
                       onChange={(e) => setEditedName(e.target.value)}
-                      className="flex-1 text-xl font-bold bg-white/20 backdrop-blur-sm rounded-lg px-3 py-1 text-white placeholder-white/50 outline-none border-2 border-white/30 focus:border-white"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleNameEdit();
+                        if (e.key === 'Escape') { setIsEditingName(false); setEditedName(finalData.food_name); }
+                      }}
+                      className="flex-1 min-w-0 text-lg font-bold bg-white/20 backdrop-blur-sm rounded-lg px-3 py-1.5 text-white placeholder-white/50 outline-none border-2 border-white/30 focus:border-white"
                       placeholder="Enter food name"
                       autoFocus
                     />
                     <button
                       onClick={handleNameEdit}
-                      className="bg-white/30 text-white px-3 py-1 rounded-lg font-bold text-sm"
+                      className="flex-shrink-0 bg-green-500 hover:bg-green-600 text-white w-9 h-9 rounded-lg font-bold text-lg flex items-center justify-center shadow-lg transition-colors"
+                      title="Save & Recalculate"
                     >
                       ✓
                     </button>
                     <button
                       onClick={() => { setIsEditingName(false); setEditedName(finalData.food_name); }}
-                      className="bg-white/20 text-white px-3 py-1 rounded-lg font-bold text-sm"
+                      className="flex-shrink-0 bg-white/20 hover:bg-white/30 text-white w-9 h-9 rounded-lg font-bold text-lg flex items-center justify-center transition-colors"
+                      title="Cancel"
                     >
                       ✕
                     </button>
