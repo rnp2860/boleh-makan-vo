@@ -1,43 +1,10 @@
 // lib/tenant/query.ts
 // 🏢 Tenant Query Helpers - Utilities for tenant-scoped database queries
+// 
+// NOTE: For server-only functions that use next/headers, see ./server.ts
 
 import { getSupabaseServiceClient } from '@/lib/supabase';
 import { DEFAULT_TENANT_ID } from '@/lib/types/tenant';
-import { headers } from 'next/headers';
-
-// ============================================
-// GET TENANT ID FROM CONTEXT
-// ============================================
-
-/**
- * Get tenant ID from request headers (set by middleware)
- * Falls back to default tenant if not found
- */
-export function getTenantIdFromHeaders(): string {
-  const headersList = headers();
-  const tenantSlug = headersList.get('x-tenant-slug');
-  
-  if (!tenantSlug) {
-    return DEFAULT_TENANT_ID;
-  }
-  
-  // This is a simplified version - in production, you'd cache this lookup
-  return DEFAULT_TENANT_ID;
-}
-
-/**
- * Get tenant context from request headers
- */
-export function getTenantContextFromHeaders() {
-  const headersList = headers();
-  
-  return {
-    tenantId: headersList.get('x-tenant-id') || DEFAULT_TENANT_ID,
-    tenantSlug: headersList.get('x-tenant-slug') || null,
-    resolutionMethod: headersList.get('x-tenant-resolution') || 'default',
-    isDefault: !headersList.get('x-tenant-slug'),
-  };
-}
 
 // ============================================
 // QUERY BUILDERS

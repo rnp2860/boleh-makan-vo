@@ -216,7 +216,7 @@ export interface TenantUsageLog {
 // TENANT CONTEXT TYPES
 // ============================================
 
-export interface TenantContext {
+export interface TenantContextData {
   tenant: Tenant;
   isCustomDomain: boolean;
   isSubdomain: boolean;
@@ -227,7 +227,10 @@ export interface TenantContext {
   limits: TenantLimits;
 }
 
-export interface TenantAdminContext extends TenantContext {
+/** @deprecated Use TenantContextData instead */
+export type TenantContext = TenantContextData;
+
+export interface TenantAdminContext extends TenantContextData {
   adminRole: TenantAdminRole;
   adminPermissions: TenantAdminPermissions;
 }

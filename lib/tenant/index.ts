@@ -1,5 +1,9 @@
 // lib/tenant/index.ts
 // 🏢 Multi-Tenant System - Barrel Export
+//
+// ⚠️ This file exports CLIENT-SAFE code only.
+// For server-only functions (using next/headers), import from:
+//   import { getTenantIdFromHeaders } from '@/lib/tenant/server'
 
 // Types
 export type {
@@ -13,7 +17,7 @@ export type {
   TenantFood,
   TenantInviteCode,
   TenantUsageLog,
-  TenantContext,
+  TenantContextData,
   TenantFeatures,
   TenantBranding,
   TenantLimits,
@@ -37,7 +41,7 @@ export {
   TENANT_ADMIN_PERMISSIONS,
 } from '@/lib/types/tenant';
 
-// Resolver
+// Resolver (client-safe parts)
 export {
   resolveTenant,
   resolveTenantByCustomDomain,
@@ -53,7 +57,7 @@ export {
   pathNeedsTenantPrefix,
 } from './resolver';
 
-// Context
+// Context (React Context - client components)
 export {
   TenantProvider,
   TenantContext,
@@ -67,7 +71,7 @@ export {
 } from './context';
 export type { TenantContextValue, TenantProviderProps } from './context';
 
-// Hooks
+// Hooks (client-side hooks)
 export {
   useAIEnabled,
   useRamadanModeEnabled,
@@ -95,10 +99,10 @@ export {
   useTenantTrialDaysRemaining,
 } from './hooks';
 
-// Query Helpers
+// Query Helpers (client-safe - NO next/headers usage)
+// ⚠️ For getTenantIdFromHeaders/getTenantContextFromHeaders, use:
+//    import { getTenantIdFromHeaders } from '@/lib/tenant/server'
 export {
-  getTenantIdFromHeaders,
-  getTenantContextFromHeaders,
   createTenantQuery,
   getUserGoals,
   getRamadanSettings,
