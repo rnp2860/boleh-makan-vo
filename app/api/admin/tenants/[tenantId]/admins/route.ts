@@ -10,15 +10,16 @@ import { getSupabaseServiceClient } from '@/lib/supabase';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { tenantId: string } }
+  { params }: { params: Promise<{ tenantId: string }> }
 ) {
   try {
+    const { tenantId } = await params;
     const supabase = getSupabaseServiceClient();
     
     const { data, error } = await supabase
       .from('tenant_admins')
       .select('*')
-      .eq('tenant_id', params.tenantId)
+      .eq('tenant_id', tenantId)
       .order('created_at', { ascending: false });
     
     if (error) {
@@ -45,9 +46,10 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { tenantId: string } }
+  { params }: { params: Promise<{ tenantId: string }> }
 ) {
   try {
+    const { tenantId } = await params;
     const supabase = getSupabaseServiceClient();
     const body = await request.json();
     
@@ -62,7 +64,7 @@ export async function POST(
     const { data: existing } = await supabase
       .from('tenant_admins')
       .select('id')
-      .eq('tenant_id', params.tenantId)
+      .eq('tenant_id', tenantId)
       .eq('email', body.email.toLowerCase())
       .single();
     
@@ -78,7 +80,7 @@ export async function POST(
     const { data, error } = await supabase
       .from('tenant_admins')
       .insert({
-        tenant_id: params.tenantId,
+        tenant_id: tenantId,
         user_id: `pending_${Date.now()}`, // Temporary until user accepts
         email: body.email.toLowerCase(),
         display_name: body.display_name || null,

@@ -10,15 +10,16 @@ import { getSupabaseServiceClient } from '@/lib/supabase';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { tenantId: string } }
+  { params }: { params: Promise<{ tenantId: string }> }
 ) {
   try {
+    const { tenantId } = await params;
     const supabase = getSupabaseServiceClient();
     
     const { data: tenant, error } = await supabase
       .from('tenants')
       .select('*')
-      .eq('id', params.tenantId)
+      .eq('id', tenantId)
       .single();
     
     if (error || !tenant) {
@@ -44,9 +45,10 @@ export async function GET(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { tenantId: string } }
+  { params }: { params: Promise<{ tenantId: string }> }
 ) {
   try {
+    const { tenantId } = await params;
     const supabase = getSupabaseServiceClient();
     const body = await request.json();
     
@@ -75,7 +77,7 @@ export async function PATCH(
     const { data: tenant, error } = await supabase
       .from('tenants')
       .update(updateData)
-      .eq('id', params.tenantId)
+      .eq('id', tenantId)
       .select()
       .single();
     
@@ -103,13 +105,14 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { tenantId: string } }
+  { params }: { params: Promise<{ tenantId: string }> }
 ) {
   try {
+    const { tenantId } = await params;
     const supabase = getSupabaseServiceClient();
     
     // Prevent deleting the default tenant
-    if (params.tenantId === '00000000-0000-0000-0000-000000000001') {
+    if (tenantId === '00000000-0000-0000-0000-000000000001') {
       return NextResponse.json(
         { success: false, error: 'Cannot delete the default tenant' },
         { status: 403 }
@@ -120,7 +123,7 @@ export async function DELETE(
     const { data: usersCount } = await supabase
       .from('user_weekly_goals')
       .select('id', { count: 'exact' })
-      .eq('tenant_id', params.tenantId);
+      .eq('tenant_id', tenantId);
     
     if (usersCount && usersCount.length > 0) {
       return NextResponse.json(
@@ -132,7 +135,7 @@ export async function DELETE(
     const { error } = await supabase
       .from('tenants')
       .delete()
-      .eq('id', params.tenantId);
+      .eq('id', tenantId);
     
     if (error) {
       console.error('Error deleting tenant:', error);

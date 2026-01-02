@@ -6,9 +6,10 @@ import { deleteVitalsEntry, updateVitalsEntry } from '@/lib/vitals/queries';
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const body = await request.json();
     const { userId } = body;
     
@@ -19,7 +20,7 @@ export async function DELETE(
       );
     }
     
-    await deleteVitalsEntry(userId, params.id);
+    await deleteVitalsEntry(userId, id);
     
     return NextResponse.json({ success: true });
   } catch (error: any) {
@@ -33,9 +34,10 @@ export async function DELETE(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const body = await request.json();
     const { userId, ...updates } = body;
     
@@ -46,7 +48,7 @@ export async function PATCH(
       );
     }
     
-    const entry = await updateVitalsEntry(userId, params.id, updates);
+    const entry = await updateVitalsEntry(userId, id, updates);
     
     return NextResponse.json({ success: true, entry });
   } catch (error: any) {

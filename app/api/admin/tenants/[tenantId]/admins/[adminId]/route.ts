@@ -10,9 +10,10 @@ import { getSupabaseServiceClient } from '@/lib/supabase';
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { tenantId: string; adminId: string } }
+  { params }: { params: Promise<{ tenantId: string; adminId: string }> }
 ) {
   try {
+    const { tenantId, adminId } = await params;
     const supabase = getSupabaseServiceClient();
     const body = await request.json();
     
@@ -28,8 +29,8 @@ export async function PATCH(
     const { data, error } = await supabase
       .from('tenant_admins')
       .update(updateData)
-      .eq('id', params.adminId)
-      .eq('tenant_id', params.tenantId)
+      .eq('id', adminId)
+      .eq('tenant_id', tenantId)
       .select()
       .single();
     
@@ -57,19 +58,20 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { tenantId: string; adminId: string } }
+  { params }: { params: Promise<{ tenantId: string; adminId: string }> }
 ) {
   try {
+    const { tenantId, adminId } = await params;
     const supabase = getSupabaseServiceClient();
     
     // Check if this is the last owner
     const { data: admins } = await supabase
       .from('tenant_admins')
       .select('id, role')
-      .eq('tenant_id', params.tenantId)
+      .eq('tenant_id', tenantId)
       .eq('role', 'owner');
     
-    const currentAdmin = admins?.find(a => a.id === params.adminId);
+    const currentAdmin = admins?.find(a => a.id === adminId);
     
     if (currentAdmin?.role === 'owner' && admins && admins.length === 1) {
       return NextResponse.json(
@@ -81,8 +83,8 @@ export async function DELETE(
     const { error } = await supabase
       .from('tenant_admins')
       .delete()
-      .eq('id', params.adminId)
-      .eq('tenant_id', params.tenantId);
+      .eq('id', adminId)
+      .eq('tenant_id', tenantId);
     
     if (error) {
       console.error('Error deleting tenant admin:', error);

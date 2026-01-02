@@ -10,9 +10,10 @@ import { getSupabaseServiceClient } from '@/lib/supabase';
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { tenantId: string; codeId: string } }
+  { params }: { params: Promise<{ tenantId: string; codeId: string }> }
 ) {
   try {
+    const { tenantId, codeId } = await params;
     const supabase = getSupabaseServiceClient();
     const body = await request.json();
     
@@ -30,8 +31,8 @@ export async function PATCH(
     const { data, error } = await supabase
       .from('tenant_invite_codes')
       .update(updateData)
-      .eq('id', params.codeId)
-      .eq('tenant_id', params.tenantId)
+      .eq('id', codeId)
+      .eq('tenant_id', tenantId)
       .select()
       .single();
     
@@ -59,16 +60,17 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { tenantId: string; codeId: string } }
+  { params }: { params: Promise<{ tenantId: string; codeId: string }> }
 ) {
   try {
+    const { tenantId, codeId } = await params;
     const supabase = getSupabaseServiceClient();
     
     const { error } = await supabase
       .from('tenant_invite_codes')
       .delete()
-      .eq('id', params.codeId)
-      .eq('tenant_id', params.tenantId);
+      .eq('id', codeId)
+      .eq('tenant_id', tenantId);
     
     if (error) {
       console.error('Error deleting invite code:', error);

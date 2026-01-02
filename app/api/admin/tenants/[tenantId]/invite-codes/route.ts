@@ -10,15 +10,16 @@ import { getSupabaseServiceClient } from '@/lib/supabase';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { tenantId: string } }
+  { params }: { params: Promise<{ tenantId: string }> }
 ) {
   try {
+    const { tenantId } = await params;
     const supabase = getSupabaseServiceClient();
     
     const { data, error } = await supabase
       .from('tenant_invite_codes')
       .select('*')
-      .eq('tenant_id', params.tenantId)
+      .eq('tenant_id', tenantId)
       .order('created_at', { ascending: false });
     
     if (error) {
@@ -45,9 +46,10 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { tenantId: string } }
+  { params }: { params: Promise<{ tenantId: string }> }
 ) {
   try {
+    const { tenantId } = await params;
     const supabase = getSupabaseServiceClient();
     const body = await request.json();
     
@@ -75,7 +77,7 @@ export async function POST(
     const { data, error } = await supabase
       .from('tenant_invite_codes')
       .insert({
-        tenant_id: params.tenantId,
+        tenant_id: tenantId,
         code: body.code.toUpperCase(),
         description: body.description || null,
         max_uses: body.max_uses || null,

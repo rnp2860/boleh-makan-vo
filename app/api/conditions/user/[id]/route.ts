@@ -8,10 +8,10 @@ import { UpdateUserConditionInput } from '@/lib/conditions/types';
 // PATCH - Update a condition
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const body = await request.json() as UpdateUserConditionInput;
 
     const result = await updateUserCondition(id, body);
@@ -36,10 +36,10 @@ export async function PATCH(
 // DELETE - Remove a condition
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
 
     const result = await removeUserCondition(id);
 
