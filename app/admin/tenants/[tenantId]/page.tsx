@@ -1,6 +1,8 @@
 // app/admin/tenants/[tenantId]/page.tsx
 // 🏢 Tenant Detail - View and manage individual tenant
 
+export const dynamic = 'force-dynamic';
+
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { 

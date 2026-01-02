@@ -3,7 +3,7 @@
 // app/cgm/waitlist/page.tsx
 // 📊 CGM Waitlist Signup Page - Dedicated signup flow
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { 
   Activity, ChevronRight, ChevronLeft, 
@@ -23,12 +23,12 @@ import {
 import { USAGE_FREQUENCY_OPTIONS, REFERRAL_SOURCE_OPTIONS } from '@/lib/cgm/devices';
 
 // ============================================
-// PAGE COMPONENT
+// PAGE CONTENT COMPONENT (uses useSearchParams)
 // ============================================
 
 const TOTAL_STEPS = 5;
 
-export default function WaitlistPage() {
+function WaitlistPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const referralCode = searchParams.get('ref');
@@ -460,4 +460,21 @@ export default function WaitlistPage() {
   );
 }
 
+// ============================================
+// PAGE COMPONENT (wraps content in Suspense)
+// ============================================
 
+export default function WaitlistPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-b from-violet-50 to-white dark:from-gray-900 dark:to-gray-950 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-violet-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-600 dark:text-gray-400">Loading...</p>
+        </div>
+      </div>
+    }>
+      <WaitlistPageContent />
+    </Suspense>
+  );
+}

@@ -1,6 +1,8 @@
 // app/admin/tenants/page.tsx
 // 🏢 Tenant Management - List all tenants
 
+export const dynamic = 'force-dynamic';
+
 import { Suspense } from 'react';
 import Link from 'next/link';
 import { Building2, Plus, Users, Calendar, ExternalLink, Search } from 'lucide-react';

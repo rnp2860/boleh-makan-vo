@@ -3,7 +3,7 @@
 // app/vitals/history/page.tsx
 // 💓 Vitals History - View and filter past vitals entries
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { ArrowLeft, Filter, Calendar, HeartPulse, Scale, Droplet, TestTube, Trash2, ChevronDown } from 'lucide-react';
@@ -194,10 +194,10 @@ function HistoryItem({ entry, onDelete, isDeleting }: HistoryItemProps) {
 }
 
 // ============================================
-// MAIN PAGE COMPONENT
+// PAGE CONTENT COMPONENT (uses useSearchParams)
 // ============================================
 
-export default function VitalsHistoryPage() {
+function VitalsHistoryContent() {
   const searchParams = useSearchParams();
   const initialType = searchParams.get('type') as VitalType | null;
   
@@ -417,4 +417,25 @@ export default function VitalsHistoryPage() {
   );
 }
 
+// ============================================
+// PAGE COMPONENT (wraps content in Suspense)
+// ============================================
 
+export default function VitalsHistoryPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-50 animate-pulse">
+        <div className="max-w-lg mx-auto px-4 py-6">
+          <div className="h-12 bg-slate-200 rounded-xl mb-6" />
+          <div className="space-y-4">
+            {[1, 2, 3, 4, 5].map(i => (
+              <div key={i} className="h-24 bg-slate-200 rounded-xl" />
+            ))}
+          </div>
+        </div>
+      </div>
+    }>
+      <VitalsHistoryContent />
+    </Suspense>
+  );
+}

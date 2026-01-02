@@ -1,6 +1,8 @@
 // app/admin/users/page.tsx
 // 👥 Admin User Management Page
 
+export const dynamic = 'force-dynamic';
+
 import { Suspense } from 'react';
 import Link from 'next/link';
 import {

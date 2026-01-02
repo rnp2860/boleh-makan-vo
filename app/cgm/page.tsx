@@ -3,7 +3,7 @@
 // app/cgm/page.tsx
 // 📊 CGM Landing Page - Main CGM info, waitlist signup, and status
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { 
   Activity, Zap, TrendingUp, Bell, Share2, 
@@ -17,10 +17,10 @@ import { WaitlistStatusResponse, CGMWaitlistEntry } from '@/lib/cgm/types';
 import { CGM_FEATURES, CGM_DEVICES, POPULAR_DEVICES_MY } from '@/lib/cgm/devices';
 
 // ============================================
-// PAGE COMPONENT
+// PAGE CONTENT COMPONENT (uses useSearchParams)
 // ============================================
 
-export default function CGMPage() {
+function CGMPageContent() {
   const searchParams = useSearchParams();
   const referralCode = searchParams.get('ref');
   
@@ -386,6 +386,25 @@ export default function CGMPage() {
         referralCode={referralCode || undefined}
       />
     </div>
+  );
+}
+
+// ============================================
+// PAGE COMPONENT (wraps content in Suspense)
+// ============================================
+
+export default function CGMPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-b from-violet-50 to-white dark:from-gray-900 dark:to-gray-950 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-violet-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-600 dark:text-gray-400">Loading...</p>
+        </div>
+      </div>
+    }>
+      <CGMPageContent />
+    </Suspense>
   );
 }
 
