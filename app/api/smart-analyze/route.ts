@@ -2,7 +2,12 @@ import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { createClient } from '@supabase/supabase-js';
 import { DR_REZA_ADVISOR_PROMPT } from '@/lib/advisorPrompts';
-import { MALAYSIAN_FOOD_VISION_PROMPT, TEXT_INPUT_VALIDATION_PROMPT } from '@/lib/visionPrompts';
+import { 
+  MALAYSIAN_FOOD_VISION_PROMPT, 
+  TEXT_INPUT_VALIDATION_PROMPT,
+  buildVisionPromptWithCorrections,
+  CorrectionEntry 
+} from '@/lib/visionPrompts';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const supabase = createClient(
@@ -12,6 +17,60 @@ const supabase = createClient(
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
+
+// 🔄 RLHF: Fetch recent user corrections for prompt injection
+async function fetchRecentCorrections(): Promise<CorrectionEntry[]> {
+  try {
+    const { data: corrections, error } = await supabase
+      .from('food_logs')
+      .select('ai_suggested_name, meal_name')
+      .eq('was_user_corrected', true)
+      .not('ai_suggested_name', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(200);
+
+    if (error || !corrections) {
+      console.log('📋 No corrections found or error:', error?.message);
+      return [];
+    }
+
+    // Group and count corrections
+    const correctionMap = new Map<string, { correctedName: string; count: number }>();
+
+    for (const entry of corrections) {
+      const aiName = entry.ai_suggested_name?.toLowerCase().trim();
+      const userCorrectedName = entry.meal_name?.trim();
+
+      if (!aiName || !userCorrectedName) continue;
+      if (aiName === userCorrectedName.toLowerCase()) continue;
+
+      const existing = correctionMap.get(aiName);
+      if (existing) {
+        if (existing.correctedName.toLowerCase() === userCorrectedName.toLowerCase()) {
+          existing.count++;
+        }
+      } else {
+        correctionMap.set(aiName, { correctedName: userCorrectedName, count: 1 });
+      }
+    }
+
+    const sorted = Array.from(correctionMap.entries())
+      .map(([aiName, { correctedName, count }]) => ({
+        ai_suggested_name: aiName,
+        food_name: correctedName,
+        correction_count: count,
+      }))
+      .sort((a, b) => b.correction_count - a.correction_count)
+      .slice(0, 50);
+
+    console.log(`🧠 RLHF: Loaded ${sorted.length} corrections for prompt injection`);
+    return sorted;
+
+  } catch (err) {
+    console.error('Error fetching corrections:', err);
+    return [];
+  }
+}
 
 // 🐷 HALAL SAFETY
 const PORK_KEYWORDS = ['babi', 'pork', 'bacon', 'ham', 'lard', 'gelatin', 'char siu', 'siew yuk', 'lap cheong'];
@@ -100,12 +159,20 @@ export async function POST(req: Request) {
     if (type === 'image') {
       console.log("🔍 Starting vision analysis...");
       
+      // 🔄 RLHF: Fetch user corrections and inject into prompt
+      const corrections = await fetchRecentCorrections();
+      const enhancedPrompt = corrections.length > 0 
+        ? buildVisionPromptWithCorrections(corrections)
+        : MALAYSIAN_FOOD_VISION_PROMPT;
+      
+      console.log(`🧠 RLHF: Using prompt with ${corrections.length} corrections`);
+      
       const visionResponse = await openai.chat.completions.create({
         model: "gpt-4o-mini",
         messages: [
           {
             role: "system",
-            content: MALAYSIAN_FOOD_VISION_PROMPT
+            content: enhancedPrompt
           },
           {
             role: "user",

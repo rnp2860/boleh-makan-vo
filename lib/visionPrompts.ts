@@ -1,6 +1,67 @@
 // lib/visionPrompts.ts
 // 🔍 MALAYSIAN FOOD VISION ANALYSIS PROMPTS
 
+// ============================================
+// 🔄 RLHF CORRECTION INJECTION HELPER
+// ============================================
+
+export interface CorrectionEntry {
+  ai_suggested_name: string;
+  food_name: string;
+  correction_count: number;
+}
+
+/**
+ * Generates the correction injection text for the vision prompt
+ * This teaches the AI from past user corrections
+ */
+export function generateCorrectionInjection(corrections: CorrectionEntry[]): string {
+  if (!corrections || corrections.length === 0) {
+    return '';
+  }
+
+  // Filter to corrections with at least 1 occurrence
+  const validCorrections = corrections.filter(c => c.correction_count >= 1);
+  
+  if (validCorrections.length === 0) {
+    return '';
+  }
+
+  const correctionLines = validCorrections
+    .slice(0, 30) // Top 30 corrections
+    .map(c => `- "${c.ai_suggested_name}" → CORRECT NAME: "${c.food_name}" (${c.correction_count} users corrected this)`)
+    .join('\n');
+
+  return `
+╔══════════════════════════════════════════════════════════════════╗
+║  🧠 LEARNED CORRECTIONS FROM USER FEEDBACK (RLHF)                ║
+╚══════════════════════════════════════════════════════════════════╝
+
+CRITICAL: Users have corrected these AI predictions. Apply these corrections:
+
+${correctionLines}
+
+RULES FOR APPLYING CORRECTIONS:
+1. If you see a dish that matches any "wrong" prediction above, use the CORRECTED name instead
+2. These corrections are from real Malaysian users - trust their local knowledge
+3. Even if visually similar, prefer the user-corrected name
+4. Pay special attention to corrections with 2+ users - these are consensus corrections
+
+`;
+}
+
+/**
+ * Builds the complete vision prompt with corrections injected
+ */
+export function buildVisionPromptWithCorrections(corrections: CorrectionEntry[]): string {
+  const correctionSection = generateCorrectionInjection(corrections);
+  return correctionSection + MALAYSIAN_FOOD_VISION_PROMPT;
+}
+
+// ============================================
+// 🔍 BASE VISION PROMPT
+// ============================================
+
 export const MALAYSIAN_FOOD_VISION_PROMPT = `You are a Malaysian Food Forensics Expert. Your PRIMARY mission is HALAL SAFETY - you must accurately identify proteins to protect Muslim users.
 
 ╔══════════════════════════════════════════════════════════════════╗
