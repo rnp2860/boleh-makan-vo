@@ -240,7 +240,7 @@ ${APP_URL}`;
           )}
 
           {/* DELETE BUTTON */}
-          <div className="pt-4 pb-6">
+          <div className="pt-4 pb-24">
             <button 
               onClick={() => {
                 if(confirm('Are you sure you want to delete this meal?')) {
