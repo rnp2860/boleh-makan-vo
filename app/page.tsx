@@ -220,13 +220,27 @@ export default function LandingPage() {
       {/* FOOTER */}
       <footer className="py-12 bg-white border-t border-slate-100">
         <div className="max-w-6xl mx-auto px-6">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="flex items-center gap-2">
               <Logo className="h-7 w-7" />
               <span className="font-semibold text-slate-700">Boleh Makan Intelligence</span>
             </div>
+            <div className="flex items-center gap-6">
+              <Link 
+                href="/privacy-policy" 
+                className="text-slate-500 hover:text-slate-700 text-sm font-medium transition-colors"
+              >
+                Privacy Policy
+              </Link>
+              <a 
+                href="mailto:privacy@bolehmakan.my" 
+                className="text-slate-500 hover:text-slate-700 text-sm font-medium transition-colors"
+              >
+                Contact
+              </a>
+            </div>
             <div className="text-slate-500 text-sm">
-              © 2026 Boleh Makan Intelligence. All rights reserved.
+              © 2026 Boleh Makan Sdn Bhd. All rights reserved.
             </div>
           </div>
         </div>

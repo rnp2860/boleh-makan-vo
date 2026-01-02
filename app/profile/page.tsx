@@ -6,7 +6,8 @@ import { useState, useEffect } from 'react';
 import { useFood } from '@/context/FoodContext';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { Trash2, AlertTriangle, Download, FileJson, Loader2, CheckCircle } from 'lucide-react';
+import { Trash2, AlertTriangle, Download, FileJson, Loader2, CheckCircle, ExternalLink } from 'lucide-react';
+import Link from 'next/link';
 import DeleteAccountModal from '@/components/DeleteAccountModal';
 
 export default function ProfilePage() {
@@ -507,6 +508,15 @@ export default function ProfilePage() {
                 </p>
               </div>
             </div>
+            
+            {/* Privacy Policy Link */}
+            <Link 
+              href="/privacy-policy"
+              className="mt-4 flex items-center justify-center gap-2 w-full py-3 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-xl font-medium text-sm transition-colors"
+            >
+              <span>Read Full Privacy Policy</span>
+              <ExternalLink className="w-4 h-4" />
+            </Link>
           </div>
         </div>
 
