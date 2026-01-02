@@ -2,6 +2,9 @@
 // 📊 Admin Dashboard Overview Page
 
 import { Suspense } from 'react';
+
+export const dynamic = 'force-dynamic';
+
 import {
   Users,
   Utensils,
@@ -105,7 +108,7 @@ export default async function AdminDashboardPage() {
           message={`${metrics.vitals.alerts_triggered} users have triggered glucose alerts in the past 24 hours.`}
           action={{
             label: 'View Alerts',
-            onClick: () => {},
+            href: '/admin/users?filter=alerts',
           }}
         />
       )}
@@ -189,25 +192,25 @@ export default async function AdminDashboardPage() {
             title="View All Users"
             description="Manage user accounts"
             icon={<Users className="w-5 h-5" />}
-            onClick={() => window.location.href = '/admin/users'}
+            href="/admin/users"
           />
           <QuickActionCard
             title="Analytics"
             description="Detailed reports"
             icon={<TrendingUp className="w-5 h-5" />}
-            onClick={() => window.location.href = '/admin/analytics'}
+            href="/admin/analytics"
           />
           <QuickActionCard
             title="Food Database"
             description="Manage food entries"
             icon={<Utensils className="w-5 h-5" />}
-            onClick={() => window.location.href = '/admin/content/foods'}
+            href="/admin/content/foods"
           />
           <QuickActionCard
             title="Announcements"
             description="Send notifications"
             icon={<AlertTriangle className="w-5 h-5" />}
-            onClick={() => window.location.href = '/admin/content/announcements'}
+            href="/admin/content/announcements"
           />
         </div>
       </div>

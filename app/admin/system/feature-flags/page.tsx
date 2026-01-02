@@ -1,6 +1,8 @@
 // app/admin/system/feature-flags/page.tsx
 // 🚩 Feature Flags Management
 
+export const dynamic = 'force-dynamic';
+
 import {
   Flag,
   Plus,

@@ -1,6 +1,8 @@
 // app/admin/analytics/page.tsx
 // 📈 Admin Analytics Dashboard
 
+export const dynamic = 'force-dynamic';
+
 import { Suspense } from 'react';
 import {
   TrendingUp,

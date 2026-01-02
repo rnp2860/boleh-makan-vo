@@ -3,6 +3,8 @@
 // app/admin/cgm/page.tsx
 // 📊 Admin CGM Waitlist Dashboard - Manage and analyze waitlist
 
+export const dynamic = 'force-dynamic';
+
 import React, { useState, useEffect } from 'react';
 import {
   Activity, Users, TrendingUp, Download, Mail,

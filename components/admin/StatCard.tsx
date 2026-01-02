@@ -134,7 +134,8 @@ interface AlertCardProps {
   message: string;
   action?: {
     label: string;
-    onClick: () => void;
+    href?: string;
+    onClick?: () => void;
   };
 }
 
@@ -151,12 +152,21 @@ export function AlertCard({ type, title, message, action }: AlertCardProps) {
       <h4 className="font-medium mb-1">{title}</h4>
       <p className="text-sm opacity-80">{message}</p>
       {action && (
-        <button
-          onClick={action.onClick}
-          className="mt-2 text-sm font-medium underline hover:no-underline"
-        >
-          {action.label}
-        </button>
+        action.href ? (
+          <a
+            href={action.href}
+            className="mt-2 inline-block text-sm font-medium underline hover:no-underline"
+          >
+            {action.label}
+          </a>
+        ) : (
+          <button
+            onClick={action.onClick}
+            className="mt-2 text-sm font-medium underline hover:no-underline"
+          >
+            {action.label}
+          </button>
+        )
       )}
     </div>
   );
@@ -167,7 +177,8 @@ interface QuickActionCardProps {
   title: string;
   description: string;
   icon: ReactNode;
-  onClick: () => void;
+  href?: string;
+  onClick?: () => void;
   disabled?: boolean;
 }
 
@@ -175,29 +186,40 @@ export function QuickActionCard({
   title,
   description,
   icon,
+  href,
   onClick,
   disabled = false,
 }: QuickActionCardProps) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={`text-left bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700 transition-all ${
-        disabled
-          ? 'opacity-50 cursor-not-allowed'
-          : 'hover:shadow-md hover:border-indigo-200 dark:hover:border-indigo-800'
-      }`}
-    >
-      <div className="flex items-center gap-3">
-        <div className="p-2 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg text-indigo-600 dark:text-indigo-400">
-          {icon}
-        </div>
-        <div>
-          <p className="font-medium text-slate-700 dark:text-white">{title}</p>
-          <p className="text-sm text-slate-500 dark:text-slate-400">{description}</p>
-        </div>
-        <ArrowUpRight className="w-5 h-5 text-slate-400 ml-auto" />
+  const content = (
+    <div className="flex items-center gap-3">
+      <div className="p-2 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg text-indigo-600 dark:text-indigo-400">
+        {icon}
       </div>
+      <div>
+        <p className="font-medium text-slate-700 dark:text-white">{title}</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400">{description}</p>
+      </div>
+      <ArrowUpRight className="w-5 h-5 text-slate-400 ml-auto" />
+    </div>
+  );
+
+  const className = `text-left bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700 transition-all ${
+    disabled
+      ? 'opacity-50 cursor-not-allowed'
+      : 'hover:shadow-md hover:border-indigo-200 dark:hover:border-indigo-800'
+  }`;
+
+  if (href) {
+    return (
+      <a href={href} className={className}>
+        {content}
+      </a>
+    );
+  }
+
+  return (
+    <button onClick={onClick} disabled={disabled} className={className}>
+      {content}
     </button>
   );
 }
