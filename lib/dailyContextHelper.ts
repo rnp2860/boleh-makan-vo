@@ -4,6 +4,17 @@
 import { getSupabaseClient } from './supabase';
 import { DailyContext, getDefaultDailyContext } from './advisorPrompts';
 
+// Type for reduce accumulator
+interface NutrientTotals {
+  calories: number;
+  carbs: number;
+  sugar: number;
+  sodium: number;
+  protein: number;
+  fat: number;
+  count: number;
+}
+
 /**
  * Fetch user's daily context for Dr. Reza's personalized advice
  * This includes today's meals, user targets, and recent glucose readings
@@ -51,7 +62,7 @@ export async function getDailyContext(userId: string, date?: string): Promise<Da
 
     // Process today's meals
     const todaysMeals = mealsResult.data || [];
-    const totals = todaysMeals.reduce((acc, meal) => ({
+    const totals = todaysMeals.reduce<NutrientTotals>((acc, meal) => ({
       calories: acc.calories + (meal.calories || 0),
       carbs: acc.carbs + (meal.carbs || 0),
       sugar: acc.sugar + (meal.sugar || 0),
@@ -140,7 +151,7 @@ export async function getQuickDailyContext(userId: string): Promise<DailyContext
     ]);
 
     const todaysMeals = mealsResult.data || [];
-    const totals = todaysMeals.reduce((acc, meal) => ({
+    const totals = todaysMeals.reduce<NutrientTotals>((acc, meal) => ({
       calories: acc.calories + (meal.calories || 0),
       carbs: acc.carbs + (meal.carbs || 0),
       sugar: acc.sugar + (meal.sugar || 0),
