@@ -293,6 +293,11 @@ export interface RamadanDailyLogInput {
   user_id: string;
   date: string;
   fasting_day?: number;
+  // Prayer times (cached)
+  imsak_time?: string;
+  subuh_time?: string;
+  maghrib_time?: string;
+  isyak_time?: string;
   sahur_logged?: boolean;
   sahur_time?: string;
   sahur_calories?: number;
