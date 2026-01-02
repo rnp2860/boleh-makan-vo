@@ -13,7 +13,12 @@ export interface CorrectionEntry {
 
 /**
  * Generates the correction injection text for the vision prompt
- * This teaches the AI from past user corrections
+ * This teaches the AI from past user corrections using ADVISORY approach
+ * 
+ * Key improvements:
+ * - Conditional logic: "check if it is actually" instead of "replace with"
+ * - Visual evidence priority: AI must verify before applying correction
+ * - Escape hatch: AI can reject correction if image clearly contradicts
  */
 export function generateCorrectionInjection(corrections: CorrectionEntry[]): string {
   if (!corrections || corrections.length === 0) {
@@ -27,25 +32,28 @@ export function generateCorrectionInjection(corrections: CorrectionEntry[]): str
     return '';
   }
 
-  const correctionLines = validCorrections
+  // Format as conditional checks, not direct replacements
+  const formattedList = validCorrections
     .slice(0, 30) // Top 30 corrections
-    .map(c => `- "${c.ai_suggested_name}" → CORRECT NAME: "${c.food_name}" (${c.correction_count} users corrected this)`)
+    .map(c => `- If you detect "${c.ai_suggested_name}", check if it is actually "${c.food_name}" (${c.correction_count} user reports).`)
     .join('\n');
 
   return `
-╔══════════════════════════════════════════════════════════════════╗
-║  🧠 LEARNED CORRECTIONS FROM USER FEEDBACK (RLHF)                ║
-╚══════════════════════════════════════════════════════════════════╝
+╔════════════════════════════════════════════════════════════════════╗
+║   🧠 LEARNED VISUAL CONTEXT & CORRECTIONS (ADVISORY)               ║
+╚════════════════════════════════════════════════════════════════════╝
+The following list represents common visual confusion points reported by Malaysian users.
+Use this to REFINE your analysis, but do not blindly apply labels if the image clearly contradicts them.
 
-CRITICAL: Users have corrected these AI predictions. Apply these corrections:
+POTENTIAL CONFUSION POINTS:
+${formattedList}
 
-${correctionLines}
-
-RULES FOR APPLYING CORRECTIONS:
-1. If you see a dish that matches any "wrong" prediction above, use the CORRECTED name instead
-2. These corrections are from real Malaysian users - trust their local knowledge
-3. Even if visually similar, prefer the user-corrected name
-4. Pay special attention to corrections with 2+ users - these are consensus corrections
+INSTRUCTION FOR ANALYSIS:
+1. If your initial prediction matches a "Wrong Prediction" above, PAUSE.
+2. Look for specific visual evidence (ingredients, sauce texture, cooking style, gravy color, side dishes) that supports the "Correct Name" instead.
+3. If the visual evidence is ambiguous OR supports the corrected name, PRIORITIZE the "Correct Name" - trust Malaysian users' local knowledge.
+4. If the image clearly and undeniably matches your original prediction (e.g., distinct features missing from the corrected version), stick to your original prediction.
+5. Pay extra attention to corrections with 2+ user reports - these represent consensus from multiple users.
 
 `;
 }
