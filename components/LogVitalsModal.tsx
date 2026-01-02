@@ -1,13 +1,21 @@
 // components/LogVitalsModal.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { 
   VitalType, 
   VitalContextTag, 
   VITAL_TYPE_CONFIG, 
   VITAL_CONTEXT_OPTIONS 
 } from '@/types/database';
+
+interface TodayReading {
+  value: number;
+  value2?: number; // For BP diastolic
+  time: string;
+  context?: string;
+}
 
 interface LogVitalsModalProps {
   isOpen: boolean;
@@ -16,6 +24,7 @@ interface LogVitalsModalProps {
 }
 
 export default function LogVitalsModal({ isOpen, onClose, onSuccess }: LogVitalsModalProps) {
+  const router = useRouter();
   const [step, setStep] = useState<'type' | 'value'>('type');
   const [selectedType, setSelectedType] = useState<VitalType | null>(null);
   const [readingValue, setReadingValue] = useState('');
@@ -25,6 +34,13 @@ export default function LogVitalsModal({ isOpen, onClose, onSuccess }: LogVitals
   const [contextTag, setContextTag] = useState<VitalContextTag>('general');
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
+  
+  // Success toast state
+  const [showSuccessToast, setShowSuccessToast] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  
+  // Today's latest readings
+  const [todayReadings, setTodayReadings] = useState<Record<string, TodayReading>>({});
 
   // Get user ID from localStorage
   const getUserId = () => {
@@ -36,6 +52,46 @@ export default function LogVitalsModal({ isOpen, onClose, onSuccess }: LogVitals
     }
     return userId;
   };
+
+  // Fetch today's latest readings when modal opens
+  const fetchTodayReadings = async () => {
+    const userId = getUserId();
+    if (!userId) return;
+
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      const response = await fetch(`/api/vitals/today?user_id=${encodeURIComponent(userId)}&date=${today.toISOString()}`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.readings) {
+          setTodayReadings(data.readings);
+          console.log('📊 Today\'s readings:', data.readings);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch today readings:', err);
+    }
+  };
+
+  // Fetch readings when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      fetchTodayReadings();
+    }
+  }, [isOpen]);
+
+  // Auto-hide success toast
+  useEffect(() => {
+    if (showSuccessToast) {
+      const timer = setTimeout(() => {
+        setShowSuccessToast(false);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [showSuccessToast]);
 
   const handleTypeSelect = (type: VitalType) => {
     setSelectedType(type);
@@ -162,9 +218,28 @@ export default function LogVitalsModal({ isOpen, onClose, onSuccess }: LogVitals
 
       console.log('✅ Vital saved successfully:', result);
 
-      // Success - reset and close
-      handleClose();
+      // Success - show toast, clear input, but keep modal open
+      const isBPSave = selectedType === 'bp_systolic';
+      const config = selectedType ? VITAL_TYPE_CONFIG[selectedType] : null;
+      
+      if (isBPSave) {
+        setSuccessMessage(`Blood Pressure ${bpSystolic}/${bpDiastolic} mmHg saved! ✓`);
+        setBpSystolic('');
+        setBpDiastolic('');
+      } else {
+        setSuccessMessage(`${config?.label || 'Vital'} ${readingValue} ${config?.unit || ''} saved! ✓`);
+        setReadingValue('');
+      }
+      
+      setShowSuccessToast(true);
+      
+      // Refresh today's readings
+      await fetchTodayReadings();
+      
+      // Trigger dashboard refresh
       onSuccess?.();
+      router.refresh();
+      
     } catch (err: any) {
       console.error('❌ Failed to save vital:', err);
       
@@ -198,9 +273,30 @@ export default function LogVitalsModal({ isOpen, onClose, onSuccess }: LogVitals
   if (!isOpen) return null;
 
   const config = selectedType ? VITAL_TYPE_CONFIG[selectedType] : null;
+  
+  // Get today's reading for the selected type
+  const getTodayReading = (type: VitalType | null): TodayReading | null => {
+    if (!type) return null;
+    if (type === 'bp_systolic') {
+      return todayReadings['bp'] || null;
+    }
+    return todayReadings[type] || null;
+  };
+  
+  const todayReading = getTodayReading(selectedType);
 
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-end justify-center backdrop-blur-sm">
+      {/* Success Toast */}
+      {showSuccessToast && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[60] animate-bounce">
+          <div className="bg-green-500 text-white px-6 py-3 rounded-full shadow-xl flex items-center gap-2 font-bold">
+            <span className="text-lg">✅</span>
+            {successMessage}
+          </div>
+        </div>
+      )}
+      
       <div className="bg-white w-full max-w-md rounded-t-3xl overflow-hidden animate-slideUp shadow-2xl">
         
         {/* Header */}
@@ -347,6 +443,16 @@ export default function LogVitalsModal({ isOpen, onClose, onSuccess }: LogVitals
                   <p className="text-xs text-slate-400 mt-2">
                     Normal: 120/80 mmHg • High: &gt;130/80 mmHg
                   </p>
+                  
+                  {/* Today's Latest BP Reading */}
+                  {todayReading && (
+                    <div className="mt-3 p-2.5 bg-green-50 border border-green-100 rounded-xl">
+                      <p className="text-xs text-green-700 font-medium">
+                        ✓ Today's last reading: <span className="font-bold">{todayReading.value}/{todayReading.value2} mmHg</span>
+                        <span className="text-green-500 ml-1">({todayReading.time})</span>
+                      </p>
+                    </div>
+                  )}
                 </div>
               ) : (
                 /* Standard Single Value Input */
@@ -385,6 +491,17 @@ export default function LogVitalsModal({ isOpen, onClose, onSuccess }: LogVitals
                     Valid range: {config.min} - {config.max} {config.unit}
                     {selectedType === 'glucose' && ' • Target: 4.0-7.0 (fasting)'}
                   </p>
+                  
+                  {/* Today's Latest Reading */}
+                  {todayReading && (
+                    <div className="mt-3 p-2.5 bg-green-50 border border-green-100 rounded-xl">
+                      <p className="text-xs text-green-700 font-medium">
+                        ✓ Today's last reading: <span className="font-bold">{todayReading.value} {config.unit}</span>
+                        <span className="text-green-500 ml-1">({todayReading.time})</span>
+                        {todayReading.context && <span className="text-green-400 ml-1">• {todayReading.context}</span>}
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
 
