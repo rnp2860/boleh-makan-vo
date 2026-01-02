@@ -327,6 +327,12 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     permission: 'users',
   },
   {
+    label: 'Tenants',
+    href: '/admin/tenants',
+    icon: 'Building2',
+    permission: 'system',
+  },
+  {
     label: 'Analytics',
     href: '/admin/analytics',
     icon: 'BarChart3',

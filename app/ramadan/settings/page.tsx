@@ -16,7 +16,7 @@ import {
   Power,
   AlertTriangle
 } from 'lucide-react';
-import MobileLayout from '@/components/MobileLayout';
+import { MobileLayout } from '@/components/MobileLayout';
 import { useRamadanMode } from '@/hooks/useRamadanMode';
 import { useFood } from '@/context/FoodContext';
 import { MALAYSIAN_CITIES, DEFAULT_RAMADAN_SETTINGS } from '@/lib/types/ramadan';

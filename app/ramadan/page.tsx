@@ -6,7 +6,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Moon, ArrowLeft, Settings, AlertCircle } from 'lucide-react';
-import MobileLayout from '@/components/MobileLayout';
+import { MobileLayout } from '@/components/MobileLayout';
 import RamadanDashboard from '@/components/ramadan/RamadanDashboard';
 import { useRamadanMode } from '@/hooks/useRamadanMode';
 import { usePrayerTimes } from '@/hooks/usePrayerTimes';
