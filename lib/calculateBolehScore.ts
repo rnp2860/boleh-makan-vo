@@ -2,13 +2,8 @@
 // 🎯 BOLEH SCORE CALCULATION ENGINE
 // Calculates a daily health score (0-100) based on food logs and vitals
 
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseServiceClient } from '@/lib/supabase';
 import { MealContext, PreparationStyle } from '@/types/database';
-
-// Initialize Supabase client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 // ============================================
 // TYPES
@@ -98,6 +93,7 @@ export async function calculateDailyScore(
   userId: string,
   date: Date = new Date()
 ): Promise<ScoreResult> {
+  const supabase = getSupabaseServiceClient();
   const insights: string[] = [];
   
   // Get start and end of the target day

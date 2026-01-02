@@ -2,15 +2,12 @@
 // 🩺 API endpoint for logging user vitals
 
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { getSupabaseServiceClient } from '@/lib/supabase';
 
 export async function POST(req: Request) {
   try {
+    // Get Supabase client inside handler (avoids build-time errors)
+    const supabase = getSupabaseServiceClient();
     const body = await req.json();
     
     // Log incoming request for debugging

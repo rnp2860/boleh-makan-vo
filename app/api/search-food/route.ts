@@ -1,15 +1,12 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { getSupabaseClient } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: Request) {
   try {
+    // Get Supabase client inside handler (avoids build-time errors)
+    const supabase = getSupabaseClient();
     const { searchParams } = new URL(req.url);
     const query = searchParams.get('q');
     const category = searchParams.get('cat'); // 'drink' | 'dessert' | 'general'

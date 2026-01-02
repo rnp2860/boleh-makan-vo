@@ -2,12 +2,7 @@
 // 🔄 RLHF Corrections API - Fetches recent user corrections for prompt injection
 
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { getSupabaseServiceClient } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,6 +13,8 @@ export interface CorrectionEntry {
 }
 
 export async function GET() {
+  // Get Supabase client inside handler (avoids build-time errors)
+  const supabase = getSupabaseServiceClient();
   try {
     // Fetch food_logs where user corrected the name (ai_suggested_name differs from food_name)
     // Group by ai_suggested_name → food_name pairs and count occurrences

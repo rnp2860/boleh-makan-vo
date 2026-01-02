@@ -1,10 +1,7 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseServiceClient } from '@/lib/supabase';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+// Initialize Supabase inside handlers to avoid build-time errors
 
 // 🎯 HEALTH LIMITS
 const DAILY_SODIUM_LIMIT = 2000; // mg
@@ -20,6 +17,9 @@ function getHealthStatus(average: number, limit: number): 'Safe' | 'Warning' | '
 
 export async function GET(req: Request) {
   try {
+    // Get Supabase client inside handler (avoids build-time errors)
+    const supabase = getSupabaseServiceClient();
+    
     const { searchParams } = new URL(req.url);
     const start_date = searchParams.get('start_date');
     const end_date = searchParams.get('end_date');

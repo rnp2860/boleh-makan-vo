@@ -2,13 +2,7 @@
 // 🗑️ PDPA Compliance: Account & Data Deletion Endpoint
 
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-// Use service role key for deletion (bypasses RLS)
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { getSupabaseServiceClient } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,6 +23,9 @@ export async function POST(req: Request) {
       );
     }
 
+    // Get Supabase client inside handler (avoids build-time errors)
+    const supabase = getSupabaseServiceClient();
+    
     const safeUserId = String(user_id);
     const results: DeletionResult[] = [];
     const timestamp = new Date().toISOString();

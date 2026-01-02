@@ -1,12 +1,7 @@
 // lib/streakCalculator.ts
 // 🔥 Daily Logging Streak Calculator
 
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { getSupabaseServiceClient } from '@/lib/supabase';
 
 // ============================================
 // TYPES
@@ -83,6 +78,7 @@ function checkMilestone(streak: number): { isMilestone: boolean; milestoneValue?
  * - Update longest_streak if current > longest
  */
 export async function updateStreak(userId: string, logDate?: Date): Promise<StreakInfo> {
+  const supabase = getSupabaseServiceClient();
   const today = getTodayString();
   const yesterday = getYesterdayString();
   const logDateStr = logDate ? getDateString(logDate) : today;
@@ -186,6 +182,8 @@ export async function updateStreak(userId: string, logDate?: Date): Promise<Stre
  * Get current streak info for a user (without updating)
  */
 export async function getStreak(userId: string): Promise<StreakInfo> {
+  const supabase = getSupabaseServiceClient();
+  
   try {
     const { data, error } = await supabase
       .from('user_profiles')
