@@ -2,6 +2,7 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
+import { Providers } from './providers';
 import { FoodProvider } from '@/context/FoodContext';
 import { AnalyticsProvider } from '@/context/AnalyticsContext';
 
@@ -21,11 +22,13 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <FoodProvider>
-          <AnalyticsProvider>
-            {children}
-          </AnalyticsProvider>
-        </FoodProvider>
+        <Providers>
+          <FoodProvider>
+            <AnalyticsProvider>
+              {children}
+            </AnalyticsProvider>
+          </FoodProvider>
+        </Providers>
       </body>
     </html>
   );

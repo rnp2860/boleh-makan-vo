@@ -3,6 +3,8 @@
 // app/vitals/page.tsx
 // 💓 Vitals Hub - Central page for health vitals logging and viewing
 
+export const dynamic = 'force-dynamic';
+
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
