@@ -70,7 +70,7 @@ interface UseVitalsHistoryOptions {
 }
 
 export function useVitalsHistory({ userId, filter }: UseVitalsHistoryOptions) {
-  const { data, isLoading, error, refetch, fetchNextPage, hasNextPage } = useQuery<VitalsLogEntry[]>({
+  const { data, isLoading, error, refetch } = useQuery<VitalsLogEntry[]>({
     queryKey: VITALS_QUERY_KEYS.history(userId, filter),
     queryFn: async () => {
       const params = new URLSearchParams({ userId });
