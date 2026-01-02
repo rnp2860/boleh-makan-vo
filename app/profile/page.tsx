@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react';
 import { useFood } from '@/context/FoodContext';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { Trash2, AlertTriangle } from 'lucide-react';
+import { Trash2, AlertTriangle, Download, FileJson, Loader2, CheckCircle } from 'lucide-react';
 import DeleteAccountModal from '@/components/DeleteAccountModal';
 
 export default function ProfilePage() {
@@ -15,6 +15,10 @@ export default function ProfilePage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [deleteSuccess, setDeleteSuccess] = useState(false);
+  
+  // Export data states
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportSuccess, setExportSuccess] = useState(false);
 
   // Get user ID on mount
   useEffect(() => {
@@ -76,6 +80,62 @@ export default function ProfilePage() {
     console.log('✅ Account deleted:', data);
     setShowDeleteModal(false);
     setDeleteSuccess(true);
+  };
+
+  // Handle data export
+  const handleExportData = async () => {
+    if (!userId) {
+      alert('User ID not found');
+      return;
+    }
+
+    setIsExporting(true);
+    setExportSuccess(false);
+
+    try {
+      const response = await fetch(`/api/user/export?user_id=${encodeURIComponent(userId)}`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to export data');
+      }
+
+      const data = await response.json();
+
+      // Create pretty-printed JSON
+      const jsonString = JSON.stringify(data, null, 2);
+      
+      // Create Blob
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      
+      // Create download link
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      
+      // Generate filename with date
+      const dateStr = new Date().toISOString().split('T')[0];
+      link.download = `boleh-makan-export-${dateStr}.json`;
+      
+      // Trigger download
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Cleanup
+      URL.revokeObjectURL(url);
+      
+      console.log('✅ Data exported successfully');
+      setExportSuccess(true);
+      
+      // Hide success message after 3 seconds
+      setTimeout(() => setExportSuccess(false), 3000);
+      
+    } catch (err: any) {
+      console.error('❌ Export failed:', err);
+      alert('Failed to export data. Please try again.');
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   if (!userProfile) {
@@ -373,9 +433,87 @@ export default function ProfilePage() {
         </div>
 
         {/* ============================================ */}
-        {/* 🗑️ DELETE ACCOUNT SECTION - PDPA Compliance */}
+        {/* 📦 YOUR DATA SECTION - PDPA Compliance */}
         {/* ============================================ */}
         <div className="mt-8 pt-6 border-t-2 border-dashed border-slate-200">
+          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-5 rounded-3xl border-2 border-blue-200">
+            <div className="flex items-start gap-3 mb-4">
+              <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                <FileJson className="w-5 h-5 text-blue-600" />
+              </div>
+              <div>
+                <h3 className="font-bold text-blue-700 text-sm">Your Data</h3>
+                <p className="text-blue-600/70 text-xs mt-0.5">
+                  Access and download all your personal data
+                </p>
+              </div>
+            </div>
+            
+            <div className="bg-white/60 rounded-2xl p-4 border border-blue-100">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-bold text-slate-700 text-sm">Download My Data</p>
+                  <p className="text-slate-500 text-xs mt-0.5">
+                    Export all meals, vitals, and goals as JSON
+                  </p>
+                </div>
+                <button
+                  onClick={handleExportData}
+                  disabled={isExporting}
+                  className={`px-4 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 transition-all shadow-md ${
+                    exportSuccess
+                      ? 'bg-green-500 text-white shadow-green-200'
+                      : isExporting
+                      ? 'bg-blue-400 text-white cursor-wait shadow-blue-200'
+                      : 'bg-blue-500 hover:bg-blue-600 text-white shadow-blue-200'
+                  }`}
+                >
+                  {exportSuccess ? (
+                    <>
+                      <CheckCircle className="w-4 h-4" />
+                      Downloaded!
+                    </>
+                  ) : isExporting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Exporting...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-4 h-4" />
+                      Download
+                    </>
+                  )}
+                </button>
+              </div>
+              
+              {/* What's included */}
+              <div className="mt-3 pt-3 border-t border-blue-100">
+                <p className="text-xs text-slate-500 mb-2 font-medium">Includes:</p>
+                <div className="flex flex-wrap gap-2">
+                  {['🍽️ Meal Logs', '🩸 Vitals', '🎯 Goals', '📊 Metadata'].map((item) => (
+                    <span key={item} className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-lg">
+                      {item}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              
+              {/* PDPA Notice */}
+              <div className="mt-3 pt-3 border-t border-blue-100">
+                <p className="text-xs text-slate-500">
+                  🇲🇾 <span className="font-medium">PDPA Rights:</span> Under Malaysia's Personal Data Protection Act 2010, 
+                  you have the right to access and obtain a copy of your personal data.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ============================================ */}
+        {/* 🗑️ DELETE ACCOUNT SECTION - PDPA Compliance */}
+        {/* ============================================ */}
+        <div className="mt-6">
           <div className="bg-gradient-to-br from-red-50 to-rose-50 p-5 rounded-3xl border-2 border-red-200">
             <div className="flex items-start gap-3 mb-4">
               <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center flex-shrink-0">
