@@ -5,7 +5,8 @@ import {
   AdminRole, 
   AdminPermissions, 
   DEFAULT_PERMISSIONS,
-  AdminUser 
+  AdminUser,
+  AdminNavItem 
 } from '@/lib/types/admin';
 
 /**
@@ -168,9 +169,9 @@ export function validateRouteAccess(
  * Filter navigation items based on permissions
  */
 export function filterNavByPermissions(
-  items: { permission?: keyof AdminPermissions; [key: string]: any }[],
+  items: AdminNavItem[],
   admin: AdminUser | null
-): typeof items {
+): AdminNavItem[] {
   return items.filter(item => {
     if (!item.permission) return true;
     return canAccess(admin, item.permission);
