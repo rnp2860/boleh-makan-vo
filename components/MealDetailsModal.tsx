@@ -159,7 +159,7 @@ ${APP_URL}`;
         </div>
 
         {/* CONTENT SCROLL AREA */}
-        <div className="p-5 space-y-5">
+        <div className="p-5 pb-8 space-y-5">
           
           {/* MACRO GRID - Full labels */}
           <div className="grid grid-cols-3 gap-2 mb-2">
@@ -240,17 +240,19 @@ ${APP_URL}`;
           )}
 
           {/* DELETE BUTTON */}
-          <button 
-            onClick={() => {
-              if(confirm('Are you sure you want to delete this meal?')) {
-                onDelete(meal.id);
-                onClose();
-              }
-            }}
-            className="w-full py-3 text-red-500 font-bold text-sm bg-red-50 hover:bg-red-100 rounded-xl transition-colors"
-          >
-            Delete Meal
-          </button>
+          <div className="pt-4 pb-6">
+            <button 
+              onClick={() => {
+                if(confirm('Are you sure you want to delete this meal?')) {
+                  onDelete(meal.id);
+                  onClose();
+                }
+              }}
+              className="w-full py-3.5 text-red-500 font-bold text-sm bg-red-50 hover:bg-red-100 rounded-xl transition-colors border border-red-100"
+            >
+              🗑️ Delete Meal
+            </button>
+          </div>
         </div>
       </div>
 
