@@ -45,60 +45,71 @@ export default function DashboardPage() {
     }
   }, []);
 
-  // Fetch Risk Chart data when date or userId changes
-  useEffect(() => {
-    const fetchRiskChartData = async () => {
-      if (!userId) return;
-      
-      setRiskChartLoading(true);
-      
-      // Get start and end of selected day
-      const startOfDay = new Date(selectedDate);
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(selectedDate);
-      endOfDay.setHours(23, 59, 59, 999);
+  // State to force chart refetch (increments after delete)
+  const [chartRefreshKey, setChartRefreshKey] = useState(0);
 
-      try {
-        // Fetch food logs for the selected date
-        const { data: foodData, error: foodError } = await supabase
-          .from('food_logs')
-          .select('id, meal_name, calories, image_url, created_at, meal_context, preparation_style')
-          .eq('user_id', userId)
-          .gte('created_at', startOfDay.toISOString())
-          .lte('created_at', endOfDay.toISOString())
-          .order('created_at', { ascending: true });
+  // Function to refetch chart data
+  const refetchChartData = async () => {
+    if (!userId) return;
+    
+    setRiskChartLoading(true);
+    
+    // Get start and end of selected day
+    const startOfDay = new Date(selectedDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(selectedDate);
+    endOfDay.setHours(23, 59, 59, 999);
 
-        if (foodError) {
-          console.error('Error fetching food logs for chart:', foodError);
-        } else {
-          console.log('📊 Dashboard: Food logs fetched for chart:', foodData?.length, foodData);
-          setRiskChartFoodLogs(foodData || []);
-        }
+    try {
+      // Fetch food logs for the selected date
+      const { data: foodData, error: foodError } = await supabase
+        .from('food_logs')
+        .select('id, meal_name, calories, image_url, created_at, meal_context, preparation_style')
+        .eq('user_id', userId)
+        .gte('created_at', startOfDay.toISOString())
+        .lte('created_at', endOfDay.toISOString())
+        .order('created_at', { ascending: true });
 
-        // Fetch vitals for the selected date
-        const { data: vitalsData, error: vitalsError } = await supabase
-          .from('user_vitals')
-          .select('id, vital_type, reading_value, unit, context_tag, measured_at')
-          .eq('user_id', userId)
-          .gte('measured_at', startOfDay.toISOString())
-          .lte('measured_at', endOfDay.toISOString())
-          .order('measured_at', { ascending: true });
-
-        if (vitalsError) {
-          console.error('Error fetching vitals for chart:', vitalsError);
-        } else {
-          console.log('📊 Dashboard: Vitals fetched for chart:', vitalsData?.length, vitalsData);
-          setRiskChartVitals(vitalsData || []);
-        }
-      } catch (err) {
-        console.error('Failed to fetch risk chart data:', err);
-      } finally {
-        setRiskChartLoading(false);
+      if (foodError) {
+        console.error('Error fetching food logs for chart:', foodError);
+      } else {
+        console.log('📊 Dashboard: Food logs fetched for chart:', foodData?.length, foodData);
+        setRiskChartFoodLogs(foodData || []);
       }
-    };
 
-    fetchRiskChartData();
-  }, [userId, selectedDate]);
+      // Fetch vitals for the selected date
+      const { data: vitalsData, error: vitalsError } = await supabase
+        .from('user_vitals')
+        .select('id, vital_type, reading_value, unit, context_tag, measured_at')
+        .eq('user_id', userId)
+        .gte('measured_at', startOfDay.toISOString())
+        .lte('measured_at', endOfDay.toISOString())
+        .order('measured_at', { ascending: true });
+
+      if (vitalsError) {
+        console.error('Error fetching vitals for chart:', vitalsError);
+      } else {
+        console.log('📊 Dashboard: Vitals fetched for chart:', vitalsData?.length, vitalsData);
+        setRiskChartVitals(vitalsData || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch risk chart data:', err);
+    } finally {
+      setRiskChartLoading(false);
+    }
+  };
+
+  // Fetch Risk Chart data when date, userId, or refreshKey changes
+  useEffect(() => {
+    refetchChartData();
+  }, [userId, selectedDate, chartRefreshKey]);
+
+  // Handler for meal deletion that also refreshes the chart
+  const handleDeleteMeal = async (mealId: string) => {
+    await deleteMeal(mealId);
+    // Immediately refetch chart data after delete
+    setChartRefreshKey(prev => prev + 1);
+  };
   
   if (!userProfile) {
     return (
@@ -518,7 +529,7 @@ export default function DashboardPage() {
       <MealDetailsModal 
         meal={selectedMeal} 
         onClose={() => setSelectedMeal(null)} 
-        onDelete={deleteMeal} 
+        onDelete={handleDeleteMeal} 
       />
 
       {/* DAY SUMMARY SHARE MODAL */}

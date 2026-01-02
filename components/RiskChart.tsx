@@ -120,21 +120,56 @@ const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
     const color = getGlucoseColor(data.glucose);
     const status = data.glucose <= 7.0 ? 'Normal' : data.glucose <= 8.0 ? 'Elevated' : 'High';
     
+    // Format context tag for display
+    const formatContextTag = (tag: string | undefined): { label: string; emoji: string; highlight: boolean } => {
+      if (!tag) return { label: 'General', emoji: '📋', highlight: false };
+      const normalized = tag.toLowerCase().replace(/[_-]/g, ' ').trim();
+      
+      if (normalized.includes('fasting')) {
+        return { label: 'Fasting', emoji: '🌅', highlight: true };
+      }
+      if (normalized.includes('pre') && normalized.includes('meal')) {
+        return { label: 'Pre-meal', emoji: '🍽️', highlight: false };
+      }
+      if (normalized.includes('post') || normalized.includes('2hr') || normalized.includes('2 hour') || normalized.includes('after')) {
+        return { label: '2hr After Meal', emoji: '⏱️', highlight: false };
+      }
+      return { label: 'General', emoji: '📋', highlight: false };
+    };
+
+    const contextInfo = formatContextTag(data.glucoseContext);
+    
     return (
-      <div className="bg-white rounded-xl shadow-xl border border-slate-200 p-3">
+      <div className="bg-white rounded-xl shadow-xl border border-slate-200 p-3 min-w-[160px]">
+        {/* Context Tag Banner (highlighted for Fasting) */}
+        <div className={`flex items-center gap-1.5 mb-2 px-2 py-1 rounded-lg text-xs font-semibold ${
+          contextInfo.highlight 
+            ? 'bg-amber-100 text-amber-700 border border-amber-200' 
+            : 'bg-slate-100 text-slate-600'
+        }`}>
+          <span>{contextInfo.emoji}</span>
+          <span>Type: {contextInfo.label}</span>
+        </div>
+        
+        {/* Glucose Value */}
         <div className="flex items-center gap-2 mb-1">
           <span className="text-lg">🩸</span>
-          <span className="font-bold text-slate-800">{data.glucose} mmol/L</span>
+          <span className="font-bold text-slate-800 text-lg">{data.glucose} mmol/L</span>
         </div>
+        
+        {/* Status */}
         <div className="flex items-center gap-2">
           <div 
-            className="w-2 h-2 rounded-full" 
+            className="w-2.5 h-2.5 rounded-full" 
             style={{ backgroundColor: color }}
           />
-          <span className="text-xs text-slate-500">{status}</span>
-          <span className="text-xs text-slate-400">• {data.glucoseContext}</span>
+          <span className="text-xs font-medium" style={{ color }}>{status}</span>
         </div>
-        <p className="text-xs text-slate-400 mt-1">{data.timeLabel}</p>
+        
+        {/* Time */}
+        <p className="text-xs text-slate-400 mt-2 border-t border-slate-100 pt-2">
+          🕐 {data.timeLabel}
+        </p>
       </div>
     );
   }
