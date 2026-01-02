@@ -1,10 +1,16 @@
 // src/app/page.tsx
 import Link from 'next/link';
+import { Suspense } from 'react';
 import Logo from '@/components/Logo';
+import DeletionSuccessToast from '@/components/DeletionSuccessToast';
 
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-white">
+      {/* Deletion Success Toast (shown when redirected after account deletion) */}
+      <Suspense fallback={null}>
+        <DeletionSuccessToast />
+      </Suspense>
       {/* NAVBAR */}
       <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-100">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">

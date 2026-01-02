@@ -2,13 +2,81 @@
 // 🎨 REDESIGNED: Beautiful gamified profile page
 'use client';
 
+import { useState, useEffect } from 'react';
 import { useFood } from '@/context/FoodContext';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import { Trash2, AlertTriangle } from 'lucide-react';
+import DeleteAccountModal from '@/components/DeleteAccountModal';
 
 export default function ProfilePage() {
   const { userProfile, setGoal, toggleCondition, updateDetails, dailyBudget, setManualOverride, setUserName } = useFood();
   const router = useRouter();
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [deleteSuccess, setDeleteSuccess] = useState(false);
+
+  // Get user ID on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const id = localStorage.getItem('boleh_makan_user_id');
+      setUserId(id);
+    }
+  }, []);
+
+  // Handle successful deletion - redirect after showing message
+  useEffect(() => {
+    if (deleteSuccess) {
+      // Clear all local data
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('boleh_makan_user_id');
+        localStorage.removeItem('boleh_makan_profile');
+        localStorage.removeItem('boleh_makan_meals');
+        // Clear any other localStorage items with boleh_makan prefix
+        const keys = Object.keys(localStorage);
+        keys.forEach(key => {
+          if (key.startsWith('boleh_makan')) {
+            localStorage.removeItem(key);
+          }
+        });
+        
+        // Also clear sessionStorage
+        const sessionKeys = Object.keys(sessionStorage);
+        sessionKeys.forEach(key => {
+          if (key.startsWith('boleh_makan')) {
+            sessionStorage.removeItem(key);
+          }
+        });
+      }
+      
+      // Redirect to landing page after a short delay
+      setTimeout(() => {
+        router.push('/?deleted=true');
+      }, 1500);
+    }
+  }, [deleteSuccess, router]);
+
+  const handleDeleteAccount = async () => {
+    if (!userId) {
+      throw new Error('User ID not found');
+    }
+
+    const response = await fetch('/api/user/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId }),
+    });
+
+    const data = await response.json();
+
+    if (!data.success) {
+      throw new Error(data.error || 'Failed to delete account');
+    }
+
+    console.log('✅ Account deleted:', data);
+    setShowDeleteModal(false);
+    setDeleteSuccess(true);
+  };
 
   if (!userProfile) {
     return (
@@ -304,9 +372,80 @@ export default function ProfilePage() {
           </div>
         </div>
 
+        {/* ============================================ */}
+        {/* 🗑️ DELETE ACCOUNT SECTION - PDPA Compliance */}
+        {/* ============================================ */}
+        <div className="mt-8 pt-6 border-t-2 border-dashed border-slate-200">
+          <div className="bg-gradient-to-br from-red-50 to-rose-50 p-5 rounded-3xl border-2 border-red-200">
+            <div className="flex items-start gap-3 mb-4">
+              <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                <AlertTriangle className="w-5 h-5 text-red-500" />
+              </div>
+              <div>
+                <h3 className="font-bold text-red-700 text-sm">Danger Zone</h3>
+                <p className="text-red-600/70 text-xs mt-0.5">
+                  Actions here are permanent and cannot be undone
+                </p>
+              </div>
+            </div>
+            
+            <div className="bg-white/60 rounded-2xl p-4 border border-red-100">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-bold text-slate-700 text-sm">Delete Account</p>
+                  <p className="text-slate-500 text-xs mt-0.5">
+                    Permanently delete your account and all data
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowDeleteModal(true)}
+                  className="px-4 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl font-bold text-sm flex items-center gap-2 transition-colors shadow-md shadow-red-200"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete
+                </button>
+              </div>
+              
+              {/* PDPA Notice */}
+              <div className="mt-3 pt-3 border-t border-red-100">
+                <p className="text-xs text-slate-500">
+                  🇲🇾 <span className="font-medium">PDPA Rights:</span> Under Malaysia's Personal Data Protection Act 2010, 
+                  you have the right to request deletion of your personal data.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* SPACER */}
         <div className="h-4"></div>
       </div>
+
+      {/* DELETE ACCOUNT MODAL */}
+      <DeleteAccountModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirmDelete={handleDeleteAccount}
+        userName={userProfile.name || undefined}
+      />
+
+      {/* SUCCESS TOAST */}
+      {deleteSuccess && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl p-8 shadow-2xl max-w-sm w-full text-center animate-in zoom-in-95">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <h3 className="text-xl font-bold text-slate-800 mb-2">Account Deleted</h3>
+            <p className="text-slate-500 text-sm mb-4">
+              Your account and all data have been permanently deleted.
+            </p>
+            <p className="text-slate-400 text-xs">Redirecting to home page...</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
