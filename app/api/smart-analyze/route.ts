@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseClient } from '@/lib/supabase';
 import { DR_REZA_ADVISOR_PROMPT } from '@/lib/advisorPrompts';
 import { 
   MALAYSIAN_FOOD_VISION_PROMPT, 
@@ -8,12 +8,16 @@ import {
   buildVisionPromptWithCorrections,
   CorrectionEntry 
 } from '@/lib/visionPrompts';
+import {
+  searchFoodDatabase,
+  mapTagToCategory,
+  checkPorkIndicators,
+  detectProteinFromName,
+  generateQuickAdvice,
+  FoodMatch
+} from '@/lib/foodDatabaseLookup';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
@@ -21,6 +25,7 @@ export const maxDuration = 30;
 // 🔄 RLHF: Fetch recent user corrections for prompt injection
 async function fetchRecentCorrections(): Promise<CorrectionEntry[]> {
   try {
+    const supabase = getSupabaseClient();
     const { data: corrections, error } = await supabase
       .from('food_logs')
       .select('ai_suggested_name, meal_name')
@@ -233,7 +238,69 @@ export async function POST(req: Request) {
         }
       }
     } else {
-      // 📝 TEXT INPUT: Use validation prompt
+      // 📝 TEXT INPUT: Check database FIRST before AI
+      console.log("📝 Text input received:", data);
+      
+      // 🏦 DATABASE-FIRST: Try to find exact/fuzzy match
+      const dbMatch = await searchFoodDatabase(data);
+      
+      if (dbMatch && dbMatch.match_confidence > 0.8) {
+        // 🎯 Database hit! Skip AI, use verified data
+        console.log(`✅ Database hit for "${data}" → "${dbMatch.name}" (${(dbMatch.match_confidence * 100).toFixed(0)}% confidence)`);
+        
+        const conditions = healthConditions || [];
+        const drRezaTip = generateQuickAdvice(dbMatch, conditions);
+        const isPork = checkPorkIndicators(dbMatch.name, dbMatch.tags);
+        const protein = detectProteinFromName(dbMatch.name);
+        
+        // Build components
+        const components = getTypicalComponents(dbMatch.name, {
+          calories: dbMatch.calories,
+          protein_g: dbMatch.protein,
+          carbs_g: dbMatch.carbs,
+          fat_g: dbMatch.fat
+        });
+        
+        return NextResponse.json({
+          success: true,
+          source: 'database',
+          verified: true,
+          confidence: dbMatch.match_confidence,
+          data: {
+            food_name: dbMatch.name,
+            category: mapTagToCategory(dbMatch.tags) || dbMatch.category || 'Other',
+            components: components,
+            macros: {
+              calories: dbMatch.calories,
+              protein_g: dbMatch.protein,
+              carbs_g: dbMatch.carbs,
+              fat_g: dbMatch.fat,
+              sugar_g: dbMatch.sugar_g,
+              sodium_mg: dbMatch.sodium_mg
+            },
+            serving_size: dbMatch.serving_size,
+            valid_lauk: [
+              { name: "Telur Mata", calories: 70, protein: 6, carbs: 0, fat: 5 },
+              { name: "Telur Rebus", calories: 60, protein: 6, carbs: 0, fat: 4 },
+              { name: "Ayam Goreng", calories: 250, protein: 20, carbs: 5, fat: 15 }
+            ],
+            analysis_content: drRezaTip,
+            data_source: `${dbMatch.source} (verified)`,
+            halal_status: { status: isPork ? 'non_halal' : 'unknown', reason: isPork ? 'May contain pork' : undefined },
+            health_tags: [],
+            risk_analysis: {
+              is_high_sodium: (dbMatch.sodium_mg || 0) > 800,
+              is_high_sugar: (dbMatch.sugar_g || 0) > 15,
+              is_high_protein: (dbMatch.protein || 0) > 25
+            },
+            is_potentially_pork: isPork,
+            detected_protein: protein
+          }
+        });
+      }
+      
+      // 🤖 No good database match - use AI validation
+      console.log("📝 No database match, using AI validation for:", data);
       const validationResponse = await openai.chat.completions.create({
         model: "gpt-4o-mini",
         messages: [
@@ -260,13 +327,41 @@ export async function POST(req: Request) {
 
     console.log(`✅ Identified: "${foodName}" | Category: ${visionCategory} | Confidence: ${visionConfidence}`);
 
-    // 🏦 STEP 2: CHECK SUPABASE DATABASE (including new columns: sodium_mg, sugar_g, health_tags)
-    const { data: dbMatch } = await supabase
-      .from('food_library')
-      .select('*, sodium_mg, sugar_g, health_tags')
-      .ilike('name', `%${foodName}%`)
-      .limit(1)
-      .maybeSingle();
+    // 🏦 STEP 2: Cross-reference AI result with database for verified nutrition
+    // This improves accuracy by using verified nutrition data when available
+    const dbMatch = await searchFoodDatabase(foodName);
+    
+    // Also try a direct database lookup as fallback
+    let directDbMatch: any = null;
+    if (!dbMatch) {
+      const supabase = getSupabaseClient();
+      const { data: directMatch } = await supabase
+        .from('food_library')
+        .select('*, sodium_mg, sugar_g, health_tags')
+        .ilike('name', `%${foodName}%`)
+        .limit(1)
+        .maybeSingle();
+      directDbMatch = directMatch;
+    }
+    
+    // Use either the fuzzy match or direct match
+    const finalDbMatch = dbMatch || (directDbMatch ? {
+      name: directDbMatch.name,
+      category: directDbMatch.category,
+      calories: directDbMatch.calories,
+      protein: directDbMatch.protein,
+      carbs: directDbMatch.carbs,
+      fat: directDbMatch.fat,
+      sugar_g: directDbMatch.sugar_g || directDbMatch.sugar,
+      sodium_mg: directDbMatch.sodium_mg || directDbMatch.sodium,
+      serving_size: directDbMatch.serving_size,
+      tags: directDbMatch.tags || directDbMatch.category,
+      source: directDbMatch.source || 'food_library',
+      match_confidence: 0.85,
+      match_type: 'direct' as const,
+      health_tags: directDbMatch.health_tags,
+      valid_lauk: directDbMatch.valid_lauk
+    } : null);
 
     // Build health conditions context for Dr. Reza
     const conditions = healthConditions || [];
@@ -274,10 +369,14 @@ export async function POST(req: Request) {
       ? `Patient has: ${conditions.join(', ')}. Focus your advice on these conditions.` 
       : '';
 
-    if (dbMatch) {
-      const cleanName = cleanFoodName(dbMatch.name);
+    if (finalDbMatch) {
+      // 🎯 Database match found - use verified nutrition data
+      const matchSource = dbMatch ? 'database_verified' : 'database';
+      console.log(`✅ Using ${matchSource} data for "${finalDbMatch.name}" (${((finalDbMatch.match_confidence || 0.85) * 100).toFixed(0)}% confidence)`);
+      
+      const cleanName = cleanFoodName(finalDbMatch.name);
       const components = getTypicalComponents(cleanName, {
-        calories: dbMatch.calories, protein_g: dbMatch.protein, carbs_g: dbMatch.carbs, fat_g: dbMatch.fat
+        calories: finalDbMatch.calories, protein_g: finalDbMatch.protein, carbs_g: finalDbMatch.carbs, fat_g: finalDbMatch.fat
       });
       
       const halalCheck = checkHalalStatus(cleanName, components);
@@ -288,12 +387,12 @@ export async function POST(req: Request) {
         sodium: acc.sodium + (comp.macros?.sodium || 0),
       }), { sugar: 0, sodium: 0 });
 
-      // 🆕 Use new DB columns if available, otherwise use component totals or vision estimates
-      const finalSodiumForAdvice = dbMatch.sodium_mg ?? dbMatch.sodium ?? visionNutrition?.sodium_mg ?? totalFromComponents.sodium ?? 400;
-      const finalSugarForAdvice = dbMatch.sugar_g ?? dbMatch.sugar ?? visionNutrition?.sugar_g ?? totalFromComponents.sugar ?? 5;
-      const healthTagsForAdvice = dbMatch.health_tags || [];
-      // Use DB category, then vision category, then default
-      const categoryForAdvice = dbMatch.category || visionCategory || 'Malay';
+      // 🆕 Use database values if available, otherwise use component totals or vision estimates
+      const finalSodiumForAdvice = finalDbMatch.sodium_mg ?? visionNutrition?.sodium_mg ?? totalFromComponents.sodium ?? 400;
+      const finalSugarForAdvice = finalDbMatch.sugar_g ?? visionNutrition?.sugar_g ?? totalFromComponents.sugar ?? 5;
+      const healthTagsForAdvice = (finalDbMatch as any).health_tags || [];
+      // Use DB category, then mapped tag, then vision category
+      const categoryForAdvice = finalDbMatch.category || mapTagToCategory(finalDbMatch.tags) || visionCategory || 'Malay';
 
       // 🩺 DR. REZA - Using new comprehensive advisor prompt
       const drRezaResponse = await openai.chat.completions.create({
@@ -308,7 +407,7 @@ export async function POST(req: Request) {
             content: `Analyze this meal:
 - Food Name: ${cleanName}
 - Category: ${categoryForAdvice}
-- Nutrition: Calories ${dbMatch.calories}kcal, Protein ${dbMatch.protein}g, Carbs ${dbMatch.carbs}g, Fat ${dbMatch.fat}g, Sodium ${finalSodiumForAdvice}mg, Sugar ${finalSugarForAdvice}g
+- Nutrition: Calories ${finalDbMatch.calories}kcal, Protein ${finalDbMatch.protein}g, Carbs ${finalDbMatch.carbs}g, Fat ${finalDbMatch.fat}g, Sodium ${finalSodiumForAdvice}mg, Sugar ${finalSugarForAdvice}g
 - Tags: ${healthTagsForAdvice.length > 0 ? healthTagsForAdvice.join(', ') : 'none'}
 - Patient Conditions: ${conditions.length > 0 ? conditions.join(', ') : 'none'}
 
@@ -323,9 +422,11 @@ Give culturally relevant advice in MAX 40 words.`
 
       // Get lauk suggestions
       let enrichedLauk: any[] = [];
-      if (dbMatch.valid_lauk && Array.isArray(dbMatch.valid_lauk)) {
-        const { data: laukData } = await supabase.from('food_library').select('name, calories, protein, carbs, fat').in('name', dbMatch.valid_lauk);
-        enrichedLauk = dbMatch.valid_lauk.map((name: string) => {
+      const validLauk = (finalDbMatch as any).valid_lauk;
+      if (validLauk && Array.isArray(validLauk)) {
+        const supabase = getSupabaseClient();
+        const { data: laukData } = await supabase.from('food_library').select('name, calories, protein, carbs, fat').in('name', validLauk);
+        enrichedLauk = validLauk.map((name: string) => {
           const found = laukData?.find((l) => l.name === name);
           return { name: cleanFoodName(name), calories: found?.calories || 80, protein: found?.protein || 5, carbs: found?.carbs || 5, fat: found?.fat || 3 };
         });
@@ -341,25 +442,31 @@ Give culturally relevant advice in MAX 40 words.`
       // Determine health warnings from tags or thresholds (reuse values from above)
       const isHighSodium = healthTagsForAdvice.includes('high_sodium') || finalSodiumForAdvice > 800;
       const isHighSugar = healthTagsForAdvice.includes('high_sugar') || finalSugarForAdvice > 15;
-      const isHighProtein = healthTagsForAdvice.includes('high_protein') || (dbMatch.protein || 0) > 25;
+      const isHighProtein = healthTagsForAdvice.includes('high_protein') || (finalDbMatch.protein || 0) > 25;
+
+      // Determine source based on match type
+      const dataSource = dbMatch 
+        ? (type === 'image' ? 'database_verified' : 'database')
+        : 'database';
 
       return NextResponse.json({
         success: true,
-        source: 'database',
+        source: dataSource,
         verified: true,
-        confidence: visionConfidence || 0.9,
+        confidence: finalDbMatch.match_confidence || visionConfidence || 0.9,
         data: {
           food_name: cleanName,
           category: categoryForAdvice,
           components: components,
           macros: {
-            calories: dbMatch.calories || 0,
-            protein_g: dbMatch.protein || 0,
-            carbs_g: dbMatch.carbs || 0,
-            fat_g: dbMatch.fat || 0,
+            calories: finalDbMatch.calories || 0,
+            protein_g: finalDbMatch.protein || 0,
+            carbs_g: finalDbMatch.carbs || 0,
+            fat_g: finalDbMatch.fat || 0,
             sugar_g: finalSugarForAdvice,
             sodium_mg: finalSodiumForAdvice,
           },
+          serving_size: finalDbMatch.serving_size || '1 serving',
           valid_lauk: enrichedLauk,
           analysis_content: drRezaTip,
           halal_status: halalCheck,
@@ -369,8 +476,9 @@ Give culturally relevant advice in MAX 40 words.`
             is_high_sugar: isHighSugar,
             is_high_protein: isHighProtein
           },
-          is_potentially_pork: isPotentiallyPork,
-          detected_protein: detectedProtein
+          is_potentially_pork: isPotentiallyPork || checkPorkIndicators(cleanName, finalDbMatch.tags),
+          detected_protein: detectedProtein || detectProteinFromName(cleanName),
+          data_source: `${finalDbMatch.source} (verified)`
         }
       });
     }
