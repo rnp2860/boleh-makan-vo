@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { updateStreak } from '@/lib/streakCalculator';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -105,10 +106,23 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     }
 
+    // Update streak after successful meal log
+    let streakInfo = null;
+    if (safeUserId) {
+      try {
+        streakInfo = await updateStreak(safeUserId);
+        console.log('🔥 Streak updated:', streakInfo);
+      } catch (streakErr) {
+        console.error('Streak update failed:', streakErr);
+        // Don't fail the request if streak update fails
+      }
+    }
+
     return NextResponse.json({ 
       success: true, 
       data,
-      image_url 
+      image_url,
+      streak: streakInfo
     });
 
   } catch (err: any) {

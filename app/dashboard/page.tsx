@@ -14,6 +14,8 @@ import DaySummaryShare from '@/components/DaySummaryShare';
 import LogVitalsModal from '@/components/LogVitalsModal';
 import BolehScoreWidget from '@/components/BolehScoreWidget';
 import RiskChart, { FoodLogEntry, VitalEntry } from '@/components/RiskChart';
+import StreakWidget from '@/components/StreakWidget';
+import StreakCelebrationModal from '@/components/StreakCelebrationModal';
 import { useFood } from '@/context/FoodContext';
 
 // Initialize Supabase client
@@ -29,6 +31,11 @@ export default function DashboardPage() {
   const [showDayShare, setShowDayShare] = useState(false);
   const [isVitalsOpen, setIsVitalsOpen] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  
+  // Streak celebration
+  const [showStreakCelebration, setShowStreakCelebration] = useState(false);
+  const [celebrationStreak, setCelebrationStreak] = useState(0);
+  const [isNewStreakRecord, setIsNewStreakRecord] = useState(false);
   
   // Risk Chart data
   const [riskChartFoodLogs, setRiskChartFoodLogs] = useState<FoodLogEntry[]>([]);
@@ -67,6 +74,27 @@ export default function DashboardPage() {
       }
     }
   }, [isLoaded, userProfile, router]);
+
+  // Check for streak celebration from meal logging
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const celebrationData = sessionStorage.getItem('boleh_makan_streak_celebration');
+      if (celebrationData) {
+        try {
+          const { streak, isMilestone, isNewRecord } = JSON.parse(celebrationData);
+          if (isMilestone) {
+            setCelebrationStreak(streak);
+            setIsNewStreakRecord(isNewRecord);
+            setShowStreakCelebration(true);
+          }
+          // Clear the celebration data
+          sessionStorage.removeItem('boleh_makan_streak_celebration');
+        } catch (e) {
+          console.error('Failed to parse streak celebration data:', e);
+        }
+      }
+    }
+  }, []);
 
   // State to force chart refetch (increments after delete)
   const [chartRefreshKey, setChartRefreshKey] = useState(0);
@@ -250,9 +278,17 @@ export default function DashboardPage() {
         <DateStrip selectedDate={selectedDate} onSelectDate={setSelectedDate} />
       </div>
 
-      {/* 🎯 BOLEH SCORE - HERO POSITION */}
-      <div className="px-4 mt-5">
-        <BolehScoreWidget userId={userId} />
+      {/* 🔥 STREAK + BOLEH SCORE - HERO POSITION */}
+      <div className="px-4 mt-5 space-y-4">
+        {/* Streak Widget - Compact inline with Score */}
+        <div className="flex gap-3">
+          <div className="flex-1">
+            <BolehScoreWidget userId={userId} />
+          </div>
+        </div>
+        
+        {/* Streak Widget - Full */}
+        <StreakWidget userId={userId} />
       </div>
 
       {/* 📊 RISK CORRELATION CHART */}
@@ -577,6 +613,14 @@ export default function DashboardPage() {
           // Optional: Show success toast or refresh data
           console.log('✅ Vital logged successfully');
         }}
+      />
+
+      {/* STREAK CELEBRATION MODAL */}
+      <StreakCelebrationModal
+        isOpen={showStreakCelebration}
+        onClose={() => setShowStreakCelebration(false)}
+        streak={celebrationStreak}
+        isNewRecord={isNewStreakRecord}
       />
     </div>
   );

@@ -619,7 +619,7 @@ export default function CheckFoodPage() {
             });
           }
           
-          await fetch('/api/log-meal', {
+          const logResponse = await fetch('/api/log-meal', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -647,12 +647,24 @@ export default function CheckFoodPage() {
               was_user_corrected: wasUserCorrected
             })
           });
+          
+          const logResult = await logResponse.json();
           console.log('✅ Meal saved to Supabase with RLHF tracking:', { 
             mealType, mealContext, preparationStyle,
             aiSuggested: aiSuggestedName,
             finalName: finalData.food_name,
-            wasUserCorrected
+            wasUserCorrected,
+            streak: logResult.streak
           });
+          
+          // 🔥 Handle streak celebration
+          if (logResult.streak?.isMilestone) {
+            sessionStorage.setItem('boleh_makan_streak_celebration', JSON.stringify({
+              streak: logResult.streak.currentStreak,
+              isMilestone: true,
+              isNewRecord: logResult.streak.isNewRecord
+            }));
+          }
           
           // Track analytics
           trackMealLogged(mealType, !!image, image ? 'camera' : 'text');
