@@ -239,8 +239,19 @@ export function MiniShareButton({ referralUrl, className = '' }: MiniShareButton
       }
     } else {
       // Fallback: copy to clipboard
-      await navigator.clipboard.writeText(referralUrl);
-      alert('Link copied to clipboard!');
+      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        await navigator.clipboard.writeText(referralUrl);
+        alert('Link copied to clipboard!');
+      } else {
+        // Final fallback for older browsers
+        const textArea = document.createElement('textarea');
+        textArea.value = referralUrl;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        alert('Link copied to clipboard!');
+      }
     }
   };
 
