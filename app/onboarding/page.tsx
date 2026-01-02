@@ -9,6 +9,7 @@ import Image from 'next/image';
 import { useFood } from '@/context/FoodContext';
 import { ChevronLeft, ChevronRight, Check, Sparkles } from 'lucide-react';
 import Logo from '@/components/Logo';
+import { trackOnboardingStarted, trackOnboardingCompleted, trackEvent } from '@/lib/analytics';
 
 // ============================================
 // STEP CONFIGURATION
@@ -63,9 +64,12 @@ export default function OnboardingPage() {
     }
   }, [userProfile]);
 
-  // Hide welcome screen after 2 seconds
+  // Hide welcome screen after 2 seconds and track start
   useEffect(() => {
-    const timer = setTimeout(() => setShowWelcome(false), 2000);
+    const timer = setTimeout(() => {
+      setShowWelcome(false);
+      trackOnboardingStarted();
+    }, 2000);
     return () => clearTimeout(timer);
   }, []);
 
@@ -123,6 +127,12 @@ export default function OnboardingPage() {
       localStorage.setItem('boleh_makan_onboarding_complete', 'true');
     }
 
+    // Track completion
+    trackOnboardingCompleted(
+      selectedGoal ? [selectedGoal] : [],
+      selectedConditions
+    );
+
     // Navigate to dashboard
     router.push('/dashboard');
   };
@@ -132,6 +142,7 @@ export default function OnboardingPage() {
     if (typeof window !== 'undefined') {
       localStorage.setItem('boleh_makan_onboarding_complete', 'true');
     }
+    trackEvent('onboarding_skipped', { step: currentStep });
     router.push('/dashboard');
   };
 

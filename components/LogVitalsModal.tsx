@@ -9,6 +9,7 @@ import {
   VITAL_TYPE_CONFIG, 
   VITAL_CONTEXT_OPTIONS 
 } from '@/types/database';
+import { trackVitalLogged } from '@/lib/analytics';
 
 interface TodayReading {
   value: number;
@@ -217,6 +218,9 @@ export default function LogVitalsModal({ isOpen, onClose, onSuccess }: LogVitals
       }
 
       console.log('✅ Vital saved successfully:', result);
+      
+      // Track analytics
+      trackVitalLogged(selectedType || 'unknown', contextTag || 'general');
 
       // Success - show toast, clear input, but keep modal open
       const isBPSave = selectedType === 'bp_systolic';

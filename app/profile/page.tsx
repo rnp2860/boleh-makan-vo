@@ -9,6 +9,7 @@ import Image from 'next/image';
 import { Trash2, AlertTriangle, Download, FileJson, Loader2, CheckCircle, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import DeleteAccountModal from '@/components/DeleteAccountModal';
+import { trackAccountDeleted, trackDataExported } from '@/lib/analytics';
 
 export default function ProfilePage() {
   const { userProfile, setGoal, toggleCondition, updateDetails, dailyBudget, setManualOverride, setUserName } = useFood();
@@ -79,6 +80,7 @@ export default function ProfilePage() {
     }
 
     console.log('✅ Account deleted:', data);
+    trackAccountDeleted();
     setShowDeleteModal(false);
     setDeleteSuccess(true);
   };
@@ -126,6 +128,7 @@ export default function ProfilePage() {
       URL.revokeObjectURL(url);
       
       console.log('✅ Data exported successfully');
+      trackDataExported();
       setExportSuccess(true);
       
       // Hide success message after 3 seconds

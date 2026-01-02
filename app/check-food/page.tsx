@@ -16,6 +16,7 @@ import {
   MEAL_CONTEXT_OPTIONS, 
   PREPARATION_STYLE_OPTIONS 
 } from '@/types/database';
+import { trackMealLogged, trackFoodCorrected } from '@/lib/analytics';
 
 // 🗜️ IMAGE COMPRESSION - Optimized for API speed
 const compressImage = (base64Str: string, maxWidth = 512, quality = 0.6) => {
@@ -652,6 +653,12 @@ export default function CheckFoodPage() {
             finalName: finalData.food_name,
             wasUserCorrected
           });
+          
+          // Track analytics
+          trackMealLogged(mealType, !!image, image ? 'camera' : 'text');
+          if (wasUserCorrected) {
+            trackFoodCorrected(aiSuggestedName || '', finalData.food_name);
+          }
         } catch (supabaseErr) {
           console.error('Supabase save failed (local save succeeded):', supabaseErr);
         }
