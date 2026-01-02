@@ -1,7 +1,18 @@
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { getSupabaseClient } from '@/lib/supabase';
-import { DR_REZA_ADVISOR_PROMPT } from '@/lib/advisorPrompts';
+import { 
+  DR_REZA_ADVISOR_PROMPT,
+  DR_REZA_SIMPLE_PROMPT,
+  buildDrRezaPromptWithContext,
+  parseDrRezaResponse,
+  formatDrRezaAdvice,
+  getDefaultDailyContext,
+  MealData,
+  DailyContext,
+  DrRezaResponse
+} from '@/lib/advisorPrompts';
+import { getDailyContext, getQuickDailyContext, predictGlucoseImpact } from '@/lib/dailyContextHelper';
 import { 
   MALAYSIAN_FOOD_VISION_PROMPT, 
   TEXT_INPUT_VALIDATION_PROMPT,
@@ -151,11 +162,27 @@ function getTypicalComponents(foodName: string, baseMacros: any): any[] {
 
 export async function POST(req: Request) {
   try {
-    const { type, data, healthConditions } = await req.json();
+    const { type, data, healthConditions, userId } = await req.json();
     let foodName = '';
     let visionCategory = 'Other'; // Category from vision analysis
     let visionNutrition: any = null; // Nutrition estimates from vision
     let visionConfidence = 0;
+    
+    // 🗓️ Fetch daily context for personalized Dr. Reza advice
+    let dailyContext: DailyContext = getDefaultDailyContext();
+    if (userId) {
+      try {
+        dailyContext = await getQuickDailyContext(userId);
+        console.log(`📊 Daily context loaded: ${dailyContext.daily_calories_before}/${dailyContext.daily_target} cal, ${dailyContext.meals_today} meals`);
+      } catch (err) {
+        console.warn('Could not fetch daily context, using defaults:', err);
+      }
+    }
+    
+    // Set health conditions from context if not provided
+    const conditions = healthConditions && healthConditions.length > 0 
+      ? healthConditions 
+      : dailyContext.health_conditions;
     let isPotentiallyPork = false;
     let detectedComponents: string[] = [];
     let detectedProtein = 'none'; // NEW: Track detected protein type
@@ -363,12 +390,6 @@ export async function POST(req: Request) {
       valid_lauk: directDbMatch.valid_lauk
     } : null);
 
-    // Build health conditions context for Dr. Reza
-    const conditions = healthConditions || [];
-    const conditionContext = conditions.length > 0 
-      ? `Patient has: ${conditions.join(', ')}. Focus your advice on these conditions.` 
-      : '';
-
     if (finalDbMatch) {
       // 🎯 Database match found - use verified nutrition data
       const matchSource = dbMatch ? 'database_verified' : 'database';
@@ -394,31 +415,48 @@ export async function POST(req: Request) {
       // Use DB category, then mapped tag, then vision category
       const categoryForAdvice = finalDbMatch.category || mapTagToCategory(finalDbMatch.tags) || visionCategory || 'Malay';
 
-      // 🩺 DR. REZA - Using new comprehensive advisor prompt
+      // 🩺 DR. REZA - Using ENHANCED advisor prompt with daily context
+      const mealData: MealData = {
+        food_name: cleanName,
+        category: categoryForAdvice,
+        calories: finalDbMatch.calories || 0,
+        protein: finalDbMatch.protein || 0,
+        carbs: finalDbMatch.carbs || 0,
+        fat: finalDbMatch.fat || 0,
+        sugar: finalSugarForAdvice,
+        sodium: finalSodiumForAdvice
+      };
+      
+      // Build the enhanced prompt with daily context
+      const enhancedPrompt = buildDrRezaPromptWithContext(mealData, dailyContext);
+      
+      // Get glucose prediction
+      const glucosePrediction = predictGlucoseImpact(cleanName, mealData.carbs, mealData.sugar, categoryForAdvice);
+      
       const drRezaResponse = await openai.chat.completions.create({
         model: "gpt-4o-mini",
         messages: [
           {
             role: "system",
-            content: DR_REZA_ADVISOR_PROMPT
+            content: enhancedPrompt
           },
           {
             role: "user",
-            content: `Analyze this meal:
-- Food Name: ${cleanName}
-- Category: ${categoryForAdvice}
-- Nutrition: Calories ${finalDbMatch.calories}kcal, Protein ${finalDbMatch.protein}g, Carbs ${finalDbMatch.carbs}g, Fat ${finalDbMatch.fat}g, Sodium ${finalSodiumForAdvice}mg, Sugar ${finalSugarForAdvice}g
-- Tags: ${healthTagsForAdvice.length > 0 ? healthTagsForAdvice.join(', ') : 'none'}
-- Patient Conditions: ${conditions.length > 0 ? conditions.join(', ') : 'none'}
-
-Give culturally relevant advice in MAX 40 words.`
+            content: `Analyze this meal and provide your advice as JSON. Remember to reference their daily totals and predict glucose impact if they have diabetes.`
           }
         ],
-        max_tokens: 100,
+        max_tokens: 400,
+        response_format: { type: "json_object" },
       });
       
-      const drRezaTip = drRezaResponse.choices[0].message.content?.trim() || 
-        `${cleanName} sedap! Balance with veggies and watch your portion ya.`;
+      // Parse Dr. Reza's structured response
+      const drRezaContent = drRezaResponse.choices[0].message.content?.trim() || '{}';
+      const drRezaParsed = parseDrRezaResponse(drRezaContent);
+      
+      // Format the advice for display (falls back to simple text if JSON parsing fails)
+      const drRezaTip = drRezaParsed 
+        ? formatDrRezaAdvice(drRezaParsed, `${cleanName} sedap! Balance with veggies and watch your portion ya.`)
+        : drRezaContent;
 
       // Get lauk suggestions
       let enrichedLauk: any[] = [];
@@ -469,6 +507,9 @@ Give culturally relevant advice in MAX 40 words.`
           serving_size: finalDbMatch.serving_size || '1 serving',
           valid_lauk: enrichedLauk,
           analysis_content: drRezaTip,
+          // Include structured Dr. Reza response for advanced UI features
+          dr_reza_analysis: drRezaParsed || null,
+          glucose_prediction: glucosePrediction,
           halal_status: halalCheck,
           health_tags: healthTagsForAdvice,
           risk_analysis: { 
@@ -543,31 +584,43 @@ Give culturally relevant advice in MAX 40 words.`
     if (finalMacros.protein_g > 25) aiHealthTags.push('high_protein');
     if (finalMacros.fat_g > 30) aiHealthTags.push('high_fat');
 
-    // 🩺 Get Dr. Reza advice using vision category
+    // 🩺 Get Dr. Reza advice using ENHANCED prompt with daily context
+    const fallbackMealData: MealData = {
+      food_name: safeFoodName,
+      category: visionCategory,
+      calories: finalMacros.calories,
+      protein: finalMacros.protein_g,
+      carbs: finalMacros.carbs_g,
+      fat: finalMacros.fat_g,
+      sugar: finalMacros.sugar_g,
+      sodium: finalMacros.sodium_mg
+    };
+    
+    const fallbackEnhancedPrompt = buildDrRezaPromptWithContext(fallbackMealData, dailyContext);
+    const fallbackGlucosePrediction = predictGlucoseImpact(safeFoodName, finalMacros.carbs_g, finalMacros.sugar_g, visionCategory);
+    
     const drRezaResponse = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         {
           role: "system",
-          content: DR_REZA_ADVISOR_PROMPT
+          content: fallbackEnhancedPrompt
         },
         {
           role: "user",
-          content: `Analyze this meal:
-- Food Name: ${safeFoodName}
-- Category: ${visionCategory}
-- Nutrition: Calories ${finalMacros.calories}kcal, Protein ${finalMacros.protein_g}g, Carbs ${finalMacros.carbs_g}g, Fat ${finalMacros.fat_g}g, Sodium ${finalMacros.sodium_mg}mg, Sugar ${finalMacros.sugar_g}g
-- Tags: ${aiHealthTags.length > 0 ? aiHealthTags.join(', ') : 'none'}
-- Patient Conditions: ${conditions.length > 0 ? conditions.join(', ') : 'none'}
-
-Give culturally relevant advice in MAX 40 words.`
+          content: `Analyze this meal and provide your advice as JSON. Remember to reference their daily totals and predict glucose impact if they have diabetes.`
         }
       ],
-      max_tokens: 100,
+      max_tokens: 400,
+      response_format: { type: "json_object" },
     });
     
-    const drRezaTip = drRezaResponse.choices[0].message.content?.trim() || 
-      `${safeFoodName} looks good! Enjoy in moderation ya. 🍽️`;
+    // Parse structured response
+    const fallbackDrRezaContent = drRezaResponse.choices[0].message.content?.trim() || '{}';
+    const fallbackDrRezaParsed = parseDrRezaResponse(fallbackDrRezaContent);
+    const drRezaTip = fallbackDrRezaParsed 
+      ? formatDrRezaAdvice(fallbackDrRezaParsed, `${safeFoodName} looks good! Enjoy in moderation ya. 🍽️`)
+      : fallbackDrRezaContent;
 
     const defaultLauk = [
       { name: "Telur Mata", calories: 70, protein: 6, carbs: 0, fat: 5 },
@@ -586,6 +639,9 @@ Give culturally relevant advice in MAX 40 words.`
         components: components,
         macros: finalMacros,
         valid_lauk: defaultLauk,
+        // Include structured Dr. Reza response for advanced UI features
+        dr_reza_analysis: fallbackDrRezaParsed || null,
+        glucose_prediction: fallbackGlucosePrediction,
         analysis_content: drRezaTip,
         halal_status: halalCheck,
         health_tags: aiHealthTags,
