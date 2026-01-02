@@ -81,13 +81,15 @@ export function useTenantCSSVariables(): Record<string, string> {
 
     const { branding } = tenant;
     
-    return {
-      '--tenant-primary': branding.primary_color,
-      '--tenant-secondary': branding.secondary_color,
-      '--tenant-accent': branding.accent_color,
-      '--tenant-background': branding.background_color,
-      '--tenant-text': branding.text_color,
+    const vars: Record<string, string> = {
+      '--tenant-primary': branding.primary_color || '#10B981',
+      '--tenant-secondary': branding.secondary_color || '#6366F1',
+      '--tenant-accent': branding.accent_color || '#F59E0B',
+      '--tenant-background': branding.background_color || '#FFFFFF',
+      '--tenant-text': branding.text_color || '#111827',
     };
+    
+    return vars;
   }, [tenant]);
 }
 

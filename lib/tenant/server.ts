@@ -18,8 +18,8 @@ import { headers } from 'next/headers';
  * - API Routes
  * - Middleware
  */
-export function getTenantIdFromHeaders(): string {
-  const headersList = headers();
+export async function getTenantIdFromHeaders(): Promise<string> {
+  const headersList = await headers();
   const tenantId = headersList.get('x-tenant-id');
   
   if (!tenantId) {
@@ -37,8 +37,8 @@ export function getTenantIdFromHeaders(): string {
  * - API Routes
  * - Middleware
  */
-export function getTenantContextFromHeaders() {
-  const headersList = headers();
+export async function getTenantContextFromHeaders() {
+  const headersList = await headers();
   
   return {
     tenantId: headersList.get('x-tenant-id') || DEFAULT_TENANT_ID,

@@ -1,7 +1,7 @@
 // lib/vitals/calculations.ts
 // 💓 Vital Calculations - BMI, trends, averages
 
-import { VitalsLogEntry, VitalTrendPoint, VitalsTrend, VitalType } from './types';
+import { VitalsLogEntry, VitalTrendPoint, VitalsTrend, VitalType, VitalStatus } from './types';
 import { classifyBP, classifyGlucose, classifyHbA1c, classifyBMI, classifyEGFR } from './status';
 
 // ============================================
@@ -176,7 +176,7 @@ export function generateTrendData(
   const data: VitalTrendPoint[] = filteredEntries.map(e => ({
     date: e.recordedAt.split('T')[0],
     value: getValue(e) || 0,
-    status: getStatusForEntry(e, vitalType),
+    status: getStatusForEntry(e, vitalType) as VitalStatus | undefined,
   }));
   
   const current = data[data.length - 1]?.value;
