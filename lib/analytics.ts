@@ -86,8 +86,10 @@ export function identifyUser(userId: string): void {
 // Event queue for batching
 let eventQueue: AnalyticsEvent[] = [];
 let flushTimeout: NodeJS.Timeout | null = null;
+let failedFlushCount = 0;
 const FLUSH_INTERVAL = 2000; // 2 seconds
 const MAX_QUEUE_SIZE = 10;
+const MAX_FAILED_FLUSHES = 3; // Stop retrying after 3 failures
 
 /**
  * Track an analytics event
@@ -134,6 +136,7 @@ export function trackPageView(pageName: string): void {
 
 /**
  * Flush queued events to the server
+ * Designed to fail silently - never block user experience
  */
 async function flushEvents(): Promise<void> {
   if (flushTimeout) {
@@ -142,6 +145,13 @@ async function flushEvents(): Promise<void> {
   }
   
   if (eventQueue.length === 0) return;
+  
+  // If we've had too many failures, stop trying (prevent infinite retries)
+  if (failedFlushCount >= MAX_FAILED_FLUSHES) {
+    // Discard events - analytics shouldn't impact user experience
+    eventQueue = [];
+    return;
+  }
   
   // Get events to flush
   const eventsToFlush = [...eventQueue];
@@ -155,18 +165,23 @@ async function flushEvents(): Promise<void> {
     });
     
     if (!response.ok) {
-      // Re-add failed events to queue (with limit)
-      if (eventQueue.length < MAX_QUEUE_SIZE * 2) {
-        eventQueue.unshift(...eventsToFlush);
+      failedFlushCount++;
+      // Silent fail - don't disrupt user experience
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('📊 Analytics flush failed:', response.status);
       }
-      console.error('Analytics flush failed:', response.status);
+      // Don't re-queue - just discard to prevent memory buildup
+    } else {
+      // Reset failure count on success
+      failedFlushCount = 0;
     }
   } catch (error) {
-    // Re-add failed events to queue (with limit)
-    if (eventQueue.length < MAX_QUEUE_SIZE * 2) {
-      eventQueue.unshift(...eventsToFlush);
+    failedFlushCount++;
+    // Silent fail - analytics should never block
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('📊 Analytics flush error (silent):', error);
     }
-    console.error('Analytics flush error:', error);
+    // Don't re-queue - just discard
   }
 }
 

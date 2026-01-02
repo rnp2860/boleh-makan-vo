@@ -1,8 +1,9 @@
 // app/api/analytics/track/route.ts
 // 📊 Analytics Event Tracking Endpoint
+// Designed to fail silently - never block user experience
 
 import { NextResponse } from 'next/server';
-import { getSupabaseServiceClient } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,37 +15,58 @@ interface AnalyticsEvent {
   session_id?: string;
 }
 
+// Helper to safely get Supabase client
+function getAnalyticsSupabase() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  
+  if (!url || !key) {
+    return null;
+  }
+  
+  return createClient(url, key);
+}
+
 export async function POST(req: Request) {
+  // Always return success to client - analytics should never block
+  const successResponse = NextResponse.json({ success: true });
+  
   try {
-    // Get Supabase client inside handler (avoids build-time errors)
-    const supabase = getSupabaseServiceClient();
+    // Get Supabase client - if not available, just return success
+    const supabase = getAnalyticsSupabase();
+    if (!supabase) {
+      console.warn('📊 Analytics: Supabase not configured, skipping');
+      return successResponse;
+    }
     
     let events: AnalyticsEvent[] = [];
     
     // Handle both JSON body and sendBeacon (text body)
     const contentType = req.headers.get('content-type');
-    if (contentType?.includes('application/json')) {
-      const body = await req.json();
-      events = body.events || [body];
-    } else {
-      // sendBeacon sends as text/plain
-      const text = await req.text();
-      try {
+    try {
+      if (contentType?.includes('application/json')) {
+        const body = await req.json();
+        events = body.events || [body];
+      } else {
+        // sendBeacon sends as text/plain
+        const text = await req.text();
         const body = JSON.parse(text);
         events = body.events || [body];
-      } catch {
-        return NextResponse.json({ success: false, error: 'Invalid JSON' }, { status: 400 });
       }
+    } catch {
+      // Invalid JSON - just return success (don't block)
+      console.warn('📊 Analytics: Invalid JSON payload');
+      return successResponse;
     }
     
     if (!events || events.length === 0) {
-      return NextResponse.json({ success: false, error: 'No events provided' }, { status: 400 });
+      return successResponse;
     }
 
     // Prepare events for insertion
     const eventsToInsert = events.map(event => ({
       user_id: event.user_id ? String(event.user_id) : null,
-      event_name: event.event_name,
+      event_name: event.event_name || 'unknown',
       event_properties: event.event_properties || {},
       page_path: event.page_path || null,
       session_id: event.session_id || null,
@@ -57,15 +79,17 @@ export async function POST(req: Request) {
       .insert(eventsToInsert);
 
     if (error) {
-      // If table doesn't exist, log but don't fail
+      // Table doesn't exist or other DB error - log but don't fail
       if (error.code === '42P01') {
-        console.log('📊 Analytics table not found - events logged to console only');
-        console.log('📊 Events:', JSON.stringify(eventsToInsert, null, 2));
-        return NextResponse.json({ success: true, stored: false, reason: 'table_not_found' });
+        // Table not found - this is expected if migration hasn't run
+        if (process.env.NODE_ENV === 'development') {
+          console.log('📊 Analytics: Table not found, logging to console');
+          eventsToInsert.forEach(e => console.log('  →', e.event_name, e.event_properties));
+        }
+      } else {
+        console.warn('📊 Analytics insert warning:', error.code, error.message);
       }
-      
-      console.error('📊 Analytics insert error:', error);
-      return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+      return successResponse;
     }
 
     return NextResponse.json({ 
@@ -75,8 +99,9 @@ export async function POST(req: Request) {
     });
 
   } catch (err: any) {
-    console.error('📊 Analytics error:', err);
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+    // Log but don't fail - analytics should never block
+    console.warn('📊 Analytics error (non-blocking):', err.message);
+    return successResponse;
   }
 }
 
