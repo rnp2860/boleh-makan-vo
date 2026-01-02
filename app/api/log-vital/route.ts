@@ -83,6 +83,21 @@ export async function POST(req: Request) {
 
       if (error) {
         console.error('❌ Supabase insert error (BP):', error);
+        
+        // Check for UUID type mismatch error
+        if (error.code === '22P02' && error.message.includes('uuid')) {
+          console.error('⚠️ Database schema issue: user_id column expects UUID but received string');
+          console.error('💡 Fix: Run this SQL in Supabase: ALTER TABLE user_vitals ALTER COLUMN user_id TYPE text;');
+          return NextResponse.json(
+            { 
+              success: false, 
+              error: 'Database configuration error. Please contact support.',
+              hint: 'user_id column needs to be TEXT type, not UUID'
+            },
+            { status: 500 }
+          );
+        }
+        
         return NextResponse.json(
           { success: false, error: error.message },
           { status: 500 }
@@ -130,6 +145,21 @@ export async function POST(req: Request) {
 
     if (error) {
       console.error('❌ Supabase insert error:', error);
+      
+      // Check for UUID type mismatch error
+      if (error.code === '22P02' && error.message.includes('uuid')) {
+        console.error('⚠️ Database schema issue: user_id column expects UUID but received string');
+        console.error('💡 Fix: Run this SQL in Supabase: ALTER TABLE user_vitals ALTER COLUMN user_id TYPE text;');
+        return NextResponse.json(
+          { 
+            success: false, 
+            error: 'Database configuration error. Please contact support.',
+            hint: 'user_id column needs to be TEXT type, not UUID'
+          },
+          { status: 500 }
+        );
+      }
+      
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 500 }
