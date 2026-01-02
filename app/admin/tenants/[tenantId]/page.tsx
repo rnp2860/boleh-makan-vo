@@ -249,13 +249,14 @@ function DomainInfo({ tenant }: { tenant: Tenant }) {
 // ============================================
 
 interface TenantDetailPageProps {
-  params: {
+  params: Promise<{
     tenantId: string;
-  };
+  }>;
 }
 
 export default async function TenantDetailPage({ params }: TenantDetailPageProps) {
-  const data = await getTenantDetails(params.tenantId);
+  const { tenantId } = await params;
+  const data = await getTenantDetails(tenantId);
   
   if (!data) {
     notFound();

@@ -4,14 +4,15 @@
 import { redirect } from 'next/navigation';
 
 interface TenantHomePageProps {
-  params: {
+  params: Promise<{
     tenantSlug: string;
-  };
+  }>;
 }
 
-export default function TenantHomePage({ params }: TenantHomePageProps) {
+export default async function TenantHomePage({ params }: TenantHomePageProps) {
+  const { tenantSlug } = await params;
   // Redirect to the tenant's dashboard
-  redirect(`/t/${params.tenantSlug}/dashboard`);
+  redirect(`/t/${tenantSlug}/dashboard`);
 }
 
 

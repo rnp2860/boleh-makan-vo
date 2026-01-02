@@ -8,17 +8,18 @@ import { TenantBrandingProvider } from '@/components/tenant/TenantBrandingProvid
 
 interface TenantLayoutProps {
   children: React.ReactNode;
-  params: {
+  params: Promise<{
     tenantSlug: string;
-  };
+  }>;
 }
 
 export default async function TenantLayout({
   children,
   params,
 }: TenantLayoutProps) {
+  const { tenantSlug } = await params;
   // Resolve tenant from slug
-  const tenant = await getTenantBySlug(params.tenantSlug);
+  const tenant = await getTenantBySlug(tenantSlug);
   
   if (!tenant) {
     notFound();
@@ -40,7 +41,8 @@ export default async function TenantLayout({
 
 // Generate metadata based on tenant
 export async function generateMetadata({ params }: TenantLayoutProps) {
-  const tenant = await getTenantBySlug(params.tenantSlug);
+  const { tenantSlug } = await params;
+  const tenant = await getTenantBySlug(tenantSlug);
   
   if (!tenant) {
     return { title: 'Not Found' };
