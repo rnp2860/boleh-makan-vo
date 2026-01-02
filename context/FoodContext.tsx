@@ -61,6 +61,7 @@ type FoodContextType = {
   getWeeklyStats: () => { day: string; calories: number; budget: number; protein: number; carbs: number; fat: number }[];
   streak: number;
   isLoaded: boolean;
+  userId: string | null;
 };
 
 const FoodContext = createContext<FoodContextType | undefined>(undefined);
@@ -68,6 +69,7 @@ const FoodContext = createContext<FoodContextType | undefined>(undefined);
 export const FoodProvider = ({ children }: { children: React.ReactNode }) => {
   const [meals, setMeals] = useState<Meal[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
   
   // Default Profile (Kept in LocalStorage for now)
   const [userProfile, setUserProfile] = useState<UserProfile>({
@@ -81,13 +83,19 @@ export const FoodProvider = ({ children }: { children: React.ReactNode }) => {
   // 🆔 Get or create unique user ID for multi-user support
   const getUserId = () => {
     if (typeof window === 'undefined') return null;
-    let userId = localStorage.getItem('boleh_makan_user_id');
-    if (!userId) {
-      userId = `user_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-      localStorage.setItem('boleh_makan_user_id', userId);
+    let storedUserId = localStorage.getItem('boleh_makan_user_id');
+    if (!storedUserId) {
+      storedUserId = `user_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+      localStorage.setItem('boleh_makan_user_id', storedUserId);
     }
-    return userId;
+    return storedUserId;
   };
+  
+  // Initialize userId on mount
+  useEffect(() => {
+    const id = getUserId();
+    setUserId(id);
+  }, []);
 
   // 🔄 FETCH DATA FROM SUPABASE ON MOUNT
   useEffect(() => {
@@ -387,7 +395,7 @@ export const FoodProvider = ({ children }: { children: React.ReactNode }) => {
     <FoodContext.Provider value={{ 
       meals, addMeal, deleteMeal, stats, userProfile, 
       toggleCondition, setGoal, updateDetails, setManualOverride, setUserName, 
-      dailyBudget, getWeeklyStats, streak: calculateStreak(), isLoaded 
+      dailyBudget, getWeeklyStats, streak: calculateStreak(), isLoaded, userId 
     }}>
       {children}
     </FoodContext.Provider>
