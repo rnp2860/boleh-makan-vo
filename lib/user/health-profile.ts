@@ -1,14 +1,14 @@
 // lib/user/health-profile.ts
 // 🩺 User Health Profile Helpers for Dr. Reza
 
-import { createClient } from '@/lib/supabase/server';
+import { getSupabaseClient } from '@/lib/supabase';
 import type { UserHealthProfile, TodayIntake, HealthCondition } from '@/lib/ai/dr-reza-prompt';
 
 /**
  * Get complete user health profile for Dr. Reza
  */
 export async function getUserHealthProfile(userId: string): Promise<UserHealthProfile> {
-  const supabase = await createClient();
+  const supabase = getSupabaseClient();
   
   try {
     // Fetch user profile with conditions and targets
@@ -62,7 +62,7 @@ export async function getUserHealthProfile(userId: string): Promise<UserHealthPr
  * Get today's nutritional intake
  */
 export async function getTodayIntake(userId: string): Promise<TodayIntake> {
-  const supabase = await createClient();
+  const supabase = getSupabaseClient();
   const today = new Date().toISOString().split('T')[0];
   
   try {
@@ -121,7 +121,7 @@ export async function getTodayIntake(userId: string): Promise<TodayIntake> {
  * Get latest vitals for user
  */
 async function getLatestVitals(userId: string) {
-  const supabase = await createClient();
+  const supabase = getSupabaseClient();
   
   try {
     // Get latest glucose
@@ -213,7 +213,7 @@ function getDefaultHealthProfile(userId: string): UserHealthProfile {
  * Get user's health conditions only (quick fetch)
  */
 export async function getUserConditions(userId: string): Promise<HealthCondition[]> {
-  const supabase = await createClient();
+  const supabase = getSupabaseClient();
   
   try {
     const { data, error } = await supabase
@@ -237,7 +237,7 @@ export async function getUserConditions(userId: string): Promise<HealthCondition
  * Update user's health conditions
  */
 export async function updateUserConditions(userId: string, conditions: HealthCondition[]): Promise<boolean> {
-  const supabase = await createClient();
+  const supabase = getSupabaseClient();
   
   try {
     const { error } = await supabase
@@ -256,7 +256,7 @@ export async function updateUserConditions(userId: string, conditions: HealthCon
  * Update user's nutrient targets
  */
 export async function updateNutrientTargets(userId: string, targets: Record<string, number>): Promise<boolean> {
-  const supabase = await createClient();
+  const supabase = getSupabaseClient();
   
   try {
     const { error } = await supabase

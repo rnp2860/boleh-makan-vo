@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
       recentMeals, 
       userId,
       mealContext, // NEW: Meal context for analysis
-      useEnhancedPrompt = true // NEW: Flag to use enhanced multi-condition prompt
+      useEnhancedPrompt: useEnhancedPromptParam = true // NEW: Flag to use enhanced multi-condition prompt
     } = await request.json();
 
     if (!message) {
@@ -27,7 +27,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Use enhanced prompt system if requested and userId available
-    let systemPrompt: string;
+    let useEnhancedPrompt = useEnhancedPromptParam; // Allow reassignment
+    let systemPrompt: string = ''; // Initialize with empty string
+    let dailyContext: DailyContext | null = null;
     
     if (useEnhancedPrompt && userId) {
       try {
@@ -48,8 +50,6 @@ export async function POST(request: NextRequest) {
     }
     
     // Fallback to legacy prompt system if enhanced not available
-    let dailyContext: DailyContext | null = null;
-    
     if (!useEnhancedPrompt) {
       // Fetch daily context if userId is provided
       if (userId) {
