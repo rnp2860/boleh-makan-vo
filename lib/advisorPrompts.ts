@@ -46,6 +46,15 @@ YOUR RESPONSE STRUCTURE
 Provide advice in this JSON format:
 {
   "main_advice": "2-3 sentences of personalized advice (60-80 words max)",
+  "condition_impacts": [
+    {
+      "condition": "Diabetes" | "Hypertension" | "High Cholesterol" | "Chronic Kidney Disease",
+      "impact_level": "low|moderate|high|severe",
+      "icon": "📊",
+      "warning": "Brief specific warning for this condition (20-30 words)",
+      "details": "Why this food affects this condition"
+    }
+  ],
   "glucose_prediction": {
     "expected_impact": "low|moderate|high|very_high",
     "peak_time": "30-60 mins after eating",
@@ -64,6 +73,29 @@ Provide advice in this JSON format:
     "likely_extras": ["Teh Tarik?", "Extra rice?"],
     "question": "Did you have any drinks with this?"
   }
+}
+
+CRITICAL: If user has MULTIPLE health conditions, you MUST include condition_impacts array with one entry for EACH condition.
+
+Example for user with Diabetes + Hypertension eating Nasi Kandar:
+{
+  "condition_impacts": [
+    {
+      "condition": "Diabetes",
+      "impact_level": "high",
+      "icon": "📊",
+      "warning": "High carbs (72g) - expect glucose spike in 45 mins",
+      "details": "White rice + curry gravy = rapid glucose rise. Monitor closely after eating."
+    },
+    {
+      "condition": "Hypertension", 
+      "impact_level": "severe",
+      "icon": "📊",
+      "warning": "High sodium (950mg) - that's 41% of daily limit",
+      "details": "Curry powder + salt in gravy. Watch your blood pressure today."
+    }
+  ],
+  ...
 }
 
 ═══════════════════════════════════════════════════════════════
@@ -244,6 +276,13 @@ export interface MealData {
 
 export interface DrRezaResponse {
   main_advice: string;
+  condition_impacts?: Array<{
+    condition: 'Diabetes' | 'Hypertension' | 'High Cholesterol' | 'Chronic Kidney Disease';
+    impact_level: 'low' | 'moderate' | 'high' | 'severe';
+    icon: string;
+    warning: string;
+    details: string;
+  }>;
   glucose_prediction: {
     expected_impact: 'low' | 'moderate' | 'high' | 'very_high';
     peak_time: string;
@@ -357,8 +396,19 @@ export function formatDrRezaAdvice(response: DrRezaResponse | null, fallbackAdvi
     return fallbackAdvice;
   }
 
-  // If we have a structured response, format it nicely
+  // Start with main advice
   let advice = response.main_advice;
+
+  // Add multi-condition impacts if present
+  if (response.condition_impacts && response.condition_impacts.length > 0) {
+    advice += '\n\n🩺 Impact on Your Conditions:\n';
+    response.condition_impacts.forEach(impact => {
+      const levelEmoji = impact.impact_level === 'severe' ? '🔴' : 
+                         impact.impact_level === 'high' ? '🟠' : 
+                         impact.impact_level === 'moderate' ? '🟡' : '🟢';
+      advice += `\n${levelEmoji} ${impact.condition.toUpperCase()}: ${impact.warning}`;
+    });
+  }
 
   // Add glucose warning for diabetics if high/very_high impact
   if (response.glucose_prediction && 

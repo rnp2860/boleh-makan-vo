@@ -90,6 +90,8 @@ export default function CheckFoodPage() {
   // 📝 TEXT INPUT (Alternative to voice)
   const [showTextInput, setShowTextInput] = useState(false);
   const [textInput, setTextInput] = useState('');
+  const [textInputResults, setTextInputResults] = useState<any[]>([]);
+  const [textInputSearching, setTextInputSearching] = useState(false);
 
   // 🥗 ADDED INGREDIENTS (user can add missed items)
   const [addedIngredients, setAddedIngredients] = useState<{name: string, calories: number, macros: {p: number, c: number, f: number}}[]>([]);
@@ -144,7 +146,31 @@ export default function CheckFoodPage() {
     return userId;
   };
 
-  // 🔎 DEBOUNCED SUPABASE SEARCH
+  // 🔎 DEBOUNCED SUPABASE SEARCH for Type It In
+  useEffect(() => {
+    if (!showTextInput) return;
+    
+    const delayDebounceFn = setTimeout(async () => {
+      if (textInput.length > 1) {
+        setTextInputSearching(true);
+        try {
+          const res = await fetch(`/api/search-food?q=${encodeURIComponent(textInput)}`);
+          const data = await res.json();
+          setTextInputResults(Array.isArray(data) ? data.slice(0, 8) : []);
+        } catch (e) { 
+          console.error(e);
+          setTextInputResults([]);
+        }
+        setTextInputSearching(false);
+      } else {
+        setTextInputResults([]);
+      }
+    }, 300);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [textInput, showTextInput]);
+
+  // 🔎 DEBOUNCED SUPABASE SEARCH for Add Modal
   useEffect(() => {
     if (!showAddModal) return;
     
@@ -244,6 +270,7 @@ export default function CheckFoodPage() {
   const handleTextSubmit = async () => {
     if (!textInput.trim()) return;
     setShowTextInput(false);
+    setTextInputResults([]);
     // Reset states for fresh analysis
     setImage(null); // No image for text input - will show placeholder
     setBaseResult(null);
@@ -816,9 +843,8 @@ export default function CheckFoodPage() {
                 </div>
                 <div className="text-left flex-1">
                   <h3 className="text-lg font-bold">Type It In</h3>
-                  <p className="text-slate-400 text-base">Quick log without photo</p>
+                  <p className="text-slate-400 text-sm">Quick log without photo</p>
                 </div>
-                <span className="text-xs font-bold text-teal-600 bg-teal-50 px-2 py-1 rounded-lg">RECOMMENDED</span>
               </button>
               
               {/* Disclaimer for Type It In */}
@@ -880,36 +906,99 @@ export default function CheckFoodPage() {
       {/* ========== TEXT INPUT MODAL ========== */}
       {showTextInput && (
         <div className="fixed inset-0 bg-black/50 z-[60] flex items-end justify-center backdrop-blur-sm">
-          <div className="bg-white w-full rounded-t-3xl p-6 pb-28 animate-slideUp">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full overflow-hidden">
-                <Image src="/assets/avatar-header.png" alt="Dr. Reza" width={40} height={40} className="object-cover" />
+          <div className="bg-white w-full max-h-[80vh] rounded-t-3xl overflow-hidden animate-slideUp flex flex-col">
+            <div className="p-6 pb-4 flex-shrink-0">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full overflow-hidden">
+                  <Image src="/assets/avatar-header.png" alt="Dr. Reza" width={40} height={40} className="object-cover" />
+                </div>
+                <p className="text-slate-700 font-medium">What did you eat?</p>
               </div>
-              <p className="text-slate-700 font-medium">What did you eat?</p>
+              <input 
+                autoFocus
+                type="text"
+                value={textInput}
+                onChange={(e) => setTextInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && textInput.trim()) {
+                    handleTextSubmit();
+                  }
+                }}
+                placeholder="e.g. Nasi Lemak Ayam Goreng"
+                className="w-full p-4 bg-slate-50 rounded-xl text-lg font-medium text-slate-800 placeholder-slate-400 outline-none border-2 border-transparent focus:border-teal-400 transition-colors"
+              />
             </div>
-            <input 
-              autoFocus
-              type="text"
-              value={textInput}
-              onChange={(e) => setTextInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleTextSubmit()}
-              placeholder="e.g. Nasi Lemak Ayam Goreng"
-              className="w-full p-4 bg-slate-50 rounded-xl text-lg font-medium text-slate-800 placeholder-slate-400 outline-none border-2 border-transparent focus:border-teal-400 transition-colors"
-            />
-            <div className="flex gap-3 mt-4">
-              <button 
-                onClick={() => setShowTextInput(false)} 
-                className="flex-1 py-4 rounded-xl bg-slate-100 text-slate-500 font-bold text-lg"
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={handleTextSubmit}
-                disabled={!textInput.trim()}
-                className="flex-1 py-4 rounded-xl bg-teal-500 text-white font-bold text-lg disabled:opacity-50"
-              >
-                Analyze
-              </button>
+
+            {/* Autocomplete Dropdown */}
+            {textInput.length > 1 && (
+              <div className="flex-1 overflow-y-auto border-t border-slate-200">
+                {textInputSearching ? (
+                  <div className="p-8 text-center text-slate-400">
+                    <div className="w-6 h-6 border-2 border-teal-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                    Searching...
+                  </div>
+                ) : textInputResults.length > 0 ? (
+                  <div className="p-4 space-y-2">
+                    <p className="text-xs font-bold text-slate-500 uppercase px-2 mb-2">
+                      💡 Suggestions from database:
+                    </p>
+                    {textInputResults.map((item, idx) => (
+                      <button
+                        key={item.id || idx}
+                        onClick={() => {
+                          setTextInput(item.name || item.name_en);
+                          setTextInputResults([]);
+                          setTimeout(() => handleTextSubmit(), 100);
+                        }}
+                        className="w-full text-left p-3 rounded-xl bg-slate-50 hover:bg-teal-50 border border-slate-100 hover:border-teal-200 transition-colors"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-bold text-slate-700 text-sm">
+                              {item.name || item.name_en}
+                            </p>
+                            {item.name_bm && (
+                              <p className="text-xs text-slate-500">{item.name_bm}</p>
+                            )}
+                          </div>
+                          <span className="text-xs font-bold text-slate-400 bg-white px-2 py-1 rounded-lg">
+                            {item.calories} kcal
+                          </span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-8 text-center text-slate-400">
+                    <p className="text-sm">Type to search database...</p>
+                    <p className="text-xs mt-2 text-slate-300">
+                      Or press Enter to analyze with AI
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="p-4 border-t border-slate-100 flex-shrink-0">
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => { 
+                    setShowTextInput(false); 
+                    setTextInput(''); 
+                    setTextInputResults([]);
+                  }} 
+                  className="flex-1 py-4 rounded-xl bg-slate-100 text-slate-500 font-bold text-lg"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={handleTextSubmit}
+                  disabled={!textInput.trim()}
+                  className="flex-1 py-4 rounded-xl bg-teal-500 text-white font-bold text-lg disabled:opacity-50"
+                >
+                  Analyze
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1206,16 +1295,65 @@ export default function CheckFoodPage() {
 
           {/* 🩺 DR. REZA'S TIP - Only show when NOT low confidence */}
           {!isLowConfidence() && (
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-2xl mb-4 flex gap-3 items-start border border-blue-100">
-              <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 border-2 border-white shadow">
-                <Image src="/assets/avatar-header.png" alt="Dr Reza" width={40} height={40} className="object-cover" />
+            <div className="space-y-3 mb-4">
+              {/* Main Advice */}
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-2xl flex gap-3 items-start border border-blue-100">
+                <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 border-2 border-white shadow">
+                  <Image src="/assets/avatar-header.png" alt="Dr Reza" width={40} height={40} className="object-cover" />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-blue-600 mb-1">Dr. Reza says</p>
+                  <p className="text-sm text-slate-700 leading-relaxed">
+                    {baseResult.data.analysis_content || "Looks good! Remember to stay hydrated 💧"}
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-xs font-bold text-blue-600 mb-1">Dr. Reza says</p>
-                <p className="text-sm text-slate-700 leading-relaxed">
-                  {baseResult.data.analysis_content || "Looks good! Remember to stay hydrated 💧"}
-                </p>
-              </div>
+
+              {/* Multi-Condition Impacts - NEW */}
+              {baseResult.data.dr_reza_analysis?.condition_impacts && 
+               baseResult.data.dr_reza_analysis.condition_impacts.length > 0 && (
+                <div className="bg-white rounded-2xl border-2 border-slate-200 overflow-hidden">
+                  <div className="bg-slate-100 px-4 py-2 border-b border-slate-200">
+                    <p className="text-xs font-bold text-slate-600 uppercase tracking-wide">
+                      🩺 Impact on Your Conditions
+                    </p>
+                  </div>
+                  <div className="p-3 space-y-2">
+                    {baseResult.data.dr_reza_analysis.condition_impacts.map((impact: any, idx: number) => {
+                      const bgColor = impact.impact_level === 'severe' ? 'bg-red-50 border-red-300' :
+                                     impact.impact_level === 'high' ? 'bg-orange-50 border-orange-300' :
+                                     impact.impact_level === 'moderate' ? 'bg-amber-50 border-amber-300' :
+                                     'bg-green-50 border-green-300';
+                      const textColor = impact.impact_level === 'severe' ? 'text-red-800' :
+                                       impact.impact_level === 'high' ? 'text-orange-800' :
+                                       impact.impact_level === 'moderate' ? 'text-amber-800' :
+                                       'text-green-800';
+                      const levelEmoji = impact.impact_level === 'severe' ? '🔴' :
+                                        impact.impact_level === 'high' ? '🟠' :
+                                        impact.impact_level === 'moderate' ? '🟡' : '🟢';
+                      
+                      return (
+                        <div key={idx} className={`${bgColor} border rounded-lg p-3`}>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-lg">{levelEmoji}</span>
+                            <span className={`text-xs font-bold ${textColor} uppercase tracking-wide`}>
+                              {impact.condition}
+                            </span>
+                          </div>
+                          <p className={`text-sm ${textColor} font-semibold`}>
+                            {impact.warning}
+                          </p>
+                          {impact.details && (
+                            <p className={`text-xs ${textColor} opacity-80 mt-1`}>
+                              {impact.details}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
