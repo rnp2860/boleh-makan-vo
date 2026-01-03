@@ -61,16 +61,14 @@ export default function DashboardPage() {
       const ramadanModeEnabled = localStorage.getItem('boleh_makan_ramadan_mode') === 'true';
       setIsRamadanMode(ramadanModeEnabled);
       
-      // Check if Sahur/Iftar logged today (basic check from meal types)
+      // Check if Sahur/Iftar logged today (check localStorage flags)
       if (ramadanModeEnabled) {
-        // This is a simplified check - you'd normally query from backend
-        const todayMeals = meals.filter(m => {
-          const mealDate = new Date(m.timestamp);
-          const today = new Date();
-          return mealDate.toDateString() === today.toDateString();
-        });
-        setSahurLogged(todayMeals.some(m => m.meal_type === 'Sahur'));
-        setIftarLogged(todayMeals.some(m => m.meal_type === 'Iftar'));
+        const today = new Date().toDateString();
+        const sahurLoggedDate = localStorage.getItem('boleh_makan_sahur_logged_date');
+        const iftarLoggedDate = localStorage.getItem('boleh_makan_iftar_logged_date');
+        
+        setSahurLogged(sahurLoggedDate === today);
+        setIftarLogged(iftarLoggedDate === today);
       }
     }
   }, [meals]);

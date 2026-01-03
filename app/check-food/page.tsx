@@ -652,6 +652,16 @@ export default function CheckFoodPage() {
       try {
         const processedImage = image ? await compressImage(image) : undefined;
         
+        // 🌙 Track Ramadan meal logging in localStorage
+        if (typeof window !== 'undefined' && isRamadanMode) {
+          const today = new Date().toDateString();
+          if (mealType === 'Sahur') {
+            localStorage.setItem('boleh_makan_sahur_logged_date', today);
+          } else if (mealType === 'Iftar') {
+            localStorage.setItem('boleh_makan_iftar_logged_date', today);
+          }
+        }
+        
         // 1️⃣ Save to localStorage (existing flow)
         addMeal({ 
           data: finalData, 
