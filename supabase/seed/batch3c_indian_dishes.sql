@@ -14,7 +14,7 @@ INSERT INTO malaysian_foods (name_en, name_bm, aliases, category, subcategory, t
 
 ('Dhal (Lentil Curry)', 'Dhal', ARRAY['dal', 'lentil curry', 'paruppu'], 'curry', 'indian', ARRAY['indian', 'vegetarian', 'protein'], '1 mangkuk', '1 bowl', 200, 180, 26, 3, 6, 42, 'low', 520, 480, 4, 1, 0, 0, 12, 180, 'safe', 'caution', 'safe', 'caution', 'ai_estimated', false),
 
-('Papadom', 'Papadom', ARRAY['papad', 'lentil crackers'], '2 keping', '2 pieces', 20, 80, 10, 0, 1, 55, 'low', 380, 80, 3, 0.5, 0, 0, 3, 50, 'safe', 'caution', 'safe', 'safe', 'snacks', 'indian', ARRAY['indian', 'crispy', 'side'], 'ai_estimated', false),
+('Papadom', 'Papadom', ARRAY['papad', 'lentil crackers'], 'snacks', 'indian', ARRAY['indian', 'crispy', 'side'], '2 keping', '2 pieces', 20, 80, 10, 0, 1, 55, 'low', 380, 80, 3, 0.5, 0, 0, 3, 50, 'safe', 'caution', 'safe', 'safe', 'ai_estimated', false),
 
 ('Acar (Indian Pickle)', 'Acar India', ARRAY['achar', 'vegetable pickle'], 'condiments', 'pickle', ARRAY['indian', 'spicy', 'tangy'], '2 sudu makan', '2 tablespoons', 40, 50, 8, 4, 1, 40, 'low', 480, 120, 2, 0.3, 0, 0, 1, 20, 'safe', 'caution', 'safe', 'safe', 'ai_estimated', false),
 
