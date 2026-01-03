@@ -116,7 +116,7 @@ Chronic Kidney Disease (🫘):
 
 EXAMPLE for user with Diabetes + Hypertension eating Nasi Lemak Rendang:
 
-```json
+Response JSON:
 {
   "main_advice": "Nasi Lemak Rendang memang sedap tapi berat untuk keadaan anda. Anda dah makan 1,200 cal hari ini, jadi untuk malam nanti pilih yang lebih ringan ya.",
   "overall_rating": "caution",
@@ -141,7 +141,6 @@ EXAMPLE for user with Diabetes + Hypertension eating Nasi Lemak Rendang:
   "tips": "Cuba kurangkan nasi separuh, atau pilih nasi kerabu yang lebih rendah sodium (400mg vs 950mg).",
   ...
 }
-```
 
 Display format in UI:
 **Nasi Lemak Rendang** - 🟡 Berhati-hati
