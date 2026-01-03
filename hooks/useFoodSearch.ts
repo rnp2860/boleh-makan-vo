@@ -1,54 +1,76 @@
+'use client';
+
 // 🇲🇾 Malaysian Food Search Hook
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { MalaysianFood, FoodCategory } from '@/lib/malaysian-foods/types';
-
-interface UseFoodSearchOptions {
-  debounceMs?: number;
-  minQueryLength?: number;
-  limit?: number;
-  category?: FoodCategory;
-  tag?: string;
-}
+import type { FoodSearchResult } from '@/types/food';
 
 interface UseFoodSearchResult {
-  query: string;
-  setQuery: (query: string) => void;
-  results: MalaysianFood[];
+  results: FoodSearchResult[];
   isLoading: boolean;
   error: string | null;
-  search: (query: string) => Promise<void>;
+  search: (query: string) => void;
   clearResults: () => void;
+  recentSearches: FoodSearchResult[];
 }
 
-const RECENT_FOODS_KEY = 'boleh_makan_recent_foods';
-const MAX_RECENT_FOODS = 10;
+const RECENT_SEARCHES_KEY = 'boleh_makan_recent_foods';
+const RECENT_SEARCHES_LIMIT = 5;
 
-export function useFoodSearch(options: UseFoodSearchOptions = {}): UseFoodSearchResult {
-  const {
-    debounceMs = 300,
-    minQueryLength = 2,
-    limit = 20,
-    category,
-    tag,
-  } = options;
-  
-  const [query, setQuery] = useState('');
-  const [results, setResults] = useState<MalaysianFood[]>([]);
+export function useFoodSearch(): UseFoodSearchResult {
+  const [results, setResults] = useState<FoodSearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [recentSearches, setRecentSearches] = useState<FoodSearchResult[]>([]);
   
-  const debounceRef = useRef<NodeJS.Timeout | null>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
+  const debounceTimer = useRef<NodeJS.Timeout | null>(null);
+  const abortController = useRef<AbortController | null>(null);
   
-  const search = useCallback(async (searchQuery: string) => {
-    // Cancel previous request
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
+  // Load recent searches from localStorage
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(RECENT_SEARCHES_KEY);
+      if (stored) {
+        setRecentSearches(JSON.parse(stored));
+      }
+    } catch (err) {
+      console.error('Failed to load recent searches:', err);
+    }
+  }, []);
+  
+  const saveToRecentSearches = useCallback((food: FoodSearchResult) => {
+    setRecentSearches(prev => {
+      // Remove if already exists
+      const filtered = prev.filter(f => f.id !== food.id);
+      // Add to front
+      const updated = [food, ...filtered].slice(0, RECENT_SEARCHES_LIMIT);
+      
+      // Save to localStorage
+      try {
+        localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(updated));
+      } catch (err) {
+        console.error('Failed to save recent searches:', err);
+      }
+      
+      return updated;
+    });
+  }, []);
+  
+  const search = useCallback((query: string) => {
+    // Clear previous timer
+    if (debounceTimer.current) {
+      clearTimeout(debounceTimer.current);
     }
     
-    if (searchQuery.length < minQueryLength) {
+    // Cancel previous request
+    if (abortController.current) {
+      abortController.current.abort();
+    }
+    
+    // Clear results if query is too short
+    if (!query || query.trim().length < 2) {
       setResults([]);
+      setError(null);
       setIsLoading(false);
       return;
     }
@@ -56,188 +78,112 @@ export function useFoodSearch(options: UseFoodSearchOptions = {}): UseFoodSearch
     setIsLoading(true);
     setError(null);
     
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
-    
-    try {
-      const params = new URLSearchParams({
-        q: searchQuery,
-        limit: String(limit),
-      });
-      
-      if (category) params.set('category', category);
-      if (tag) params.set('tag', tag);
-      
-      const response = await fetch(`/api/foods/search?${params}`, {
-        signal: controller.signal,
-      });
-      
-      if (!response.ok) {
-        throw new Error('Search failed');
+    // Debounce the search
+    debounceTimer.current = setTimeout(async () => {
+      try {
+        abortController.current = new AbortController();
+        
+        const params = new URLSearchParams({
+          q: query.trim(),
+          limit: '20',
+        });
+        
+        const response = await fetch(`/api/foods/search?${params}`, {
+          signal: abortController.current.signal,
+        });
+        
+        if (!response.ok) {
+          throw new Error('Search failed');
+        }
+        
+        const data = await response.json();
+        setResults(data.results || []);
+        
+      } catch (err: any) {
+        if (err.name === 'AbortError') {
+          // Request was cancelled, ignore
+          return;
+        }
+        console.error('Search error:', err);
+        setError('Gagal mencari makanan / Failed to search foods');
+        setResults([]);
+      } finally {
+        setIsLoading(false);
       }
-      
-      const data = await response.json();
-      setResults(data.foods || []);
-      
-    } catch (err) {
-      if (err instanceof Error && err.name === 'AbortError') {
-        return; // Ignore aborted requests
-      }
-      console.error('Food search error:', err);
-      setError('Gagal mencari makanan. Sila cuba lagi.');
-      setResults([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [minQueryLength, limit, category, tag]);
-  
-  // Debounced search on query change
-  useEffect(() => {
-    if (debounceRef.current) {
-      clearTimeout(debounceRef.current);
-    }
-    
-    if (query.length >= minQueryLength) {
-      debounceRef.current = setTimeout(() => {
-        search(query);
-      }, debounceMs);
-    } else {
-      setResults([]);
-    }
-    
-    return () => {
-      if (debounceRef.current) {
-        clearTimeout(debounceRef.current);
-      }
-    };
-  }, [query, search, debounceMs, minQueryLength]);
+    }, 300); // 300ms debounce
+  }, []);
   
   const clearResults = useCallback(() => {
-    setQuery('');
     setResults([]);
     setError(null);
+    setIsLoading(false);
+  }, []);
+  
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimer.current) {
+        clearTimeout(debounceTimer.current);
+      }
+      if (abortController.current) {
+        abortController.current.abort();
+      }
+    };
   }, []);
   
   return {
-    query,
-    setQuery,
     results,
     isLoading,
     error,
     search,
     clearResults,
+    recentSearches,
   };
 }
 
-// Hook to get popular foods
-export function usePopularFoods(limit: number = 10, condition?: string) {
-  const [foods, setFoods] = useState<MalaysianFood[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+// Hook for fetching individual food details
+export function useFoodDetail(foodId: string | null) {
+  const [food, setFood] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
   useEffect(() => {
-    const fetchPopular = async () => {
+    if (!foodId) {
+      setFood(null);
+      return;
+    }
+    
+    const fetchFood = async () => {
+      setIsLoading(true);
+      setError(null);
+      
       try {
-        const params = new URLSearchParams({ limit: String(limit) });
-        if (condition) params.set('condition', condition);
-        
-        const response = await fetch(`/api/foods/popular?${params}`);
+        const response = await fetch(`/api/foods/${foodId}`);
         
         if (!response.ok) {
-          throw new Error('Failed to get popular foods');
+          throw new Error('Failed to fetch food details');
         }
         
         const data = await response.json();
-        setFoods(data.foods || []);
+        setFood(data);
+        
+        // Increment popularity
+        fetch(`/api/foods/${foodId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'increment_popularity' }),
+        }).catch(err => console.error('Failed to increment popularity:', err));
         
       } catch (err) {
-        console.error('Get popular foods error:', err);
-        setError('Gagal memuatkan makanan popular');
+        console.error('Food detail error:', err);
+        setError('Gagal memuatkan maklumat / Failed to load details');
       } finally {
         setIsLoading(false);
       }
     };
     
-    fetchPopular();
-  }, [limit, condition]);
+    fetchFood();
+  }, [foodId]);
   
-  return { foods, isLoading, error };
+  return { food, isLoading, error };
 }
-
-// Hook to get food categories
-export function useFoodCategories() {
-  const [categories, setCategories] = useState<Array<{
-    id: FoodCategory;
-    labelEn: string;
-    labelBm: string;
-    icon: string;
-    count: number;
-  }>>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  
-  useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        const response = await fetch('/api/foods/categories');
-        
-        if (!response.ok) {
-          throw new Error('Failed to get categories');
-        }
-        
-        const data = await response.json();
-        setCategories(data.categories || []);
-        
-      } catch (err) {
-        console.error('Get categories error:', err);
-        setError('Gagal memuatkan kategori');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    fetchCategories();
-  }, []);
-  
-  return { categories, isLoading, error };
-}
-
-// ============================================
-// RECENT FOODS HELPERS
-// ============================================
-
-export function getRecentFoods(): MalaysianFood[] {
-  if (typeof window === 'undefined') return [];
-  
-  try {
-    const stored = localStorage.getItem(RECENT_FOODS_KEY);
-    if (!stored) return [];
-    return JSON.parse(stored);
-  } catch {
-    return [];
-  }
-}
-
-export function addRecentFood(food: MalaysianFood): void {
-  if (typeof window === 'undefined') return;
-  
-  try {
-    const recent = getRecentFoods();
-    
-    // Remove if already exists
-    const filtered = recent.filter(f => f.id !== food.id);
-    
-    // Add to front
-    const updated = [food, ...filtered].slice(0, MAX_RECENT_FOODS);
-    
-    localStorage.setItem(RECENT_FOODS_KEY, JSON.stringify(updated));
-  } catch {
-    // Ignore storage errors
-  }
-}
-
-export function clearRecentFoods(): void {
-  if (typeof window === 'undefined') return;
-  localStorage.removeItem(RECENT_FOODS_KEY);
-}
-

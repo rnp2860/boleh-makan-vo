@@ -2,367 +2,374 @@
 
 // 🇲🇾 Malaysian Food Detail Modal
 
-import React, { useState, useMemo } from 'react';
-import { X, Minus, Plus, AlertTriangle, CheckCircle, XCircle, Info, Utensils } from 'lucide-react';
-import { MalaysianFood, ConditionRating, DAILY_LIMITS } from '@/lib/malaysian-foods/types';
-import { 
-  calculateAdjustedNutrients, 
-  getConditionWarnings,
-  getRatingColor,
-  formatServing,
-  formatCalories,
-  getGILabel,
-  getGIColor,
-} from '@/lib/malaysian-foods/utils';
+import React, { useState, useEffect } from 'react';
+import { X, Loader2, Plus, Minus, AlertTriangle, CheckCircle, Info } from 'lucide-react';
+import { useFoodDetail } from '@/hooks/useFoodSearch';
+import type { MalaysianFood, ConditionRating } from '@/types/food';
+
+const SERVING_PRESETS = [
+  { multiplier: 0.5, label: 'Half' },
+  { multiplier: 1.0, label: 'Normal' },
+  { multiplier: 1.5, label: '1.5x' },
+  { multiplier: 2.0, label: 'Double' },
+];
 
 interface FoodDetailModalProps {
-  food: MalaysianFood;
-  isOpen: boolean;
+  foodId: string | null;
   onClose: () => void;
-  onLogFood: (food: MalaysianFood, multiplier: number) => void;
+  onLogMeal: (food: MalaysianFood, multiplier: number) => void;
   userConditions?: string[];
-  isLogging?: boolean;
 }
 
-const PORTION_PRESETS = [0.5, 1, 1.5, 2];
-
 export function FoodDetailModal({
-  food,
-  isOpen,
+  foodId,
   onClose,
-  onLogFood,
+  onLogMeal,
   userConditions = [],
-  isLogging = false,
 }: FoodDetailModalProps) {
-  const [multiplier, setMultiplier] = useState(1);
-  const [customMultiplier, setCustomMultiplier] = useState('');
-  const [showCustom, setShowCustom] = useState(false);
+  const { food, isLoading, error } = useFoodDetail(foodId);
+  const [servingMultiplier, setServingMultiplier] = useState(1.0);
+  const [customGrams, setCustomGrams] = useState<string>('');
+  const [activeTab, setActiveTab] = useState<'basic' | 'diabetes' | 'bp' | 'cholesterol' | 'kidney'>('basic');
   
-  // Calculate adjusted nutrients based on multiplier
-  const adjustedNutrients = useMemo(() => 
-    calculateAdjustedNutrients(food, multiplier),
-    [food, multiplier]
-  );
+  useEffect(() => {
+    if (food) {
+      setCustomGrams(food.serving_grams.toString());
+    }
+  }, [food]);
   
-  // Get condition warnings
-  const warnings = useMemo(() => 
-    getConditionWarnings(food, userConditions, multiplier),
-    [food, userConditions, multiplier]
-  );
+  if (!foodId) return null;
   
-  if (!isOpen) return null;
-  
-  const handleMultiplierChange = (newMultiplier: number) => {
-    setMultiplier(newMultiplier);
-    setShowCustom(false);
-  };
-  
-  const handleCustomMultiplier = () => {
-    const value = parseFloat(customMultiplier);
-    if (!isNaN(value) && value > 0 && value <= 10) {
-      setMultiplier(value);
+  const handleCustomGramsChange = (value: string) => {
+    setCustomGrams(value);
+    const grams = parseFloat(value);
+    if (!isNaN(grams) && food) {
+      setServingMultiplier(grams / food.serving_grams);
     }
   };
   
   const handleLog = () => {
-    onLogFood(food, multiplier);
+    if (food) {
+      onLogMeal(food, servingMultiplier);
+      onClose();
+    }
   };
   
+  // Calculate adjusted nutrition
+  const adjustedNutrition = food ? {
+    calories: Math.round(food.calories_kcal * servingMultiplier),
+    carbs: Math.round(food.carbs_g * servingMultiplier),
+    sugar: food.sugar_g ? Math.round(food.sugar_g * servingMultiplier) : null,
+    fiber: food.fiber_g ? Math.round(food.fiber_g * servingMultiplier) : null,
+    sodium: food.sodium_mg ? Math.round(food.sodium_mg * servingMultiplier) : null,
+    potassium: food.potassium_mg ? Math.round(food.potassium_mg * servingMultiplier) : null,
+    total_fat: food.total_fat_g ? Math.round(food.total_fat_g * servingMultiplier) : null,
+    saturated_fat: food.saturated_fat_g ? Math.round(food.saturated_fat_g * servingMultiplier) : null,
+    trans_fat: food.trans_fat_g ? Math.round(food.trans_fat_g * servingMultiplier) : null,
+    cholesterol: food.cholesterol_mg ? Math.round(food.cholesterol_mg * servingMultiplier) : null,
+    protein: food.protein_g ? Math.round(food.protein_g * servingMultiplier) : null,
+    phosphorus: food.phosphorus_mg ? Math.round(food.phosphorus_mg * servingMultiplier) : null,
+  } : null;
+  
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-      {/* Backdrop */}
-      <div 
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-        onClick={onClose}
-      />
-      
-      {/* Modal */}
-      <div className="relative w-full sm:max-w-lg max-h-[90vh] bg-white rounded-t-3xl sm:rounded-2xl 
-                      overflow-hidden flex flex-col animate-in slide-in-from-bottom duration-300">
-        
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div className="bg-white w-full sm:max-w-2xl sm:rounded-2xl rounded-t-2xl max-h-[95vh] flex flex-col">
         {/* Header */}
-        <div className="flex items-start justify-between p-4 border-b border-slate-100">
-          <div className="flex-1">
-            <h2 className="text-xl font-bold text-slate-800">{food.nameBm}</h2>
-            <p className="text-sm text-slate-500">{food.nameEn}</p>
-          </div>
+        <div className="flex items-center justify-between p-4 border-b border-slate-200">
+          <h2 className="text-lg font-bold text-slate-800">Maklumat Makanan</h2>
           <button
             onClick={onClose}
             className="p-2 hover:bg-slate-100 rounded-full transition-colors"
           >
-            <X className="w-5 h-5 text-slate-400" />
+            <X className="w-5 h-5 text-slate-600" />
           </button>
         </div>
         
-        {/* Content - Scrollable */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          
-          {/* Serving Size */}
-          <div className="bg-emerald-50 rounded-xl p-4">
-            <div className="text-sm text-emerald-600 font-medium mb-1">Saiz Hidangan</div>
-            <div className="text-2xl font-bold text-emerald-700">
-              {formatServing(food, multiplier)}
-            </div>
-            <div className="text-3xl font-bold text-emerald-600 mt-1">
-              {formatCalories(adjustedNutrients.caloriesKcal)}
-            </div>
-          </div>
-          
-          {/* Portion Selector */}
-          <div>
-            <div className="text-sm font-medium text-slate-600 mb-2">Saiz Portion</div>
-            <div className="flex gap-2 flex-wrap">
-              {PORTION_PRESETS.map((preset) => (
-                <button
-                  key={preset}
-                  onClick={() => handleMultiplierChange(preset)}
-                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                    multiplier === preset && !showCustom
-                      ? 'bg-emerald-600 text-white'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  {preset}x
-                </button>
-              ))}
-              <button
-                onClick={() => setShowCustom(true)}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  showCustom
-                    ? 'bg-emerald-600 text-white'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                Lain
-              </button>
-            </div>
-            
-            {showCustom && (
-              <div className="flex gap-2 mt-2">
-                <button
-                  onClick={() => setMultiplier(Math.max(0.25, multiplier - 0.25))}
-                  className="p-2 bg-slate-100 rounded-lg hover:bg-slate-200"
-                >
-                  <Minus className="w-5 h-5" />
-                </button>
-                <input
-                  type="number"
-                  value={customMultiplier || multiplier}
-                  onChange={(e) => setCustomMultiplier(e.target.value)}
-                  onBlur={handleCustomMultiplier}
-                  className="flex-1 px-4 py-2 bg-slate-100 rounded-lg text-center font-medium"
-                  step="0.25"
-                  min="0.25"
-                  max="10"
-                />
-                <button
-                  onClick={() => setMultiplier(Math.min(10, multiplier + 0.25))}
-                  className="p-2 bg-slate-100 rounded-lg hover:bg-slate-200"
-                >
-                  <Plus className="w-5 h-5" />
-                </button>
-              </div>
-            )}
-          </div>
-          
-          {/* Condition Warnings */}
-          {warnings.length > 0 && (
-            <div className="space-y-2">
-              <div className="text-sm font-medium text-slate-600">Peringatan Kesihatan</div>
-              {warnings.map((warning, index) => (
-                <WarningCard key={index} warning={warning} />
-              ))}
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto">
+          {isLoading && (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
             </div>
           )}
           
-          {/* GI Information */}
-          {(food.glycemicIndex || food.giCategory) && (
-            <div className="bg-slate-50 rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Info className="w-4 h-4 text-slate-500" />
-                <span className="text-sm font-medium text-slate-600">Indeks Glisemik (GI)</span>
-              </div>
-              <div className={`text-lg font-bold ${getGIColor(food.glycemicIndex)}`}>
-                {getGILabel(food.glycemicIndex, food.giCategory)}
-              </div>
-              <p className="text-xs text-slate-500 mt-1">
-                {food.giCategory === 'low' && 'Rendah GI - sesuai untuk kawalan gula darah'}
-                {food.giCategory === 'medium' && 'Sederhana GI - makan dengan bahagian kecil'}
-                {food.giCategory === 'high' && 'Tinggi GI - boleh menyebabkan lonjakan gula darah'}
-              </p>
+          {error && (
+            <div className="p-4 m-4 bg-red-50 border border-red-200 rounded-xl text-red-600">
+              {error}
             </div>
           )}
           
-          {/* Nutrition Details */}
-          <div>
-            <div className="text-sm font-medium text-slate-600 mb-3">Maklumat Pemakanan</div>
-            <div className="grid grid-cols-2 gap-3">
-              <NutrientItem 
-                label="Karbohidrat" 
-                value={adjustedNutrients.carbsG} 
-                unit="g"
-                dailyPercent={Math.round((adjustedNutrients.carbsG / DAILY_LIMITS.carbs) * 100)}
-              />
-              <NutrientItem 
-                label="Gula" 
-                value={adjustedNutrients.sugarG} 
-                unit="g"
-                dailyPercent={adjustedNutrients.sugarG ? Math.round((adjustedNutrients.sugarG / DAILY_LIMITS.sugar) * 100) : undefined}
-                warning={adjustedNutrients.sugarG !== undefined && adjustedNutrients.sugarG > 15}
-              />
-              <NutrientItem 
-                label="Protein" 
-                value={adjustedNutrients.proteinG} 
-                unit="g"
-              />
-              <NutrientItem 
-                label="Lemak" 
-                value={adjustedNutrients.totalFatG} 
-                unit="g"
-              />
-              <NutrientItem 
-                label="Lemak Tepu" 
-                value={adjustedNutrients.saturatedFatG} 
-                unit="g"
-                dailyPercent={adjustedNutrients.saturatedFatG ? Math.round((adjustedNutrients.saturatedFatG / DAILY_LIMITS.saturatedFat) * 100) : undefined}
-                warning={adjustedNutrients.saturatedFatG !== undefined && adjustedNutrients.saturatedFatG > 7}
-              />
-              <NutrientItem 
-                label="Sodium" 
-                value={adjustedNutrients.sodiumMg} 
-                unit="mg"
-                dailyPercent={adjustedNutrients.sodiumMg ? Math.round((adjustedNutrients.sodiumMg / DAILY_LIMITS.sodium) * 100) : undefined}
-                warning={adjustedNutrients.sodiumMg !== undefined && adjustedNutrients.sodiumMg > 600}
-              />
-              <NutrientItem 
-                label="Kolesterol" 
-                value={adjustedNutrients.cholesterolMg} 
-                unit="mg"
-                dailyPercent={adjustedNutrients.cholesterolMg ? Math.round((adjustedNutrients.cholesterolMg / DAILY_LIMITS.cholesterol) * 100) : undefined}
-              />
-              <NutrientItem 
-                label="Fosforus" 
-                value={adjustedNutrients.phosphorusMg} 
-                unit="mg"
-              />
+          {food && (
+            <div className="p-4 space-y-6">
+              {/* Food Header */}
+              <div>
+                <h3 className="text-2xl font-bold text-slate-800 mb-1">{food.name_bm}</h3>
+                <p className="text-slate-500">{food.name_en}</p>
+                <div className="flex flex-wrap gap-2 mt-3">
+                  <span className="text-xs font-medium px-2 py-1 bg-slate-100 text-slate-700 rounded-full">
+                    {food.category.replace('_', ' ')}
+                  </span>
+                  {food.tags.slice(0, 3).map((tag) => (
+                    <span key={tag} className="text-xs px-2 py-1 bg-emerald-50 text-emerald-700 rounded-full">
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              
+              {/* Condition Warnings */}
+              {userConditions.length > 0 && (
+                <div className="space-y-2">
+                  {userConditions.map((condition) => {
+                    const rating = food[`${condition}_rating` as keyof MalaysianFood] as ConditionRating;
+                    return (
+                      <ConditionAlert key={condition} condition={condition} rating={rating} />
+                    );
+                  })}
+                </div>
+              )}
+              
+              {/* Serving Size Adjustment */}
+              <div className="bg-slate-50 rounded-xl p-4">
+                <label className="block text-sm font-medium text-slate-700 mb-3">
+                  Saiz hidangan / Serving size
+                </label>
+                
+                {/* Preset Buttons */}
+                <div className="grid grid-cols-4 gap-2 mb-3">
+                  {SERVING_PRESETS.map((preset) => (
+                    <button
+                      key={preset.multiplier}
+                      onClick={() => {
+                        setServingMultiplier(preset.multiplier);
+                        setCustomGrams((food.serving_grams * preset.multiplier).toString());
+                      }}
+                      className={`py-2 px-3 rounded-lg font-medium text-sm transition-colors ${
+                        servingMultiplier === preset.multiplier
+                          ? 'bg-emerald-600 text-white'
+                          : 'bg-white border border-slate-200 text-slate-700 hover:border-emerald-300'
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+                
+                {/* Custom Grams Input */}
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      const newGrams = Math.max(10, parseFloat(customGrams || '0') - 10);
+                      handleCustomGramsChange(newGrams.toString());
+                    }}
+                    className="p-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-50"
+                  >
+                    <Minus className="w-4 h-4 text-slate-600" />
+                  </button>
+                  <input
+                    type="number"
+                    value={customGrams}
+                    onChange={(e) => handleCustomGramsChange(e.target.value)}
+                    className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-lg text-center font-medium"
+                  />
+                  <span className="text-sm text-slate-600">g</span>
+                  <button
+                    onClick={() => {
+                      const newGrams = parseFloat(customGrams || '0') + 10;
+                      handleCustomGramsChange(newGrams.toString());
+                    }}
+                    className="p-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-50"
+                  >
+                    <Plus className="w-4 h-4 text-slate-600" />
+                  </button>
+                </div>
+                
+                <p className="text-xs text-slate-500 mt-2 text-center">
+                  Standard: {food.serving_grams}g ({food.serving_description})
+                </p>
+              </div>
+              
+              {/* Nutrition Tabs */}
+              <div>
+                <div className="flex gap-2 overflow-x-auto pb-2 mb-4 border-b border-slate-200">
+                  <TabButton active={activeTab === 'basic'} onClick={() => setActiveTab('basic')}>
+                    Basic
+                  </TabButton>
+                  <TabButton active={activeTab === 'diabetes'} onClick={() => setActiveTab('diabetes')}>
+                    Diabetes
+                  </TabButton>
+                  <TabButton active={activeTab === 'bp'} onClick={() => setActiveTab('bp')}>
+                    Blood Pressure
+                  </TabButton>
+                  <TabButton active={activeTab === 'cholesterol'} onClick={() => setActiveTab('cholesterol')}>
+                    Cholesterol
+                  </TabButton>
+                  <TabButton active={activeTab === 'kidney'} onClick={() => setActiveTab('kidney')}>
+                    Kidney
+                  </TabButton>
+                </div>
+                
+                {activeTab === 'basic' && adjustedNutrition && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <NutrientItem label="Calories" value={adjustedNutrition.calories} unit="kcal" />
+                    <NutrientItem label="Carbs" value={adjustedNutrition.carbs} unit="g" />
+                    <NutrientItem label="Protein" value={adjustedNutrition.protein} unit="g" />
+                    <NutrientItem label="Fat" value={adjustedNutrition.total_fat} unit="g" />
+                  </div>
+                )}
+                
+                {activeTab === 'diabetes' && adjustedNutrition && (
+                  <div className="space-y-3">
+                    <NutrientItem label="Carbohydrates" value={adjustedNutrition.carbs} unit="g" />
+                    <NutrientItem label="Sugar" value={adjustedNutrition.sugar} unit="g" />
+                    <NutrientItem label="Fiber" value={adjustedNutrition.fiber} unit="g" />
+                    {food.glycemic_index && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-600">GI Index</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-slate-800">{food.glycemic_index}</span>
+                          <span className={`text-xs px-2 py-1 rounded-full ${
+                            food.gi_category === 'low' ? 'bg-emerald-100 text-emerald-700' :
+                            food.gi_category === 'medium' ? 'bg-amber-100 text-amber-700' :
+                            'bg-red-100 text-red-700'
+                          }`}>
+                            {food.gi_category}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {activeTab === 'bp' && adjustedNutrition && (
+                  <div className="space-y-3">
+                    <NutrientItem label="Sodium" value={adjustedNutrition.sodium} unit="mg" warning={adjustedNutrition.sodium !== null && adjustedNutrition.sodium > 600} />
+                    <NutrientItem label="Potassium" value={adjustedNutrition.potassium} unit="mg" />
+                  </div>
+                )}
+                
+                {activeTab === 'cholesterol' && adjustedNutrition && (
+                  <div className="space-y-3">
+                    <NutrientItem label="Total Fat" value={adjustedNutrition.total_fat} unit="g" />
+                    <NutrientItem label="Saturated Fat" value={adjustedNutrition.saturated_fat} unit="g" warning={adjustedNutrition.saturated_fat !== null && adjustedNutrition.saturated_fat > 5} />
+                    <NutrientItem label="Trans Fat" value={adjustedNutrition.trans_fat} unit="g" warning={adjustedNutrition.trans_fat !== null && adjustedNutrition.trans_fat > 0} />
+                    <NutrientItem label="Cholesterol" value={adjustedNutrition.cholesterol} unit="mg" warning={adjustedNutrition.cholesterol !== null && adjustedNutrition.cholesterol > 100} />
+                  </div>
+                )}
+                
+                {activeTab === 'kidney' && adjustedNutrition && (
+                  <div className="space-y-3">
+                    <NutrientItem label="Protein" value={adjustedNutrition.protein} unit="g" />
+                    <NutrientItem label="Phosphorus" value={adjustedNutrition.phosphorus} unit="mg" />
+                    <NutrientItem label="Potassium" value={adjustedNutrition.potassium} unit="mg" />
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-          
-          {/* Source Info */}
-          <div className="text-xs text-slate-400 text-center pt-2">
-            Sumber data: {food.source === 'myfcd' ? 'Malaysian Food Composition Database' : 
-                         food.source === 'hpb' ? 'Health Promotion Board Singapore' :
-                         food.source === 'ai_estimated' ? 'AI Anggaran' : 'Manual'}
-            {food.verified && ' ✓ Disahkan'}
-          </div>
+          )}
         </div>
         
-        {/* Footer - Log Button */}
-        <div className="p-4 border-t border-slate-100 bg-white">
-          <button
-            onClick={handleLog}
-            disabled={isLogging}
-            className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300
-                       text-white font-semibold rounded-xl transition-colors
-                       flex items-center justify-center gap-2"
-          >
-            {isLogging ? (
-              <>
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                Menyimpan...
-              </>
-            ) : (
-              <>
-                <Utensils className="w-5 h-5" />
-                Log Makanan Ini
-              </>
-            )}
-          </button>
-        </div>
+        {/* Footer */}
+        {food && (
+          <div className="p-4 border-t border-slate-200 bg-white">
+            <button
+              onClick={handleLog}
+              className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold
+                       rounded-xl transition-colors flex items-center justify-center gap-2"
+            >
+              <Plus className="w-5 h-5" />
+              Log This Meal
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-// ============================================
-// WARNING CARD
-// ============================================
-
-interface WarningCardProps {
-  warning: {
-    condition: string;
-    rating: ConditionRating;
-    message: string;
-    detail?: string;
-  };
+function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-colors ${
+        active
+          ? 'bg-emerald-600 text-white'
+          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+      }`}
+    >
+      {children}
+    </button>
+  );
 }
 
-function WarningCard({ warning }: WarningCardProps) {
+function NutrientItem({ 
+  label, 
+  value, 
+  unit, 
+  warning 
+}: { 
+  label: string; 
+  value: number | null; 
+  unit: string; 
+  warning?: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-slate-600">{label}</span>
+      <div className="flex items-center gap-2">
+        <span className="font-semibold text-slate-800">
+          {value !== null ? `${value} ${unit}` : 'N/A'}
+        </span>
+        {warning && value !== null && (
+          <AlertTriangle className="w-4 h-4 text-amber-500" />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ConditionAlert({ condition, rating }: { condition: string; rating: ConditionRating }) {
   const conditionLabels: Record<string, string> = {
     diabetes: 'Diabetes',
     hypertension: 'Darah Tinggi',
     cholesterol: 'Kolesterol',
-    ckd: 'Penyakit Buah Pinggang',
+    ckd: 'Buah Pinggang',
   };
   
-  const Icon = warning.rating === 'safe' ? CheckCircle :
-               warning.rating === 'caution' ? AlertTriangle :
-               XCircle;
+  const ratingConfig = {
+    safe: {
+      icon: CheckCircle,
+      color: 'bg-emerald-50 border-emerald-200 text-emerald-700',
+      iconColor: 'text-emerald-600',
+      label: 'Selamat / Safe',
+    },
+    caution: {
+      icon: Info,
+      color: 'bg-amber-50 border-amber-200 text-amber-700',
+      iconColor: 'text-amber-600',
+      label: 'Berhati-hati / Caution',
+    },
+    limit: {
+      icon: AlertTriangle,
+      color: 'bg-red-50 border-red-200 text-red-700',
+      iconColor: 'text-red-600',
+      label: 'Had / Limit',
+    },
+  };
+  
+  const config = ratingConfig[rating];
+  const Icon = config.icon;
   
   return (
-    <div className={`p-3 rounded-xl border ${getRatingColor(warning.rating)}`}>
-      <div className="flex items-start gap-2">
-        <Icon className="w-5 h-5 flex-shrink-0 mt-0.5" />
-        <div className="flex-1">
-          <div className="font-medium text-sm">
-            {conditionLabels[warning.condition] || warning.condition}
-          </div>
-          <p className="text-sm opacity-80 mt-0.5">{warning.message}</p>
-          {warning.detail && (
-            <p className="text-xs opacity-60 mt-1">{warning.detail}</p>
-          )}
-        </div>
+    <div className={`flex items-start gap-3 p-3 rounded-lg border ${config.color}`}>
+      <Icon className={`w-5 h-5 ${config.iconColor} flex-shrink-0 mt-0.5`} />
+      <div className="flex-1 min-w-0">
+        <p className="font-medium text-sm">
+          {conditionLabels[condition]}: {config.label}
+        </p>
       </div>
-    </div>
-  );
-}
-
-// ============================================
-// NUTRIENT ITEM
-// ============================================
-
-interface NutrientItemProps {
-  label: string;
-  value: number | undefined;
-  unit: string;
-  dailyPercent?: number;
-  warning?: boolean;
-}
-
-function NutrientItem({ label, value, unit, dailyPercent, warning }: NutrientItemProps) {
-  if (value === undefined || value === null) {
-    return (
-      <div className="bg-slate-50 rounded-lg p-3">
-        <div className="text-xs text-slate-500">{label}</div>
-        <div className="text-lg font-semibold text-slate-300">-</div>
-      </div>
-    );
-  }
-  
-  return (
-    <div className={`rounded-lg p-3 ${warning ? 'bg-amber-50' : 'bg-slate-50'}`}>
-      <div className="text-xs text-slate-500">{label}</div>
-      <div className={`text-lg font-semibold ${warning ? 'text-amber-600' : 'text-slate-800'}`}>
-        {value}{unit}
-      </div>
-      {dailyPercent !== undefined && (
-        <div className="text-xs text-slate-400">
-          {dailyPercent}% harian
-        </div>
-      )}
     </div>
   );
 }
 
 export default FoodDetailModal;
-

@@ -1,6 +1,4 @@
-// 🇲🇾 Malaysian Food Components - Main Export
+// 🇲🇾 Food Components - Main Export
 
-export { FoodSearch } from './FoodSearch';
+export { MalaysianFoodSearch } from './MalaysianFoodSearch';
 export { FoodDetailModal } from './FoodDetailModal';
-export { FoodCategoryBrowser } from './FoodCategoryBrowser';
-
