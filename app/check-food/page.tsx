@@ -806,57 +806,32 @@ export default function CheckFoodPage() {
           <div className="space-y-4">
             
             {/* Camera Button - Primary */}
-            <div>
-              <button 
-                onClick={() => fileInputRef.current?.click()}
-                className="w-full bg-gradient-to-r from-teal-500 to-cyan-500 text-white rounded-2xl p-5 shadow-lg shadow-teal-200/50 flex items-center gap-4 active:scale-[0.98] transition-transform"
-              >
-                <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
-                  <span className="text-3xl">📸</span>
-                </div>
-                <div className="text-left">
-                  <h3 className="text-lg font-bold">Take a Photo</h3>
-                  <p className="text-teal-100 text-base">Snap or choose from gallery</p>
-                </div>
-              </button>
-              
-              {/* Disclaimer for Take a Photo */}
-              <div className="mt-2 px-3">
-                <p className="text-xs text-gray-500 flex items-start gap-1.5">
-                  <Info className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-                  <span>
-                    AI scanning works best with Malaysian foods. For other cuisines, results may vary. 
-                    You can always edit the detected food.
-                  </span>
-                </p>
+            <button 
+              onClick={() => fileInputRef.current?.click()}
+              className="w-full bg-gradient-to-r from-teal-500 to-cyan-500 text-white rounded-2xl p-5 shadow-lg shadow-teal-200/50 flex items-center gap-4 active:scale-[0.98] transition-transform"
+            >
+              <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
+                <span className="text-3xl">📸</span>
               </div>
-            </div>
+              <div className="text-left">
+                <h3 className="text-lg font-bold">Take a Photo</h3>
+                <p className="text-teal-100 text-sm">Snap or choose from gallery</p>
+              </div>
+            </button>
 
             {/* Text Input Button - Secondary */}
-            <div>
-              <button 
-                onClick={() => setShowTextInput(true)}
-                className="w-full bg-white text-slate-700 rounded-2xl p-5 shadow-md border border-slate-200 flex items-center gap-4 active:scale-[0.98] transition-transform hover:border-teal-300"
-              >
-                <div className="w-14 h-14 bg-slate-100 rounded-xl flex items-center justify-center">
-                  <span className="text-3xl">✏️</span>
-                </div>
-                <div className="text-left flex-1">
-                  <h3 className="text-lg font-bold">Type It In</h3>
-                  <p className="text-slate-400 text-sm">Quick log without photo</p>
-                </div>
-              </button>
-              
-              {/* Disclaimer for Type It In */}
-              <div className="mt-2 px-3">
-                <p className="text-xs text-gray-500 flex items-start gap-1.5">
-                  <Info className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-                  <span>
-                    Search our database of 500+ Malaysian foods. Type food name in BM or English.
-                  </span>
-                </p>
+            <button 
+              onClick={() => setShowTextInput(true)}
+              className="w-full bg-white text-slate-700 rounded-2xl p-5 shadow-md border border-slate-200 flex items-center gap-4 active:scale-[0.98] transition-transform hover:border-teal-300"
+            >
+              <div className="w-14 h-14 bg-slate-100 rounded-xl flex items-center justify-center">
+                <span className="text-3xl">✏️</span>
               </div>
-            </div>
+              <div className="text-left flex-1">
+                <h3 className="text-lg font-bold">Type It In</h3>
+                <p className="text-slate-400 text-sm">Quick log without photo</p>
+              </div>
+            </button>
 
             <input 
               type="file" 
@@ -865,6 +840,18 @@ export default function CheckFoodPage() {
               onChange={handleFileChange} 
               className="hidden" 
             />
+          </div>
+
+          {/* Disclaimers Section - Below Buttons */}
+          <div className="mt-6 space-y-2 px-1">
+            <p className="text-xs text-gray-500 flex items-start gap-2">
+              <span>📸</span>
+              <span>Photo scanning works best with Malaysian foods. You can always edit results.</span>
+            </p>
+            <p className="text-xs text-gray-500 flex items-start gap-2">
+              <span>✏️</span>
+              <span>Type to search 500+ Malaysian foods by name in BM or English.</span>
+            </p>
           </div>
 
           {/* Pro tip */}
@@ -1296,49 +1283,63 @@ export default function CheckFoodPage() {
           {/* 🩺 DR. REZA'S TIP - Only show when NOT low confidence */}
           {!isLowConfidence() && (
             <div className="space-y-3 mb-4">
-              {/* Main Advice */}
+              {/* Main Advice with Overall Rating */}
               <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-2xl flex gap-3 items-start border border-blue-100">
                 <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 border-2 border-white shadow">
                   <Image src="/assets/avatar-header.png" alt="Dr Reza" width={40} height={40} className="object-cover" />
                 </div>
-                <div>
+                <div className="flex-1">
                   <p className="text-xs font-bold text-blue-600 mb-1">Dr. Reza says</p>
+                  
+                  {/* Overall Rating if present */}
+                  {baseResult.data.dr_reza_analysis?.overall_rating && (
+                    <div className="mb-2">
+                      <span className={`inline-flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-full ${
+                        baseResult.data.dr_reza_analysis.overall_rating === 'safe' ? 'bg-green-100 text-green-700' :
+                        baseResult.data.dr_reza_analysis.overall_rating === 'caution' ? 'bg-amber-100 text-amber-700' :
+                        'bg-red-100 text-red-700'
+                      }`}>
+                        {baseResult.data.dr_reza_analysis.overall_rating === 'safe' ? '🟢 Selamat' :
+                         baseResult.data.dr_reza_analysis.overall_rating === 'caution' ? '🟡 Berhati-hati' :
+                         '🔴 Hadkan'}
+                      </span>
+                    </div>
+                  )}
+                  
                   <p className="text-sm text-slate-700 leading-relaxed">
                     {baseResult.data.analysis_content || "Looks good! Remember to stay hydrated 💧"}
                   </p>
                 </div>
               </div>
 
-              {/* Multi-Condition Impacts - NEW */}
+              {/* Multi-Condition Impacts - NEW FORMAT */}
               {baseResult.data.dr_reza_analysis?.condition_impacts && 
                baseResult.data.dr_reza_analysis.condition_impacts.length > 0 && (
                 <div className="bg-white rounded-2xl border-2 border-slate-200 overflow-hidden">
-                  <div className="bg-slate-100 px-4 py-2 border-b border-slate-200">
-                    <p className="text-xs font-bold text-slate-600 uppercase tracking-wide">
-                      🩺 Impact on Your Conditions
+                  <div className="bg-gradient-to-r from-slate-100 to-slate-50 px-4 py-2 border-b border-slate-200">
+                    <p className="text-xs font-bold text-slate-700 uppercase tracking-wide">
+                      📊 Untuk keadaan anda:
                     </p>
                   </div>
                   <div className="p-3 space-y-2">
                     {baseResult.data.dr_reza_analysis.condition_impacts.map((impact: any, idx: number) => {
-                      const bgColor = impact.impact_level === 'severe' ? 'bg-red-50 border-red-300' :
-                                     impact.impact_level === 'high' ? 'bg-orange-50 border-orange-300' :
-                                     impact.impact_level === 'moderate' ? 'bg-amber-50 border-amber-300' :
+                      const bgColor = impact.rating === 'limit' ? 'bg-red-50 border-red-300' :
+                                     impact.rating === 'caution' ? 'bg-amber-50 border-amber-300' :
                                      'bg-green-50 border-green-300';
-                      const textColor = impact.impact_level === 'severe' ? 'text-red-800' :
-                                       impact.impact_level === 'high' ? 'text-orange-800' :
-                                       impact.impact_level === 'moderate' ? 'text-amber-800' :
+                      const textColor = impact.rating === 'limit' ? 'text-red-800' :
+                                       impact.rating === 'caution' ? 'text-amber-800' :
                                        'text-green-800';
-                      const levelEmoji = impact.impact_level === 'severe' ? '🔴' :
-                                        impact.impact_level === 'high' ? '🟠' :
-                                        impact.impact_level === 'moderate' ? '🟡' : '🟢';
                       
                       return (
                         <div key={idx} className={`${bgColor} border rounded-lg p-3`}>
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-lg">{levelEmoji}</span>
-                            <span className={`text-xs font-bold ${textColor} uppercase tracking-wide`}>
-                              {impact.condition}
-                            </span>
+                          <div className="flex items-center justify-between mb-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg">{impact.emoji}</span>
+                              <span className={`text-sm font-bold ${textColor}`}>
+                                {impact.condition}
+                              </span>
+                            </div>
+                            <span className="text-lg">{impact.rating_emoji}</span>
                           </div>
                           <p className={`text-sm ${textColor} font-semibold`}>
                             {impact.warning}
@@ -1352,6 +1353,16 @@ export default function CheckFoodPage() {
                       );
                     })}
                   </div>
+                </div>
+              )}
+
+              {/* Tips Section */}
+              {baseResult.data.dr_reza_analysis?.tips && (
+                <div className="bg-gradient-to-r from-teal-50 to-cyan-50 border border-teal-200 rounded-xl p-3">
+                  <p className="text-xs font-bold text-teal-700 mb-1">💡 Tips:</p>
+                  <p className="text-sm text-teal-800">
+                    {baseResult.data.dr_reza_analysis.tips}
+                  </p>
                 </div>
               )}
             </div>

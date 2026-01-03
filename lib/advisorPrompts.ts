@@ -46,15 +46,18 @@ YOUR RESPONSE STRUCTURE
 Provide advice in this JSON format:
 {
   "main_advice": "2-3 sentences of personalized advice (60-80 words max)",
+  "overall_rating": "safe|caution|limit",
   "condition_impacts": [
     {
-      "condition": "Diabetes" | "Hypertension" | "High Cholesterol" | "Chronic Kidney Disease",
-      "impact_level": "low|moderate|high|severe",
-      "icon": "📊",
-      "warning": "Brief specific warning for this condition (20-30 words)",
+      "condition": "Diabetes" | "Darah Tinggi" | "Kolesterol" | "Buah Pinggang",
+      "emoji": "🩸" | "❤️" | "🫀" | "🫘",
+      "rating": "safe|caution|limit",
+      "rating_emoji": "🟢|🟡|🔴",
+      "warning": "Brief specific warning with numbers (e.g., 'Carbs tinggi (95g) - boleh spike glucose')",
       "details": "Why this food affects this condition"
     }
   ],
+  "tips": "One actionable Malaysian alternative or portion suggestion",
   "glucose_prediction": {
     "expected_impact": "low|moderate|high|very_high",
     "peak_time": "30-60 mins after eating",
@@ -64,39 +67,90 @@ Provide advice in this JSON format:
     "calories_status": "under|on_track|over",
     "concern_flag": "none|sodium|sugar|calories|multiple",
     "remaining_budget": "X calories remaining for dinner"
-  },
-  "smart_swap": {
-    "suggestion": "Healthier alternative if applicable",
-    "savings": "Would save X calories / Xmg sodium"
-  },
-  "hidden_additions": {
-    "likely_extras": ["Teh Tarik?", "Extra rice?"],
-    "question": "Did you have any drinks with this?"
   }
 }
 
-CRITICAL: If user has MULTIPLE health conditions, you MUST include condition_impacts array with one entry for EACH condition.
+CRITICAL MULTI-CONDITION FORMAT:
 
-Example for user with Diabetes + Hypertension eating Nasi Kandar:
+When user has MULTIPLE health conditions, you MUST format response as:
+
+**[Food Name]** - [🟢 Selamat / 🟡 Berhati-hati / 🔴 Hadkan]
+
+📊 **Untuk keadaan anda:**
+🩸 Diabetes: [🟢/🟡/🔴] [specific numbers + brief impact in Bahasa Malaysia]
+❤️ Darah Tinggi: [🟢/🟡/🔴] [specific numbers + brief impact]
+🫀 Kolesterol: [🟢/🟡/🔴] [specific numbers + brief impact]
+🫘 Buah Pinggang: [🟢/🟡/🔴] [specific numbers + brief impact]
+
+💡 **Tips:** [One specific actionable Malaysian food suggestion]
+
+CONDITION MAPPING & THRESHOLDS:
+
+Diabetes (🩸):
+- Check: carbs_g, sugar_g, glycemic_index
+- 🔴 Limit: Carbs >60g per meal OR sugar >15g
+- 🟡 Caution: Carbs 40-60g OR sugar 10-15g
+- 🟢 Safe: Carbs <40g AND sugar <10g
+- Labels: Use "Diabetes" in response
+
+Hypertension (❤️):
+- Check: sodium_mg
+- 🔴 Limit: Sodium >700mg per meal
+- 🟡 Caution: Sodium 400-700mg
+- 🟢 Safe: Sodium <400mg
+- Labels: Use "Darah Tinggi" in response
+
+High Cholesterol (🫀):
+- Check: saturated_fat_g, trans_fat_g, cholesterol_mg
+- 🔴 Limit: Saturated fat >8g OR trans fat >0.5g OR cholesterol >100mg
+- 🟡 Caution: Saturated fat 4-8g OR cholesterol 50-100mg
+- 🟢 Safe: Saturated fat <4g AND cholesterol <50mg
+- Labels: Use "Kolesterol" in response
+
+Chronic Kidney Disease (🫘):
+- Check: protein_g, potassium_mg, phosphorus_mg
+- 🔴 Limit: Protein >30g OR high-potassium foods (banana, coconut water, orange)
+- 🟡 Caution: Protein 20-30g OR moderate potassium
+- 🟢 Safe: Protein <20g AND low potassium
+- Labels: Use "Buah Pinggang" in response
+
+EXAMPLE for user with Diabetes + Hypertension eating Nasi Lemak Rendang:
+
+```json
 {
+  "main_advice": "Nasi Lemak Rendang memang sedap tapi berat untuk keadaan anda. Anda dah makan 1,200 cal hari ini, jadi untuk malam nanti pilih yang lebih ringan ya.",
+  "overall_rating": "caution",
   "condition_impacts": [
     {
       "condition": "Diabetes",
-      "impact_level": "high",
-      "icon": "📊",
-      "warning": "High carbs (72g) - expect glucose spike in 45 mins",
-      "details": "White rice + curry gravy = rapid glucose rise. Monitor closely after eating."
+      "emoji": "🩸",
+      "rating": "limit",
+      "rating_emoji": "🔴",
+      "warning": "Carbs tinggi (95g) - boleh spike glucose",
+      "details": "White rice + rendang gravy = rapid glucose rise. Monitor blood sugar after eating."
     },
     {
-      "condition": "Hypertension", 
-      "impact_level": "severe",
-      "icon": "📊",
-      "warning": "High sodium (950mg) - that's 41% of daily limit",
-      "details": "Curry powder + salt in gravy. Watch your blood pressure today."
+      "condition": "Darah Tinggi",
+      "emoji": "❤️",
+      "rating": "limit",
+      "rating_emoji": "🔴",
+      "warning": "Sodium 950mg - 48% daily limit",
+      "details": "Santan + sambal + rendang = very high sodium. Watch your BP today."
     }
   ],
+  "tips": "Cuba kurangkan nasi separuh, atau pilih nasi kerabu yang lebih rendah sodium (400mg vs 950mg).",
   ...
 }
+```
+
+Display format in UI:
+**Nasi Lemak Rendang** - 🟡 Berhati-hati
+
+📊 **Untuk keadaan anda:**
+🩸 Diabetes: 🔴 Carbs tinggi (95g) - boleh spike glucose
+❤️ Darah Tinggi: 🔴 Sodium 950mg - 48% daily limit
+
+💡 **Tips:** Cuba kurangkan nasi separuh, atau pilih nasi kerabu yang lebih rendah sodium.
 
 ═══════════════════════════════════════════════════════════════
 GLUCOSE IMPACT GUIDELINES (For Diabetics)
@@ -276,13 +330,16 @@ export interface MealData {
 
 export interface DrRezaResponse {
   main_advice: string;
+  overall_rating?: 'safe' | 'caution' | 'limit';
   condition_impacts?: Array<{
-    condition: 'Diabetes' | 'Hypertension' | 'High Cholesterol' | 'Chronic Kidney Disease';
-    impact_level: 'low' | 'moderate' | 'high' | 'severe';
-    icon: string;
+    condition: string; // 'Diabetes' | 'Darah Tinggi' | 'Kolesterol' | 'Buah Pinggang'
+    emoji: string; // '🩸' | '❤️' | '🫀' | '🫘'
+    rating: 'safe' | 'caution' | 'limit';
+    rating_emoji: '🟢' | '🟡' | '🔴';
     warning: string;
     details: string;
   }>;
+  tips?: string;
   glucose_prediction: {
     expected_impact: 'low' | 'moderate' | 'high' | 'very_high';
     peak_time: string;
@@ -293,11 +350,11 @@ export interface DrRezaResponse {
     concern_flag: 'none' | 'sodium' | 'sugar' | 'calories' | 'multiple';
     remaining_budget: string;
   };
-  smart_swap: {
+  smart_swap?: {
     suggestion: string;
     savings: string;
   } | null;
-  hidden_additions: {
+  hidden_additions?: {
     likely_extras: string[];
     question: string;
   } | null;
@@ -399,15 +456,24 @@ export function formatDrRezaAdvice(response: DrRezaResponse | null, fallbackAdvi
   // Start with main advice
   let advice = response.main_advice;
 
+  // Add overall rating if present
+  if (response.overall_rating) {
+    const ratingEmoji = response.overall_rating === 'safe' ? '🟢 Selamat' :
+                       response.overall_rating === 'caution' ? '🟡 Berhati-hati' : '🔴 Hadkan';
+    advice = `${ratingEmoji}\n\n${advice}`;
+  }
+
   // Add multi-condition impacts if present
   if (response.condition_impacts && response.condition_impacts.length > 0) {
-    advice += '\n\n🩺 Impact on Your Conditions:\n';
+    advice += '\n\n📊 Untuk keadaan anda:\n';
     response.condition_impacts.forEach(impact => {
-      const levelEmoji = impact.impact_level === 'severe' ? '🔴' : 
-                         impact.impact_level === 'high' ? '🟠' : 
-                         impact.impact_level === 'moderate' ? '🟡' : '🟢';
-      advice += `\n${levelEmoji} ${impact.condition.toUpperCase()}: ${impact.warning}`;
+      advice += `${impact.emoji} ${impact.condition}: ${impact.rating_emoji} ${impact.warning}\n`;
     });
+  }
+
+  // Add tips if present
+  if (response.tips) {
+    advice += `\n💡 Tips: ${response.tips}`;
   }
 
   // Add glucose warning for diabetics if high/very_high impact
