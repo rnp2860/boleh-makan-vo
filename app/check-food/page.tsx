@@ -940,7 +940,13 @@ export default function CheckFoodPage() {
               )}
               <div className={`${image ? 'absolute bottom-0 left-0 right-0' : ''} p-4`}>
                 <div className="flex items-center gap-2 mb-1 flex-wrap">
-                  {!isLowConfidence() && baseResult.is_verified && (
+                  {/* 🇲🇾 MALAYSIAN DATABASE BADGE - Show when matched to our 485 Malaysian foods */}
+                  {!isLowConfidence() && baseResult.source === 'malaysian_database' && (
+                    <span className="bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                      <span>🇲🇾</span> MALAYSIAN DATABASE
+                    </span>
+                  )}
+                  {!isLowConfidence() && baseResult.is_verified && baseResult.source !== 'malaysian_database' && (
                     <span className="bg-green-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">✓ VERIFIED</span>
                   )}
                   {!isLowConfidence() && !baseResult.is_verified && (
