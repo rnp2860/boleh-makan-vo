@@ -27,6 +27,11 @@ import {
   generateQuickAdvice,
   FoodMatch
 } from '@/lib/foodDatabaseLookup';
+import {
+  searchMalaysianFoodDatabase,
+  getMalaysianFoodComponents,
+  generateMalaysianFoodAdvice
+} from '@/lib/malaysianFoodDatabaseLookup';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -106,6 +111,32 @@ function cleanFoodName(rawName: string): string {
     }
   }
   return cleaned.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+}
+
+function buildHealthTags(food: any): string[] {
+  const tags: string[] = [];
+  
+  // Check sodium
+  if (food.sodium_mg > 600) {
+    tags.push('high_sodium');
+  }
+  
+  // Check sugar
+  if (food.sugar_g > 15) {
+    tags.push('high_sugar');
+  }
+  
+  // Check saturated fat
+  if (food.saturated_fat_g && food.saturated_fat_g > 5) {
+    tags.push('high_saturated_fat');
+  }
+  
+  // Check protein
+  if (food.protein > 20) {
+    tags.push('high_protein');
+  }
+  
+  return tags;
 }
 
 function checkHalalStatus(foodName: string, components: any[]): { status: 'halal' | 'non_halal' | 'unknown', reason?: string } {
@@ -290,15 +321,68 @@ export async function POST(req: Request) {
         }
       }
     } else {
-      // 📝 TEXT INPUT: Check database FIRST before AI
+      // 📝 TEXT INPUT: Check MALAYSIAN database FIRST, then generic database
       console.log("📝 Text input received:", data);
       
-      // 🏦 DATABASE-FIRST: Try to find exact/fuzzy match
+      // 🇲🇾 PRIORITY 1: Search Malaysian food database (485 Malaysian dishes)
+      const malaysianMatch = await searchMalaysianFoodDatabase(data);
+      
+      if (malaysianMatch && malaysianMatch.match_confidence > 0.7) {
+        // 🎯 Malaysian database hit! Use verified Malaysian data
+        console.log(`✅ Malaysian DB hit for "${data}" → "${malaysianMatch.name_en}" (${(malaysianMatch.match_confidence * 100).toFixed(0)}% confidence)`);
+        
+        const conditions = healthConditions || [];
+        const drRezaTip = generateMalaysianFoodAdvice(malaysianMatch, conditions);
+        
+        // Build components from Malaysian food
+        const components = getMalaysianFoodComponents(malaysianMatch);
+        
+        return NextResponse.json({
+          success: true,
+          source: 'malaysian_database',
+          verified: true,
+          confidence: malaysianMatch.match_confidence,
+          data: {
+            food_name: malaysianMatch.name_en,
+            food_name_bm: malaysianMatch.name_bm,
+            category: malaysianMatch.category,
+            components: components,
+            macros: {
+              calories: malaysianMatch.calories,
+              protein_g: malaysianMatch.protein,
+              carbs_g: malaysianMatch.carbs,
+              fat_g: malaysianMatch.fat,
+              sugar_g: malaysianMatch.sugar_g,
+              sodium_mg: malaysianMatch.sodium_mg,
+              saturated_fat_g: malaysianMatch.saturated_fat_g,
+              cholesterol_mg: malaysianMatch.cholesterol_mg,
+              phosphorus_mg: malaysianMatch.phosphorus_mg,
+              potassium_mg: malaysianMatch.potassium_mg,
+              fiber_g: malaysianMatch.fiber_g
+            },
+            serving_size: malaysianMatch.serving_description,
+            serving_grams: malaysianMatch.serving_grams,
+            // Include condition ratings for multi-condition analysis
+            diabetes_rating: malaysianMatch.diabetes_rating,
+            hypertension_rating: malaysianMatch.hypertension_rating,
+            cholesterol_rating: malaysianMatch.cholesterol_rating,
+            ckd_rating: malaysianMatch.ckd_rating,
+            valid_lauk: [], // Not applicable for database matches
+            analysis_content: drRezaTip,
+            is_potentially_pork: false,
+            matched_protein: null,
+            visual_notes: `From Malaysian food database: ${malaysianMatch.name_bm}`,
+            health_tags: buildHealthTags(malaysianMatch)
+          }
+        });
+      }
+      
+      // 🏦 PRIORITY 2: Try generic database (116k foods) as fallback
       const dbMatch = await searchFoodDatabase(data);
       
       if (dbMatch && dbMatch.match_confidence > 0.8) {
-        // 🎯 Database hit! Skip AI, use verified data
-        console.log(`✅ Database hit for "${data}" → "${dbMatch.name}" (${(dbMatch.match_confidence * 100).toFixed(0)}% confidence)`);
+        // 🎯 Generic database hit (likely USDA/international food)
+        console.log(`✅ Generic DB hit for "${data}" → "${dbMatch.name}" (${(dbMatch.match_confidence * 100).toFixed(0)}% confidence)`);
         
         const conditions = healthConditions || [];
         const drRezaTip = generateQuickAdvice(dbMatch, conditions);

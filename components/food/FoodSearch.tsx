@@ -6,6 +6,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Search, X, Clock, TrendingUp, Loader2 } from 'lucide-react';
 import type { FoodSearchResult } from '@/types/food';
 import { useFoodSearch, getRecentFoods, addRecentFood } from '@/hooks/useFoodSearch';
+import { SearchSuggestions } from './SearchSuggestions';
 
 interface FoodSearchProps {
   onSelectFood: (food: FoodSearchResult) => void;
@@ -78,6 +79,7 @@ export function FoodSearch({
   
   const showResults = isFocused && (results.length > 0 || query.length >= 2);
   const showRecent = isFocused && query.length < 2 && recentFoods.length > 0;
+  const showSuggestions = isFocused && (query.length < 2 || (query.length >= 2 && results.length === 0 && !isLoading));
   
   // Get worst rating for display
   const getWorstRating = (food: FoodSearchResult): { rating: string; color: string } => {
@@ -172,17 +174,19 @@ export function FoodSearch({
                     />
                   ))}
                 </>
-              ) : (
-                <div className="px-4 py-8 text-center">
-                  <p className="text-slate-500 text-sm mb-2">
-                    Tiada hasil untuk &quot;{query}&quot;
-                  </p>
-                  <p className="text-slate-400 text-xs">
-                    No results found. Try a different search term.
-                  </p>
-                </div>
-              )}
+              ) : null}
             </div>
+          )}
+          
+          {/* Search Suggestions */}
+          {showSuggestions && (
+            <SearchSuggestions
+              query={query}
+              onSuggestionClick={(suggestion) => {
+                setQuery(suggestion);
+                inputRef.current?.focus();
+              }}
+            />
           )}
           
           {/* Error State */}

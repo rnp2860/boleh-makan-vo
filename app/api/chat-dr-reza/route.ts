@@ -1,19 +1,57 @@
 // src/app/api/chat-dr-reza/route.ts
+// 🩺 Enhanced Dr. Reza - Multi-Condition AI Health Advisor
+
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { getDailyContext } from '@/lib/dailyContextHelper';
 import { DailyContext } from '@/lib/advisorPrompts';
+import { getDrRezaSystemPrompt, buildMealAnalysisMessage, type MealContext } from '@/lib/ai/dr-reza-prompt';
+import { getUserHealthProfile, getTodayIntake } from '@/lib/user/health-profile';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export async function POST(request: NextRequest) {
   try {
-    const { message, conversationHistory, userProfile, recentMeals, userId } = await request.json();
+    const { 
+      message, 
+      conversationHistory, 
+      userProfile, 
+      recentMeals, 
+      userId,
+      mealContext, // NEW: Meal context for analysis
+      useEnhancedPrompt = true // NEW: Flag to use enhanced multi-condition prompt
+    } = await request.json();
 
     if (!message) {
       return NextResponse.json({ error: 'Message is required' }, { status: 400 });
     }
 
+    // Use enhanced prompt system if requested and userId available
+    let systemPrompt: string;
+    
+    if (useEnhancedPrompt && userId) {
+      try {
+        // Fetch comprehensive health profile
+        const healthProfile = await getUserHealthProfile(userId);
+        
+        // Get today's intake
+        const todayIntake = await getTodayIntake(userId);
+        healthProfile.todayIntake = todayIntake;
+        
+        // Generate condition-aware system prompt
+        systemPrompt = getDrRezaSystemPrompt(healthProfile);
+        
+      } catch (err) {
+        console.warn('Could not load enhanced profile, falling back to legacy:', err);
+        useEnhancedPrompt = false;
+      }
+    }
+    
+    // Fallback to legacy prompt system if enhanced not available
+    if (!useEnhancedPrompt) {
+
+    // Fallback to legacy prompt system if enhanced not available
+    if (!useEnhancedPrompt) {
     // Fetch daily context if userId is provided
     let dailyContext: DailyContext | null = null;
     if (userId) {
@@ -66,7 +104,7 @@ ${recentMeals.slice(0, 10).map((meal: any) =>
 ).join('\n')}
 ` : '';
 
-    const systemPrompt = `You are Dr. Reza, a senior Malaysian clinical dietitian and nutritionist with 20+ years of experience. You work at a prestigious hospital in Kuala Lumpur and are known for your warm, caring approach.
+    systemPrompt = `You are Dr. Reza, a senior Malaysian clinical dietitian and nutritionist with 20+ years of experience. You work at a prestigious hospital in Kuala Lumpur and are known for your warm, caring approach.
 
 PERSONALITY:
 - Warm, kind, and empathetic - like a caring family doctor
@@ -103,6 +141,13 @@ ${userContext}
 ${mealsContext}
 
 Remember: You are having a friendly consultation, not lecturing. Be like a wise friend who happens to be a nutrition expert.`;
+    }
+
+    // Build user message with meal context if analyzing food
+    let userMessage = message;
+    if (mealContext) {
+      userMessage = buildMealAnalysisMessage(mealContext as MealContext, message);
+    }
 
     // Build messages array with conversation history
     const messages: OpenAI.ChatCompletionMessageParam[] = [
@@ -119,8 +164,8 @@ Remember: You are having a friendly consultation, not lecturing. Be like a wise 
       });
     }
 
-    // Add current message
-    messages.push({ role: 'user', content: message });
+    // Add current message (with meal context if analyzing food)
+    messages.push({ role: 'user', content: userMessage });
 
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',

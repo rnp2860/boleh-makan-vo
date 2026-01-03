@@ -3,9 +3,10 @@
 // 🇲🇾 Malaysian Food Search Component
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, X, Clock, TrendingUp, Utensils, Loader2 } from 'lucide-react';
+import { Search, X, Clock, TrendingUp, Utensils, Loader2, Plus } from 'lucide-react';
 import { useFoodSearch } from '@/hooks/useFoodSearch';
 import type { FoodSearchResult, ConditionRating } from '@/types/food';
+import { SearchSuggestions } from './SearchSuggestions';
 
 interface MalaysianFoodSearchProps {
   onSelectFood: (food: FoodSearchResult) => void;
@@ -47,6 +48,7 @@ export function MalaysianFoodSearch({
   
   const displayResults = showRecent && results.length === 0 ? recentSearches : results;
   const showNoResults = query.length >= 2 && !isLoading && results.length === 0 && !showRecent;
+  const showSuggestions = query.length < 2 || showNoResults;
   
   return (
     <div className="flex flex-col h-full bg-white">
@@ -130,19 +132,33 @@ export function MalaysianFoodSearch({
             <h3 className="text-lg font-semibold text-slate-800 mb-2">
               Tiada hasil / No results
             </h3>
-            <p className="text-slate-500 mb-6">
-              Kami tidak menemui &quot;{query}&quot; dalam database kami
+            <p className="text-slate-500 mb-6 max-w-sm">
+              Kami tidak menemui &quot;{query}&quot; dalam database kami.
+              Cuba cari dengan istilah lain atau tambah secara manual.
             </p>
             {onManualEntry && (
               <button
                 onClick={onManualEntry}
                 className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-medium
-                         rounded-xl transition-colors"
+                         rounded-xl transition-colors flex items-center gap-2 shadow-sm"
               >
+                <Plus className="w-5 h-5" />
                 Log Manual Entry
               </button>
             )}
           </div>
+        )}
+        
+        {/* Search Suggestions */}
+        {showSuggestions && !isLoading && (
+          <SearchSuggestions
+            query={query}
+            onSuggestionClick={(suggestion) => {
+              setQuery(suggestion);
+              inputRef.current?.focus();
+            }}
+            className="border-t-0"
+          />
         )}
       </div>
     </div>
