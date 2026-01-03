@@ -48,22 +48,20 @@ export async function POST(request: NextRequest) {
     }
     
     // Fallback to legacy prompt system if enhanced not available
-    if (!useEnhancedPrompt) {
-
-    // Fallback to legacy prompt system if enhanced not available
-    if (!useEnhancedPrompt) {
-    // Fetch daily context if userId is provided
     let dailyContext: DailyContext | null = null;
-    if (userId) {
-      try {
-        dailyContext = await getDailyContext(userId);
-      } catch (err) {
-        console.warn('Could not fetch daily context:', err);
+    
+    if (!useEnhancedPrompt) {
+      // Fetch daily context if userId is provided
+      if (userId) {
+        try {
+          dailyContext = await getDailyContext(userId);
+        } catch (err) {
+          console.warn('Could not fetch daily context:', err);
+        }
       }
-    }
 
-    // Build context about the user
-    const userContext = userProfile ? `
+      // Build context about the user
+      const userContext = userProfile ? `
 USER PROFILE:
 - Name: ${userProfile.name || 'Friend'}
 - Age: ${userProfile.details?.age || 'Not specified'}
@@ -76,8 +74,8 @@ USER PROFILE:
 - Daily Calorie Target: ${userProfile.manualOverride || 'Auto-calculated'} kcal
 ` : '';
 
-    // Build daily nutrition context
-    const dailyNutritionContext = dailyContext ? `
+      // Build daily nutrition context
+      const dailyNutritionContext = dailyContext ? `
 ═══════════════════════════════════════════════════════════════
 TODAY'S NUTRITION SUMMARY (${new Date().toLocaleDateString('en-MY')})
 ═══════════════════════════════════════════════════════════════
@@ -96,15 +94,15 @@ ${dailyContext.avg_glucose !== null ? `WEEKLY GLUCOSE AVG: ${dailyContext.avg_gl
 ═══════════════════════════════════════════════════════════════
 ` : '';
 
-    // Build recent meals context
-    const mealsContext = recentMeals && recentMeals.length > 0 ? `
+      // Build recent meals context
+      const mealsContext = recentMeals && recentMeals.length > 0 ? `
 RECENT MEALS (Last 3 days):
 ${recentMeals.slice(0, 10).map((meal: any) => 
   `- ${meal.name}: ${meal.calories} kcal, P:${meal.protein}g, C:${meal.carbs}g, F:${meal.fat}g (${new Date(meal.timestamp).toLocaleDateString()})`
 ).join('\n')}
 ` : '';
 
-    systemPrompt = `You are Dr. Reza, a senior Malaysian clinical dietitian and nutritionist with 20+ years of experience. You work at a prestigious hospital in Kuala Lumpur and are known for your warm, caring approach.
+      systemPrompt = `You are Dr. Reza, a senior Malaysian clinical dietitian and nutritionist with 20+ years of experience. You work at a prestigious hospital in Kuala Lumpur and are known for your warm, caring approach.
 
 PERSONALITY:
 - Warm, kind, and empathetic - like a caring family doctor
@@ -142,6 +140,7 @@ ${mealsContext}
 
 Remember: You are having a friendly consultation, not lecturing. Be like a wise friend who happens to be a nutrition expert.`;
     }
+    // Close the if (!useEnhancedPrompt) block
 
     // Build user message with meal context if analyzing food
     let userMessage = message;
