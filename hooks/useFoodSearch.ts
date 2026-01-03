@@ -17,6 +17,63 @@ interface UseFoodSearchResult {
 const RECENT_SEARCHES_KEY = 'boleh_makan_recent_foods';
 const RECENT_SEARCHES_LIMIT = 5;
 
+// ============================================
+// RECENT FOODS - Standalone Functions
+// ============================================
+
+/**
+ * Get recent foods from localStorage
+ */
+export function getRecentFoods(): FoodSearchResult[] {
+  if (typeof window === 'undefined') return [];
+  
+  try {
+    const stored = localStorage.getItem(RECENT_SEARCHES_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch (err) {
+    console.error('Failed to load recent foods:', err);
+    return [];
+  }
+}
+
+/**
+ * Add a food to recent searches
+ */
+export function addRecentFood(food: FoodSearchResult): void {
+  if (typeof window === 'undefined') return;
+  
+  try {
+    const recent = getRecentFoods();
+    
+    // Remove if already exists (will re-add at front)
+    const filtered = recent.filter(f => f.id !== food.id);
+    
+    // Add to front, limit to max
+    const updated = [food, ...filtered].slice(0, RECENT_SEARCHES_LIMIT);
+    
+    localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(updated));
+  } catch (err) {
+    console.error('Failed to save recent food:', err);
+  }
+}
+
+/**
+ * Clear all recent foods
+ */
+export function clearRecentFoods(): void {
+  if (typeof window === 'undefined') return;
+  
+  try {
+    localStorage.removeItem(RECENT_SEARCHES_KEY);
+  } catch (err) {
+    console.error('Failed to clear recent foods:', err);
+  }
+}
+
+// ============================================
+// MAIN SEARCH HOOK
+// ============================================
+
 export function useFoodSearch(): UseFoodSearchResult {
   const [results, setResults] = useState<FoodSearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -28,32 +85,12 @@ export function useFoodSearch(): UseFoodSearchResult {
   
   // Load recent searches from localStorage
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(RECENT_SEARCHES_KEY);
-      if (stored) {
-        setRecentSearches(JSON.parse(stored));
-      }
-    } catch (err) {
-      console.error('Failed to load recent searches:', err);
-    }
+    setRecentSearches(getRecentFoods());
   }, []);
   
   const saveToRecentSearches = useCallback((food: FoodSearchResult) => {
-    setRecentSearches(prev => {
-      // Remove if already exists
-      const filtered = prev.filter(f => f.id !== food.id);
-      // Add to front
-      const updated = [food, ...filtered].slice(0, RECENT_SEARCHES_LIMIT);
-      
-      // Save to localStorage
-      try {
-        localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(updated));
-      } catch (err) {
-        console.error('Failed to save recent searches:', err);
-      }
-      
-      return updated;
-    });
+    addRecentFood(food);
+    setRecentSearches(getRecentFoods());
   }, []);
   
   const search = useCallback((query: string) => {
@@ -141,7 +178,10 @@ export function useFoodSearch(): UseFoodSearchResult {
   };
 }
 
-// Hook for fetching individual food details
+// ============================================
+// FOOD DETAIL HOOK
+// ============================================
+
 export function useFoodDetail(foodId: string | null) {
   const [food, setFood] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -188,7 +228,10 @@ export function useFoodDetail(foodId: string | null) {
   return { food, isLoading, error };
 }
 
-// Hook for fetching food categories
+// ============================================
+// FOOD CATEGORIES HOOK
+// ============================================
+
 export interface FoodCategory {
   name: string;
   count: number;
@@ -227,4 +270,42 @@ export function useFoodCategories() {
   }, []);
 
   return { categories, isLoading, error };
+}
+
+// ============================================
+// POPULAR FOODS HOOK
+// ============================================
+
+export function usePopularFoods(limit: number = 10) {
+  const [foods, setFoods] = useState<FoodSearchResult[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchPopular = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        
+        const response = await fetch(`/api/foods/popular?limit=${limit}`);
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch popular foods');
+        }
+        
+        const data = await response.json();
+        setFoods(data.results || []);
+        
+      } catch (err) {
+        console.error('Popular foods fetch error:', err);
+        setError(err instanceof Error ? err.message : 'Unknown error');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchPopular();
+  }, [limit]);
+
+  return { foods, isLoading, error };
 }

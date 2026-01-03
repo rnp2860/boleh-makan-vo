@@ -4,12 +4,11 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, X, Clock, TrendingUp, Loader2 } from 'lucide-react';
-import { MalaysianFood } from '@/lib/malaysian-foods/types';
+import type { FoodSearchResult } from '@/types/food';
 import { useFoodSearch, getRecentFoods, addRecentFood } from '@/hooks/useFoodSearch';
-import { formatCalories, getRatingColor, getRatingIcon } from '@/lib/malaysian-foods/utils';
 
 interface FoodSearchProps {
-  onSelectFood: (food: MalaysianFood) => void;
+  onSelectFood: (food: FoodSearchResult) => void;
   userConditions?: string[];
   placeholder?: string;
   autoFocus?: boolean;
@@ -24,16 +23,16 @@ export function FoodSearch({
   className = '',
 }: FoodSearchProps) {
   const {
-    query,
-    setQuery,
     results,
     isLoading,
     error,
+    search,
     clearResults,
-  } = useFoodSearch({ debounceMs: 300 });
+  } = useFoodSearch();
   
+  const [query, setQuery] = useState('');
   const [isFocused, setIsFocused] = useState(false);
-  const [recentFoods, setRecentFoods] = useState<MalaysianFood[]>([]);
+  const [recentFoods, setRecentFoods] = useState<FoodSearchResult[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   
@@ -41,6 +40,11 @@ export function FoodSearch({
   useEffect(() => {
     setRecentFoods(getRecentFoods());
   }, []);
+  
+  // Trigger search when query changes
+  useEffect(() => {
+    search(query);
+  }, [query, search]);
   
   // Handle click outside
   useEffect(() => {
@@ -54,35 +58,43 @@ export function FoodSearch({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
   
-  const handleSelect = (food: MalaysianFood) => {
+  const handleSelect = (food: FoodSearchResult) => {
     addRecentFood(food);
     setRecentFoods(getRecentFoods());
     onSelectFood(food);
     clearResults();
+    setQuery('');
     setIsFocused(false);
     
     // Increment popularity
     fetch(`/api/foods/${food.id}`, { method: 'POST' }).catch(() => {});
   };
   
+  const handleClear = () => {
+    setQuery('');
+    clearResults();
+    setIsFocused(false);
+  };
+  
   const showResults = isFocused && (results.length > 0 || query.length >= 2);
   const showRecent = isFocused && query.length < 2 && recentFoods.length > 0;
   
-  // Get relevant condition rating for a food
-  const getRelevantRating = (food: MalaysianFood): { condition: string; rating: string } | null => {
-    if (userConditions.includes('diabetes') && food.diabetesRating) {
-      return { condition: 'diabetes', rating: food.diabetesRating };
+  // Get worst rating for display
+  const getWorstRating = (food: FoodSearchResult): { rating: string; color: string } => {
+    const ratings = [];
+    if (userConditions.includes('diabetes')) ratings.push(food.diabetes_rating);
+    if (userConditions.includes('hypertension')) ratings.push(food.hypertension_rating);
+    if (userConditions.includes('cholesterol') || userConditions.includes('dyslipidemia')) 
+      ratings.push(food.cholesterol_rating);
+    if (userConditions.includes('ckd')) ratings.push(food.ckd_rating);
+    
+    if (ratings.includes('limit')) {
+      return { rating: 'Limit', color: 'bg-red-100 text-red-700 border-red-200' };
     }
-    if (userConditions.includes('hypertension') && food.hypertensionRating) {
-      return { condition: 'hypertension', rating: food.hypertensionRating };
+    if (ratings.includes('caution')) {
+      return { rating: 'Caution', color: 'bg-amber-100 text-amber-700 border-amber-200' };
     }
-    if (userConditions.includes('dyslipidemia') && food.cholesterolRating) {
-      return { condition: 'cholesterol', rating: food.cholesterolRating };
-    }
-    if (userConditions.includes('ckd') && food.ckdRating) {
-      return { condition: 'ckd', rating: food.ckdRating };
-    }
-    return null;
+    return { rating: 'Safe', color: 'bg-emerald-100 text-emerald-700 border-emerald-200' };
   };
   
   return (
@@ -105,7 +117,7 @@ export function FoodSearch({
         />
         {query && (
           <button
-            onClick={clearResults}
+            onClick={handleClear}
             className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-slate-100 rounded-full"
           >
             <X className="w-4 h-4 text-slate-400" />
@@ -135,7 +147,7 @@ export function FoodSearch({
                   key={food.id}
                   food={food}
                   onClick={() => handleSelect(food)}
-                  relevantRating={getRelevantRating(food)}
+                  userConditions={userConditions}
                 />
               ))}
             </div>
@@ -156,7 +168,7 @@ export function FoodSearch({
                       food={food}
                       onClick={() => handleSelect(food)}
                       query={query}
-                      relevantRating={getRelevantRating(food)}
+                      userConditions={userConditions}
                     />
                   ))}
                 </>
@@ -190,13 +202,13 @@ export function FoodSearch({
 // ============================================
 
 interface FoodSearchItemProps {
-  food: MalaysianFood;
+  food: FoodSearchResult;
   onClick: () => void;
   query?: string;
-  relevantRating?: { condition: string; rating: string } | null;
+  userConditions: string[];
 }
 
-function FoodSearchItem({ food, onClick, query, relevantRating }: FoodSearchItemProps) {
+function FoodSearchItem({ food, onClick, query, userConditions }: FoodSearchItemProps) {
   // Highlight matching text
   const highlightText = (text: string, searchQuery?: string) => {
     if (!searchQuery) return text;
@@ -213,6 +225,28 @@ function FoodSearchItem({ food, onClick, query, relevantRating }: FoodSearchItem
     );
   };
   
+  // Get worst rating for display
+  const getWorstRating = (): { rating: string; color: string } | null => {
+    if (userConditions.length === 0) return null;
+    
+    const ratings = [];
+    if (userConditions.includes('diabetes')) ratings.push(food.diabetes_rating);
+    if (userConditions.includes('hypertension')) ratings.push(food.hypertension_rating);
+    if (userConditions.includes('cholesterol') || userConditions.includes('dyslipidemia')) 
+      ratings.push(food.cholesterol_rating);
+    if (userConditions.includes('ckd')) ratings.push(food.ckd_rating);
+    
+    if (ratings.includes('limit')) {
+      return { rating: 'Limit', color: 'bg-red-100 text-red-700 border-red-200' };
+    }
+    if (ratings.includes('caution')) {
+      return { rating: 'Caution', color: 'bg-amber-100 text-amber-700 border-amber-200' };
+    }
+    return { rating: 'Safe', color: 'bg-emerald-100 text-emerald-700 border-emerald-200' };
+  };
+  
+  const ratingBadge = getWorstRating();
+  
   return (
     <button
       onClick={onClick}
@@ -227,33 +261,22 @@ function FoodSearchItem({ food, onClick, query, relevantRating }: FoodSearchItem
       {/* Food Info */}
       <div className="flex-1 min-w-0">
         <div className="font-medium text-slate-800 truncate">
-          {highlightText(food.nameBm, query)}
+          {highlightText(food.name_bm, query)}
         </div>
         <div className="text-sm text-slate-500 truncate">
-          {highlightText(food.nameEn, query)}
+          {highlightText(food.name_en, query)}
         </div>
         <div className="flex items-center gap-2 mt-1">
           <span className="text-xs text-slate-400">
-            {food.servingDescription} • {formatCalories(food.caloriesKcal)}
+            {food.serving_description} • {Math.round(food.calories_kcal)} kcal
           </span>
-          {food.giCategory && (
-            <span className={`text-xs px-1.5 py-0.5 rounded ${
-              food.giCategory === 'low' ? 'bg-green-100 text-green-700' :
-              food.giCategory === 'medium' ? 'bg-amber-100 text-amber-700' :
-              'bg-red-100 text-red-700'
-            }`}>
-              GI {food.giCategory}
-            </span>
-          )}
         </div>
       </div>
       
       {/* Condition Rating Badge */}
-      {relevantRating && (
-        <div className={`px-2 py-1 rounded-lg text-xs font-medium border ${
-          getRatingColor(relevantRating.rating as 'safe' | 'caution' | 'limit')
-        }`}>
-          {getRatingIcon(relevantRating.rating as 'safe' | 'caution' | 'limit')}
+      {ratingBadge && (
+        <div className={`px-2 py-1 rounded-lg text-xs font-medium border ${ratingBadge.color}`}>
+          {ratingBadge.rating}
         </div>
       )}
     </button>
