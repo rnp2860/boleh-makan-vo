@@ -1,6 +1,6 @@
 # 🍽️ BOLEH MAKAN - Master Project Record
-**Version:** 1.0.0  
-**Last Updated:** January 2, 2026  
+**Version:** 1.1.0  
+**Last Updated:** January 3, 2026  
 **Platform:** Next.js 16 + Supabase + OpenAI  
 
 ---
@@ -182,7 +182,15 @@ boleh-makan/
 │   ├── visionPrompts.ts          # AI vision prompt + RLHF
 │   ├── advisorPrompts.ts         # Dr. Reza prompt
 │   ├── calculateBolehScore.ts    # Score calculation logic
-│   └── supabaseClient.ts         # Supabase client init
+│   ├── supabaseClient.ts         # Supabase client init
+│   ├── supabase.ts               # Supabase helper functions
+│   ├── malaysianFoodDatabaseLookup.ts  # Malaysian food search
+│   ├── foodDatabaseLookup.ts     # Generic food search (fallback)
+│   ├── dailyContextHelper.ts     # Daily intake context
+│   ├── ai/
+│   │   └── dr-reza-prompt.ts     # Multi-condition Dr. Reza prompt
+│   └── user/
+│       └── health-profile.ts     # User health profile helpers
 │
 ├── context/
 │   └── FoodContext.tsx           # Global food/meal state
@@ -199,7 +207,13 @@ boleh-makan/
 │
 └── supabase/migrations/          # Database migrations
     ├── add_meal_type_column.sql
-    └── create_user_weekly_goals_table.sql
+    ├── create_user_weekly_goals_table.sql
+    ├── 20260102_malaysian_foods.sql
+    ├── 20260102_multi_tenant.sql
+    ├── 20260102_comorbidity_schema.sql
+    ├── 20260103_improved_food_search.sql
+    ├── 20260103_add_food_aliases.sql
+    └── 20260103_food_functions.sql
 ```
 
 ---
@@ -263,6 +277,46 @@ boleh-makan/
 | `valid_lauk` | jsonb | Array of valid side dishes |
 | `health_tags` | jsonb | Array of tags (high_sodium, high_sugar, etc.) |
 
+### Table: `malaysian_foods`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | uuid | Primary key |
+| `name_en` | text | Food name (English) |
+| `name_bm` | text | Food name (Bahasa Malaysia) |
+| `aliases` | text[] | Common abbreviations & misspellings (ckt, bkt, etc.) |
+| `category` | text | Malay/Chinese/Indian/Mamak/Western/Beverage/Dessert/Kuih |
+| `subcategory` | text | Rice/Noodles/Bread/Soup/etc. |
+| `serving_description` | text | e.g., "1 plate (400g)" |
+| `serving_grams` | numeric | Serving size in grams |
+| `calories_kcal` | numeric | Calories per serving |
+| `protein_g` | numeric | Protein in grams |
+| `carbs_g` | numeric | Carbohydrates in grams |
+| `total_fat_g` | numeric | Total fat in grams |
+| `saturated_fat_g` | numeric | Saturated fat in grams |
+| `sugar_g` | numeric | Sugar in grams |
+| `sodium_mg` | numeric | Sodium in mg |
+| `fiber_g` | numeric | Fiber in grams |
+| `cholesterol_mg` | numeric | Cholesterol in mg |
+| `potassium_mg` | numeric | Potassium in mg |
+| `phosphorus_mg` | numeric | Phosphorus in mg |
+| **Condition Ratings** | | |
+| `diabetes_rating` | text | safe/caution/limit |
+| `hypertension_rating` | text | safe/caution/limit |
+| `cholesterol_rating` | text | safe/caution/limit |
+| `ckd_rating` | text | safe/caution/limit (Chronic Kidney Disease) |
+| `popularity_score` | numeric | For ranking search results |
+
+### Table: `user_profiles`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `user_id` | text | Primary key (user identifier) |
+| `name` | text | User's name |
+| `health_conditions` | text[] | Array of conditions: diabetes, hypertension, cholesterol, ckd, etc. |
+| `daily_targets` | jsonb | Nutrient targets: calories, carbs_g, sodium_mg, etc. |
+| `ramadan_mode_active` | boolean | Ramadan fasting mode enabled |
+
 ---
 
 ## 🔌 API Endpoints
@@ -271,10 +325,14 @@ boleh-makan/
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/smart-analyze` | POST | AI food recognition with RLHF |
+| `/api/smart-analyze` | POST | AI food recognition with RLHF + Malaysian DB priority |
 | `/api/analyze-food` | POST | Legacy food analysis |
 | `/api/recalculate-nutrition` | POST | Recalculate after name edit |
 | `/api/search-food` | POST | Search food database |
+| `/api/foods/search` | GET | Search Malaysian food database (485 foods) |
+| `/api/foods/[id]` | GET | Get specific Malaysian food by ID |
+| `/api/foods/categories` | GET | Get Malaysian food categories |
+| `/api/foods/popular` | GET | Get popular Malaysian foods |
 
 **POST /api/smart-analyze**
 ```typescript
@@ -398,36 +456,61 @@ boleh-makan/
 ### 1. AI Food Scanner
 - Camera capture or gallery upload
 - GPT-4o-mini vision analysis
+- **Malaysian Database Priority** - 485 verified Malaysian foods checked first
 - Malaysian cultural dish recognition
 - Halal safety detection
 - RLHF learning from corrections
+- **Alias Support** - Recognizes abbreviations (ckt, bkt, ytf)
+- **Fuzzy Matching** - Handles misspellings and variations
+- **Multi-Strategy Search** - Exact → Alias → Fuzzy → Partial word matching
 
-### 2. Boleh Score
+### 2. Malaysian Food Database
+- **485 verified Malaysian dishes** with accurate nutrition data
+- Condition ratings for diabetes, hypertension, cholesterol, CKD
+- English and Bahasa Malaysia names
+- Common aliases and misspellings
+- Categories: Malay, Chinese, Indian, Mamak, Western, Beverages, Desserts, Kuih
+- Popularity-based ranking
+- Comprehensive nutrient data (13+ nutrients per food)
+
+### 3. Type It In Feature
+- Quick text-based food logging
+- **Malaysian database search first** before generic fallback
+- Real-time search suggestions
+- "Did you mean" correction suggestions
+- Works with abbreviations and misspellings
+- Shows source badge (Malaysian DB vs AI estimate)
+
+### 4. Boleh Score
 - Daily health score (0-100)
 - Factors: meal consistency, context, preparation, sugar, vitals
 - Color-coded gauge (Green/Yellow/Red)
 - Personalized insights
 
-### 3. Risk Correlation Chart
+### 5. Risk Correlation Chart
 - Timeline visualization
 - Glucose readings (blue line)
 - Meal markers (teal dots)
 - Context tags in tooltips
 - Reference lines for target/high levels
 
-### 4. Vitals Logging
+### 6. Vitals Logging
 - Glucose (fasting/pre-meal/post-meal/general)
 - Blood Pressure (systolic/diastolic)
 - Weight
 - Today's latest reading display
 
-### 5. Dr. Reza AI Advisor
+### 7. Dr. Reza AI Advisor (Multi-Condition)
+- **Analyzes food against ALL user conditions**
 - Culturally-aware nutritional advice
-- Health condition personalization
+- Health condition personalization (diabetes, hypertension, cholesterol, CKD)
+- Today's intake context awareness
 - Malaysian food expertise
+- Traffic light rating system (🟢 🟡 🔴)
+- Suggests Malaysian alternatives
 - Friendly, approachable tone
 
-### 6. RLHF Correction System
+### 8. RLHF Correction System
 - User can edit AI food predictions
 - Corrections stored in database
 - Injected into AI prompts dynamically
@@ -532,6 +615,66 @@ GEMINI_API_KEY=...
 
 ## 📜 Changelog
 
+### January 3, 2026
+
+#### 🇲🇾 Malaysian Food Database Integration
+- **Created `malaysian_foods` table** with 485 verified Malaysian dishes
+- Added comprehensive nutrition data with condition ratings (diabetes, hypertension, cholesterol, CKD)
+- Implemented intelligent food search with fuzzy matching, aliases, and compound dish handling
+- Created `/api/foods/search` endpoint for Malaysian food search
+- Added `searchMalaysianFoodDatabase()` utility with multi-strategy matching
+
+#### 🔍 Improved Food Search System
+- **Vision AI → Malaysian DB Priority:** Vision results now search Malaysian database FIRST before generic database
+- **Text Input → Malaysian DB:** "Type It In" feature prioritizes Malaysian foods (485 dishes)
+- **Alias Support:** Common abbreviations work (ckt → Char Kuey Teow, bkt → Bak Kut Teh, ytf → Yong Tau Foo)
+- **Fuzzy Matching:** Handles misspellings (roti chanai → Roti Canai, nasik lemak → Nasi Lemak)
+- **Word Order Flexibility:** "ayam goreng" = "goreng ayam"
+- **Compound Dishes:** "nasi lemak ayam rendang" finds correct variations
+
+#### 🎨 UI/UX Improvements
+- **New Badge:** "🇲🇾 MALAYSIAN DATABASE" (emerald green) for verified Malaysian food matches
+- **Badge Hierarchy:** Malaysian DB → Verified → AI Estimate → Unidentified
+- **Search Suggestions Component:** Shows relevant suggestions when typing
+- **"Did You Mean" Feature:** Suggests corrections for misspellings
+- **Improved Empty States:** Better messaging when no results found
+
+#### 🩺 Dr. Reza AI Upgrade (Multi-Condition Support)
+- **Enhanced System Prompt:** Now receives full user health profile with all conditions
+- **Condition-Aware Analysis:** Explicitly analyzes food against EACH user condition
+- **Multi-Condition Warnings:** Mentions diabetes, hypertension, cholesterol, AND kidney impacts
+- **Today's Intake Context:** Dr. Reza sees what user already ate today
+- **Meal Context Preservation:** Keeps original meal name even when edited
+- **Traffic Light System:** 🟢 SELAMAT / 🟡 BERHATI-HATI / 🔴 HADKAN ratings
+- **Malaysian Alternatives:** Suggests local food alternatives
+
+#### 🔧 API Improvements
+- Updated `/api/smart-analyze` to prioritize Malaysian database for both vision and text input
+- Created `/lib/user/health-profile.ts` with `getUserHealthProfile()` and `getTodayIntake()`
+- Updated `/app/api/chat-dr-reza/route.ts` to pass comprehensive health context to AI
+- Fixed variable scoping and const reassignment issues
+
+#### 📊 Database Migrations
+- `20260103_improved_food_search.sql` - Enhanced search function with scoring
+- `20260103_add_food_aliases.sql` - 200+ aliases for common Malaysian foods
+- `20260103_food_functions.sql` - Database helper functions
+
+#### 📝 Documentation
+- `FOOD_SCANNING_IMPROVEMENTS.md` - Vision AI → Malaysian DB integration guide
+- `FOOD_SCANNING_TESTING.md` - Testing guide with test cases
+- `DR_REZA_AI_UPGRADE.md` - Multi-condition AI upgrade documentation
+- `TYPE_IT_IN_STATUS.md` - Type It In feature status report
+- `TYPE_IT_IN_QA_CHECKLIST.md` - Comprehensive 14-category QA checklist
+- `FINAL_REPORT_TYPE_IT_IN.md` - Executive summary
+
+#### 🐛 Bug Fixes
+- Fixed "Type It In" returning generic USDA results instead of Malaysian foods
+- Fixed Dr. Reza only warning about one condition when user has multiple
+- Fixed syntax errors in chat-dr-reza route (duplicate blocks, missing brackets)
+- Fixed Supabase client import paths (`@/lib/supabase` not `@/lib/supabase/server`)
+
+---
+
 ### January 2, 2026
 
 #### RLHF Correction System
@@ -613,5 +756,5 @@ git push origin main  # Auto-deploys via Vercel
 
 ---
 
-*This document is auto-generated for project records. Last updated: January 2, 2026*
+*This document is auto-generated for project records. Last updated: January 3, 2026*
 
