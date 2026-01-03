@@ -416,14 +416,28 @@ function buildIntakeSummary(intake?: TodayIntake, targets?: NutrientTargets): st
 function buildRamadanContext(isFasting?: boolean): string {
   if (isFasting) {
     return `**Ramadan Mode: Currently Fasting** 🌙
-- Consider meal timing for Iftar/Sahur
-- Avoid heavy meals at Iftar - start light
-- Sahur should be slow-release carbs`;
+
+FOR SAHUR (pre-dawn meal):
+- Recommend slow-releasing carbs (oat, brown rice, whole grain)
+- Encourage protein and fiber for sustained energy
+- Suggest adequate hydration
+- Warn against very salty foods (will cause thirst)
+- Recommend: kurma, oat, telur rebus, roti wholemeal
+- Example: "Untuk sahur, pilihan bagus! Oat dengan kurma bagi tenaga tahan lama. Minum air secukupnya sebelum Subuh. 🌙"
+
+FOR IFTAR (breaking fast):
+- Recommend starting with dates and water (Sunnah)
+- Warn against overeating after fasting
+- Suggest balanced meal, not all fried foods
+- Recommend: kurma, air, sup, then main meal
+- Caution on very sugary drinks (glucose spike after fasting)
+- Example: "Untuk berbuka, mulakan dengan kurma dan air dulu ya. Lepas tu baru makan main course. Jangan makan terlalu cepat! 🌅"`;
   }
   
   return `**Ramadan Mode: Active** 🌙
 - Consider fasting context in advice
-- Meal timing matters (Sahur vs Iftar)`;
+- Meal timing matters (Sahur vs Iftar)
+- Hydration important between Iftar and Sahur`;
 }
 
 /**

@@ -21,12 +21,21 @@ export default function ProfilePage() {
   // Export data states
   const [isExporting, setIsExporting] = useState(false);
   const [exportSuccess, setExportSuccess] = useState(false);
+  
+  // Ramadan Mode state
+  const [ramadanMode, setRamadanMode] = useState(false);
 
   // Get user ID on mount
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const id = localStorage.getItem('boleh_makan_user_id');
       setUserId(id);
+      
+      // Load Ramadan mode from localStorage
+      const savedRamadanMode = localStorage.getItem('boleh_makan_ramadan_mode');
+      if (savedRamadanMode) {
+        setRamadanMode(savedRamadanMode === 'true');
+      }
     }
   }, []);
 
@@ -139,6 +148,22 @@ export default function ProfilePage() {
       alert('Failed to export data. Please try again.');
     } finally {
       setIsExporting(false);
+    }
+  };
+
+  // Handle Ramadan Mode Toggle
+  const handleRamadanToggle = (enabled: boolean) => {
+    setRamadanMode(enabled);
+    
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('boleh_makan_ramadan_mode', enabled.toString());
+    }
+    
+    // Show a toast-like feedback
+    if (enabled) {
+      alert('🌙 Mod Ramadan diaktifkan. Waktu makan akan disesuaikan untuk Sahur dan Iftar.');
+    } else {
+      alert('Mod Ramadan dinyahaktifkan.');
     }
   };
 
@@ -395,10 +420,53 @@ export default function ProfilePage() {
           </div>
         </div>
 
+        {/* 🌙 MOD RAMADAN (Ramadan Mode Toggle) */}
+        <div className="bg-white rounded-3xl p-5 shadow-lg border border-slate-100">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center">
+                <span className="text-xl">🌙</span>
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900">Mod Ramadan</h3>
+                <p className="text-sm text-gray-500">Aktifkan untuk waktu puasa</p>
+              </div>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={ramadanMode}
+                onChange={(e) => handleRamadanToggle(e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-emerald-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+            </label>
+          </div>
+          
+          {/* Ramadan Info when enabled */}
+          {ramadanMode && (
+            <div className="mt-4 p-3 bg-emerald-50 rounded-lg">
+              <p className="text-sm text-emerald-800">
+                🌙 Mod Ramadan aktif. Waktu makan akan disesuaikan untuk Sahur dan Iftar.
+              </p>
+              <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+                <div className="bg-white p-2 rounded">
+                  <p className="text-gray-500">Sahur</p>
+                  <p className="font-medium">3:00 AM - 5:30 AM</p>
+                </div>
+                <div className="bg-white p-2 rounded">
+                  <p className="text-gray-500">Iftar</p>
+                  <p className="font-medium">7:00 PM - 9:00 PM</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* 🔢 DAILY TARGET */}
         <div className="bg-gradient-to-br from-slate-100 to-slate-200 p-5 rounded-3xl shadow-lg border border-slate-200">
           <div className="flex justify-between items-center mb-3">
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">🔢 Daily Calorie Target</label>
+            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">🔢 Sasaran Kalori Harian</label>
             <span className="text-xs font-bold text-teal-600 bg-teal-100 px-3 py-1 rounded-lg">
               Auto: {dailyBudget} kcal
             </span>
@@ -416,7 +484,7 @@ export default function ProfilePage() {
           </div>
           
           <p className="text-[10px] text-slate-500 mb-4">
-            💡 Override only if you have a specific target from a dietitian.
+            💡 Override hanya jika anda ada sasaran khusus dari pakar pemakanan.
           </p>
           
           {/* Scientific Method Explanation */}
@@ -424,12 +492,12 @@ export default function ProfilePage() {
             <div className="flex items-start gap-3">
               <span className="text-xl">🔬</span>
               <div>
-                <p className="text-xs font-bold text-slate-700 mb-1">How We Calculate</p>
+                <p className="text-xs font-bold text-slate-700 mb-1">Cara Kami Mengira</p>
                 <p className="text-[11px] text-slate-600 leading-relaxed">
-                  We use the <span className="font-semibold text-teal-600">Mifflin-St Jeor Equation</span> — 
-                  the gold standard method recommended by dietitians worldwide. 
-                  Your BMR is calculated from age, height, weight & gender, 
-                  then multiplied by your activity level to get your TDEE (Total Daily Energy Expenditure).
+                  Kami gunakan <span className="font-semibold text-teal-600">Mifflin-St Jeor Equation</span> — 
+                  kaedah standard yang disyorkan oleh pakar pemakanan di seluruh dunia. 
+                  BMR anda dikira dari umur, tinggi, berat & jantina, 
+                  kemudian didarabkan dengan tahap aktiviti anda untuk dapatkan TDEE (Total Daily Energy Expenditure).
                 </p>
               </div>
             </div>
@@ -446,9 +514,9 @@ export default function ProfilePage() {
                 <FileJson className="w-5 h-5 text-blue-600" />
               </div>
               <div>
-                <h3 className="font-bold text-blue-700 text-sm">Your Data</h3>
+                <h3 className="font-bold text-blue-700 text-sm">Data Anda</h3>
                 <p className="text-blue-600/70 text-xs mt-0.5">
-                  Access and download all your personal data
+                  Akses dan muat turun semua data peribadi anda
                 </p>
               </div>
             </div>
@@ -456,9 +524,9 @@ export default function ProfilePage() {
             <div className="bg-white/60 rounded-2xl p-4 border border-blue-100">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="font-bold text-slate-700 text-sm">Download My Data</p>
+                  <p className="font-bold text-slate-700 text-sm">Muat Turun Data Saya</p>
                   <p className="text-slate-500 text-xs mt-0.5">
-                    Export all meals, vitals, and goals as JSON
+                    Export semua makanan, vital, dan matlamat sebagai JSON
                   </p>
                 </div>
                 <button
@@ -480,12 +548,12 @@ export default function ProfilePage() {
                   ) : isExporting ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      Exporting...
+                      Mengexport...
                     </>
                   ) : (
                     <>
                       <Download className="w-4 h-4" />
-                      Download
+                      Muat Turun
                     </>
                   )}
                 </button>
@@ -493,7 +561,7 @@ export default function ProfilePage() {
               
               {/* What's included */}
               <div className="mt-3 pt-3 border-t border-blue-100">
-                <p className="text-xs text-slate-500 mb-2 font-medium">Includes:</p>
+                <p className="text-xs text-slate-500 mb-2 font-medium">Termasuk:</p>
                 <div className="flex flex-wrap gap-2">
                   {['🍽️ Meal Logs', '🩸 Vitals', '🎯 Goals', '📊 Metadata'].map((item) => (
                     <span key={item} className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-lg">
@@ -517,7 +585,7 @@ export default function ProfilePage() {
               href="/privacy-policy"
               className="mt-4 flex items-center justify-center gap-2 w-full py-3 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-xl font-medium text-sm transition-colors"
             >
-              <span>Read Full Privacy Policy</span>
+              <span>Baca Dasar Privasi Penuh</span>
               <ExternalLink className="w-4 h-4" />
             </Link>
           </div>
@@ -533,9 +601,9 @@ export default function ProfilePage() {
                 <AlertTriangle className="w-5 h-5 text-red-500" />
               </div>
               <div>
-                <h3 className="font-bold text-red-700 text-sm">Danger Zone</h3>
+                <h3 className="font-bold text-red-700 text-sm">Zon Bahaya</h3>
                 <p className="text-red-600/70 text-xs mt-0.5">
-                  Actions here are permanent and cannot be undone
+                  Tindakan di sini adalah kekal dan tidak boleh dibatalkan
                 </p>
               </div>
             </div>
@@ -543,9 +611,9 @@ export default function ProfilePage() {
             <div className="bg-white/60 rounded-2xl p-4 border border-red-100">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="font-bold text-slate-700 text-sm">Delete Account</p>
+                  <p className="font-bold text-slate-700 text-sm">Padam Akaun</p>
                   <p className="text-slate-500 text-xs mt-0.5">
-                    Permanently delete your account and all data
+                    Padam akaun dan semua data secara kekal
                   </p>
                 </div>
                 <button
@@ -553,7 +621,7 @@ export default function ProfilePage() {
                   className="px-4 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl font-bold text-sm flex items-center gap-2 transition-colors shadow-md shadow-red-200"
                 >
                   <Trash2 className="w-4 h-4" />
-                  Delete
+                  Padam
                 </button>
               </div>
               
@@ -589,11 +657,11 @@ export default function ProfilePage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
               </svg>
             </div>
-            <h3 className="text-xl font-bold text-slate-800 mb-2">Account Deleted</h3>
+            <h3 className="text-xl font-bold text-slate-800 mb-2">Akaun Dipadam</h3>
             <p className="text-slate-500 text-sm mb-4">
-              Your account and all data have been permanently deleted.
+              Akaun dan semua data anda telah dipadam secara kekal.
             </p>
-            <p className="text-slate-400 text-xs">Redirecting to home page...</p>
+            <p className="text-slate-400 text-xs">Mengalihkan ke laman utama...</p>
           </div>
         </div>
       )}

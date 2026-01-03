@@ -32,6 +32,11 @@ export default function DashboardPage() {
   const [isVitalsOpen, setIsVitalsOpen] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   
+  // 🌙 Ramadan Mode state
+  const [isRamadanMode, setIsRamadanMode] = useState(false);
+  const [sahurLogged, setSahurLogged] = useState(false);
+  const [iftarLogged, setIftarLogged] = useState(false);
+  
   // Streak celebration
   const [showStreakCelebration, setShowStreakCelebration] = useState(false);
   const [celebrationStreak, setCelebrationStreak] = useState(0);
@@ -51,8 +56,24 @@ export default function DashboardPage() {
         localStorage.setItem('boleh_makan_user_id', id);
       }
       setUserId(id);
+      
+      // Check if Ramadan mode is enabled
+      const ramadanModeEnabled = localStorage.getItem('boleh_makan_ramadan_mode') === 'true';
+      setIsRamadanMode(ramadanModeEnabled);
+      
+      // Check if Sahur/Iftar logged today (basic check from meal types)
+      if (ramadanModeEnabled) {
+        // This is a simplified check - you'd normally query from backend
+        const todayMeals = meals.filter(m => {
+          const mealDate = new Date(m.timestamp);
+          const today = new Date();
+          return mealDate.toDateString() === today.toDateString();
+        });
+        setSahurLogged(todayMeals.some(m => m.meal_type === 'Sahur'));
+        setIftarLogged(todayMeals.some(m => m.meal_type === 'Iftar'));
+      }
     }
-  }, []);
+  }, [meals]);
 
   // Check if user needs onboarding (new user without profile setup)
   useEffect(() => {
@@ -235,11 +256,11 @@ export default function DashboardPage() {
 
   // Date display
   const getDateTitle = () => {
-    if (isToday) return "Today";
+    if (isToday) return "Hari Ini";
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
-    if (selectedDate.toDateString() === yesterday.toDateString()) return "Yesterday";
-    return selectedDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    if (selectedDate.toDateString() === yesterday.toDateString()) return "Semalam";
+    return selectedDate.toLocaleDateString('ms-MY', { weekday: 'short', month: 'short', day: 'numeric' });
   };
 
   return (
@@ -260,7 +281,7 @@ export default function DashboardPage() {
             </div>
             <div>
               <h1 className="text-xl font-black text-slate-900 leading-none">{getDateTitle()}</h1>
-              <p className="text-xs text-slate-500 font-medium mt-1">Welcome back, {firstName}</p>
+              <p className="text-xs text-slate-500 font-medium mt-1">Selamat kembali, {firstName}</p>
             </div>
           </div>
           
@@ -280,20 +301,43 @@ export default function DashboardPage() {
 
       {/* 🔥 STREAK + BOLEH SCORE - HERO POSITION */}
       <div className="px-4 mt-5 space-y-4">
+        {/* 🌙 RAMADAN MODE WIDGET - Show if enabled */}
+        {isRamadanMode && (
+          <div className="bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl p-4 text-white mb-4">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-2xl">🌙</span>
+              <h3 className="font-semibold">Ramadan Mubarak</h3>
+            </div>
+            <div className="grid grid-cols-2 gap-3 mt-3">
+              <div className="bg-white/20 rounded-lg p-3">
+                <p className="text-white/80 text-xs">Sahur</p>
+                <p className="font-semibold">{sahurLogged ? '✅ Logged' : '⏳ Belum log'}</p>
+              </div>
+              <div className="bg-white/20 rounded-lg p-3">
+                <p className="text-white/80 text-xs">Iftar</p>
+                <p className="font-semibold">{iftarLogged ? '✅ Logged' : '⏳ Belum log'}</p>
+              </div>
+            </div>
+            <p className="text-xs text-white/70 mt-3">
+              💡 Tip: Minum air secukupnya antara Iftar dan Sahur
+            </p>
+          </div>
+        )}
+        
         {/* Streak Widget - Compact inline with Score */}
         <div className="flex gap-3">
           <div className="flex-1">
             <BolehScoreWidget userId={userId} />
           </div>
         </div>
-        
-        {/* Streak Widget - Full */}
-        <StreakWidget userId={userId} />
-      </div>
+          
+          {/* Streak Widget - Full */}
+          <StreakWidget userId={userId} />
+        </div>
 
-      {/* 📊 RISK CORRELATION CHART */}
-      <div className="px-4 mt-4">
-        {riskChartLoading ? (
+        {/* 📊 CARTA KORELASI RISIKO (Risk Correlation Chart) */}
+        <div className="px-4 mt-4">
+          {riskChartLoading ? (
           <div className="bg-white rounded-2xl p-6 shadow-lg border border-slate-100">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 bg-slate-200 rounded-xl animate-pulse"></div>
@@ -327,7 +371,7 @@ export default function DashboardPage() {
       {/* QUICK ACTIONS */}
       <div className="px-4 mt-5">
         <div className="grid grid-cols-2 gap-3">
-          {/* Log Food */}
+          {/* Log Makanan (Log Food) */}
           <Link 
             href="/check-food"
             className="bg-gradient-to-br from-teal-500 to-emerald-600 p-4 rounded-2xl shadow-lg shadow-teal-200/50 flex items-center gap-3 active:scale-[0.98] transition-transform"
@@ -339,12 +383,12 @@ export default function DashboardPage() {
               </svg>
             </div>
             <div>
-              <p className="text-white font-bold text-sm">Log Food</p>
-              <p className="text-teal-100 text-xs">Scan or type</p>
+              <p className="text-white font-bold text-sm">Log Makanan</p>
+              <p className="text-teal-100 text-xs">Scan atau taip</p>
             </div>
           </Link>
 
-          {/* Log Vitals */}
+          {/* Log Bacaan (Log Vitals) */}
           <button 
             onClick={() => setIsVitalsOpen(true)}
             className="bg-gradient-to-br from-rose-500 to-pink-600 p-4 rounded-2xl shadow-lg shadow-rose-200/50 flex items-center gap-3 active:scale-[0.98] transition-transform text-left"
@@ -357,8 +401,8 @@ export default function DashboardPage() {
               </svg>
             </div>
             <div>
-              <p className="text-white font-bold text-sm">Log Vitals</p>
-              <p className="text-rose-100 text-xs">Glucose, BP, Weight</p>
+              <p className="text-white font-bold text-sm">Log Bacaan</p>
+              <p className="text-rose-100 text-xs">Glukosa, BP, Berat</p>
             </div>
           </button>
         </div>
@@ -374,11 +418,11 @@ export default function DashboardPage() {
             <div className="absolute inset-0 bg-gradient-to-br from-slate-800/85 via-slate-900/75 to-teal-900/65 backdrop-blur-[3px] flex flex-col items-center justify-center p-4 z-50 overflow-hidden">
               
               {/* Title */}
-              <h3 className="text-white font-bold text-lg mb-1">Weekly Insights</h3>
+              <h3 className="text-white font-bold text-lg mb-1">Statistik Mingguan</h3>
               
               {/* Message */}
               <p className="text-teal-300 text-xs font-medium mb-4 text-center">
-                Log your first 3 days to unlock!
+                Log 3 hari pertama untuk buka!
               </p>
               
               {/* Progress Checkboxes - Day 1, 2, 3 */}
@@ -416,7 +460,7 @@ export default function DashboardPage() {
                 href="/check-food" 
                 className="bg-gradient-to-r from-teal-500 to-teal-600 text-white text-xs font-bold px-5 py-2.5 rounded-full shadow-lg shadow-teal-500/30 hover:shadow-teal-500/50 transition-all"
               >
-                📸 Log Today's Meal
+                📸 Log Makanan Hari Ini
               </Link>
             </div>
           )}
@@ -439,7 +483,7 @@ export default function DashboardPage() {
       {/* MEAL LIST HEADER */}
       <div className="px-4 mt-6 flex justify-between items-center">
         <h3 className="font-bold text-slate-800">
-          {isToday ? "Today's Meals" : `Meals on ${selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}
+          {isToday ? "Makanan Hari Ini" : `Makanan pada ${selectedDate.toLocaleDateString('ms-MY', { month: 'short', day: 'numeric' })}`}
         </h3>
         {filteredMeals.length > 0 && (
           <button 
@@ -449,7 +493,7 @@ export default function DashboardPage() {
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
               <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z" />
             </svg>
-            Share Day
+            Kongsi
           </button>
         )}
       </div>
@@ -459,16 +503,16 @@ export default function DashboardPage() {
         {filteredMeals.length === 0 ? (
           <div className="bg-white rounded-2xl p-8 text-center border border-dashed border-slate-200">
             <div className="text-4xl mb-3">🍽️</div>
-            <p className="text-slate-500 font-medium">No meals tracked {isToday ? 'today' : 'on this day'}.</p>
+            <p className="text-slate-500 font-medium">Tiada makanan dilog {isToday ? 'hari ini' : 'pada hari ini'}.</p>
             {isToday && (
               <div className="mt-4">
                 {/* Prominent CTA for first-time users */}
                 <div className="bg-gradient-to-r from-blue-50 to-teal-50 rounded-xl p-4 border border-blue-100">
                   <p className="text-blue-700 font-bold text-sm mb-2">
-                    Ready to start your health journey?
+                    Bersedia untuk mulakan perjalanan sihat anda?
                   </p>
                   <p className="text-slate-500 text-xs">
-                    Tap the camera button below to log your first meal!
+                    Tekan butang kamera di bawah untuk log makanan pertama anda!
                   </p>
                 </div>
                 
@@ -579,7 +623,7 @@ export default function DashboardPage() {
             href="/report"
             className="block w-full py-4 bg-gradient-to-r from-slate-800 to-slate-900 text-white font-bold text-center rounded-2xl shadow-lg"
           >
-            📄 Generate Weekly Report
+            📄 Jana Laporan Mingguan
           </Link>
         </div>
       )}

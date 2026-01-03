@@ -34,10 +34,13 @@ USER HEALTH PROFILE:
 - Daily calorie target: {daily_target} kcal
 - Daily sodium limit: {sodium_limit}mg
 - Daily sugar limit: {sugar_limit}g
+- Ramadan Mode: {ramadan_mode} (Active/Inactive)
 
 RECENT GLUCOSE (if available):
 - Last reading: {last_glucose} mmol/L ({glucose_context})
 - Average this week: {avg_glucose} mmol/L
+
+{ramadan_context}
 
 ═══════════════════════════════════════════════════════════════
 YOUR RESPONSE STRUCTURE

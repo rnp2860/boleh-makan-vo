@@ -116,8 +116,22 @@ export default function CheckFoodPage() {
   const [isReanalyzing, setIsReanalyzing] = useState(false);
   
   // 🍽️ MEAL TYPE SELECTOR (for Nutrition Reports)
-  // Auto-select based on current time
-  const getDefaultMealType = (): 'Breakfast' | 'Lunch' | 'Dinner' | 'Snack' => {
+  // Auto-select based on current time OR Ramadan mode
+  const getDefaultMealType = (): 'Breakfast' | 'Lunch' | 'Dinner' | 'Snack' | 'Sahur' | 'Iftar' => {
+    // Check if Ramadan mode is enabled
+    if (typeof window !== 'undefined') {
+      const ramadanModeEnabled = localStorage.getItem('boleh_makan_ramadan_mode') === 'true';
+      
+      if (ramadanModeEnabled) {
+        // Ramadan mode: Auto-select based on time
+        const hour = new Date().getHours();
+        if (hour >= 3 && hour < 6) return 'Sahur';      // 3am - 6am: Sahur time
+        if (hour >= 18 && hour < 21) return 'Iftar';    // 6pm - 9pm: Iftar time
+        return 'Iftar'; // Default to Iftar if outside sahur time
+      }
+    }
+    
+    // Normal mode: Use existing logic
     const hour = new Date().getHours();
     if (hour >= 5 && hour < 10) return 'Breakfast';      // 5am - 10am
     if (hour >= 10 && hour < 12) return 'Snack';          // 10am - 12pm (morning snack)
@@ -126,7 +140,7 @@ export default function CheckFoodPage() {
     if (hour >= 18 && hour < 22) return 'Dinner';         // 6pm - 10pm
     return 'Snack';                                        // 10pm - 5am (late night snack)
   };
-  const [mealType, setMealType] = useState<'Breakfast' | 'Lunch' | 'Dinner' | 'Snack'>(getDefaultMealType);
+  const [mealType, setMealType] = useState<'Breakfast' | 'Lunch' | 'Dinner' | 'Snack' | 'Sahur' | 'Iftar'>(getDefaultMealType);
 
   // 🏪 MEAL CONTEXT & PREPARATION (Enterprise Features)
   const [mealContext, setMealContext] = useState<MealContext>('hawker_stall');
@@ -134,6 +148,16 @@ export default function CheckFoodPage() {
 
   const { addMeal, userProfile } = useFood();
   const router = useRouter();
+  
+  // 🌙 Check if Ramadan mode is enabled
+  const [isRamadanMode, setIsRamadanMode] = useState(false);
+  
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const ramadanModeEnabled = localStorage.getItem('boleh_makan_ramadan_mode') === 'true';
+      setIsRamadanMode(ramadanModeEnabled);
+    }
+  }, []);
 
   // 🆔 Get or create user ID for Supabase
   const getUserId = () => {
@@ -814,8 +838,8 @@ export default function CheckFoodPage() {
                 <span className="text-3xl">📸</span>
               </div>
               <div className="text-left">
-                <h3 className="text-lg font-bold">Take a Photo</h3>
-                <p className="text-teal-100 text-sm">Snap or choose from gallery</p>
+                <h3 className="text-lg font-bold">Ambil Gambar</h3>
+                <p className="text-teal-100 text-sm">Snap atau pilih dari galeri</p>
               </div>
             </button>
 
@@ -828,8 +852,8 @@ export default function CheckFoodPage() {
                 <span className="text-3xl">✏️</span>
               </div>
               <div className="text-left flex-1">
-                <h3 className="text-lg font-bold">Type It In</h3>
-                <p className="text-slate-400 text-sm">Quick log without photo</p>
+                <h3 className="text-lg font-bold">Taip Sendiri</h3>
+                <p className="text-slate-400 text-sm">Log cepat tanpa foto</p>
               </div>
             </button>
 
@@ -846,11 +870,11 @@ export default function CheckFoodPage() {
           <div className="mt-6 space-y-2 px-1">
             <p className="text-xs text-gray-500 flex items-start gap-2">
               <span>📸</span>
-              <span>Photo scanning works best with Malaysian foods. You can always edit results.</span>
+              <span>Scan gambar paling sesuai untuk makanan Malaysia. Anda boleh edit hasil bila-bila masa.</span>
             </p>
             <p className="text-xs text-gray-500 flex items-start gap-2">
               <span>✏️</span>
-              <span>Type to search 500+ Malaysian foods by name in BM or English.</span>
+              <span>Taip untuk cari 500+ makanan Malaysia dalam BM atau English.</span>
             </p>
           </div>
 
@@ -861,8 +885,8 @@ export default function CheckFoodPage() {
               <div>
                 <p className="text-sm font-bold text-teal-700 mb-1">Pro Tip</p>
                 <p className="text-xs text-teal-600 leading-relaxed">
-                  <strong>Take a Photo</strong> gives you the most accurate analysis — I can see portion sizes, ingredients, and cooking style! 
-                  <span className="text-teal-500"> Type It In is great for quick entries, but may miss some details.</span>
+                  <strong>Ambil Gambar</strong> memberikan analisis paling tepat — saya boleh nampak saiz porsi, bahan-bahan, dan cara masak! 
+                  <span className="text-teal-500"> Taip Sendiri bagus untuk entry cepat, tapi mungkin terlepas beberapa detail.</span>
                 </p>
               </div>
             </div>
@@ -1003,8 +1027,8 @@ export default function CheckFoodPage() {
               <div className="absolute inset-0 rounded-full border-4 border-teal-400 border-t-transparent animate-spin"></div>
             </div>
             
-            <p className="text-slate-600 font-bold text-lg mb-2">Analyzing your meal...</p>
-            <p className="text-slate-400 text-sm">Dr. Reza is identifying ingredients</p>
+            <p className="text-slate-600 font-bold text-lg mb-2">Menganalisis makanan anda...</p>
+            <p className="text-slate-400 text-sm">Dr. Reza sedang mengenal pasti bahan</p>
             
             {/* Image preview while loading */}
             {image && (
@@ -1166,8 +1190,8 @@ export default function CheckFoodPage() {
                     <Image src="/assets/avatar-header-thinking.png" alt="Dr Reza" width={48} height={48} className="object-cover" />
                   </div>
                   <div>
-                    <p className="text-amber-800 font-bold">Help me identify this!</p>
-                    <p className="text-amber-600 text-sm">What food is this?</p>
+                    <p className="text-amber-800 font-bold">Tolong saya kenal pasti ini!</p>
+                    <p className="text-amber-600 text-sm">Makanan apa ini?</p>
                   </div>
                 </div>
                 
@@ -1178,7 +1202,7 @@ export default function CheckFoodPage() {
                     value={correctionInput}
                     onChange={(e) => setCorrectionInput(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleCorrectionSubmit()}
-                    placeholder="e.g. Curry Puff, Nasi Lemak, Roti Canai..."
+                    placeholder="cth: Karipap, Nasi Lemak, Roti Canai..."
                     disabled={isReanalyzing}
                     className="w-full p-4 pr-12 bg-white rounded-2xl text-lg font-semibold text-slate-800 placeholder-slate-400 outline-none border-2 border-amber-200 focus:border-amber-500 transition-colors shadow-inner disabled:opacity-50"
                     autoFocus
@@ -1199,7 +1223,7 @@ export default function CheckFoodPage() {
                 </div>
                 
                 <p className="text-amber-600 text-xs mt-3 text-center">
-                  Press <strong>Enter</strong> or tap the arrow to analyze
+                  Tekan <strong>Enter</strong> atau tap anak panah untuk menganalisis
                 </p>
               </div>
             ) : (
@@ -1207,7 +1231,7 @@ export default function CheckFoodPage() {
               <div className="p-4 bg-gradient-to-r from-teal-500 to-cyan-500 text-white">
                 <div className="flex justify-between items-center">
                   <div>
-                    <p className="text-teal-100 text-xs font-bold uppercase tracking-wider">Total Calories</p>
+                    <p className="text-teal-100 text-xs font-bold uppercase tracking-wider">Jumlah Kalori</p>
                     <p className="text-4xl font-black">{finalData.macros.calories}<span className="text-lg font-medium ml-1">kcal</span></p>
                   </div>
                   <div className="grid grid-cols-3 gap-3 text-center">
@@ -1258,7 +1282,7 @@ export default function CheckFoodPage() {
                 {/* 📏 QUICK PORTION SELECTOR */}
                 <div className="mt-3 pt-3 border-t border-white/20">
                   <div className="flex items-center justify-between">
-                    <p className="text-white/70 text-[10px] font-bold uppercase">Portion Size</p>
+                    <p className="text-white/70 text-[10px] font-bold uppercase">Saiz Porsi</p>
                     <div className="flex gap-1">
                       {([0.5, 1, 1.5] as const).map((size) => (
                         <button
@@ -1270,7 +1294,7 @@ export default function CheckFoodPage() {
                               : 'bg-white/20 text-white/80 hover:bg-white/30'
                           }`}
                         >
-                          {size === 0.5 ? '½ Small' : size === 1 ? '1x Std' : '1.5x Large'}
+                          {size === 0.5 ? '½ Kecil' : size === 1 ? '1x Biasa' : '1.5x Besar'}
                         </button>
                       ))}
                     </div>
@@ -1373,14 +1397,14 @@ export default function CheckFoodPage() {
             <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 mb-4">
               <div className="flex items-center gap-3 mb-2">
                 <AlertTriangle className="w-6 h-6 text-amber-600 flex-shrink-0" />
-                <h3 className="font-bold text-amber-800">Please Verify</h3>
+                <h3 className="font-bold text-amber-800">Sila Verifikasi</h3>
               </div>
               <p className="text-sm text-amber-700 mb-3">
-                This food wasn't found in our database. AI has estimated the nutrition values. 
-                <strong> Adakah ini betul? / Is this correct?</strong>
+                Makanan ini tidak dijumpai dalam database kami. AI telah menganggarkan nilai nutrisi. 
+                <strong> Adakah ini betul?</strong>
               </p>
               <p className="text-xs text-amber-600">
-                💡 Tip: Use the edit button above to correct the food name if needed, or adjust the portion size below.
+                💡 Tip: Gunakan butang edit di atas untuk betulkan nama makanan jika perlu, atau laraskan saiz porsi di bawah.
               </p>
             </div>
           )}
@@ -1391,7 +1415,7 @@ export default function CheckFoodPage() {
               
               {/* PORTION SIZE - Cool Pills */}
               <div className="mb-6">
-                <p className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">📏 Portion Size</p>
+                <p className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">📏 Saiz Porsi</p>
                 <div className="grid grid-cols-4 gap-2">
                   {([0.5, 1, 1.5, 2] as const).map((size) => (
                     <button
@@ -1408,9 +1432,9 @@ export default function CheckFoodPage() {
                   ))}
                 </div>
                 <div className="flex justify-between text-[10px] text-slate-400 mt-2 px-1">
-                  <span>Small</span>
-                  <span>Regular</span>
-                  <span>Large</span>
+                  <span>Kecil</span>
+                  <span>Biasa</span>
+                  <span>Besar</span>
                   <span>XL</span>
                 </div>
               </div>
@@ -1418,12 +1442,12 @@ export default function CheckFoodPage() {
               {/* INGREDIENTS BREAKDOWN */}
               <div className="mb-6">
                 <div className="flex justify-between items-center mb-3">
-                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">🥗 Ingredients Detected</p>
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">🥗 Bahan Dikesan</p>
                   <button 
                     onClick={() => setShowAddIngredient(true)}
                     className="text-xs font-bold text-teal-600 hover:text-teal-700"
                   >
-                    + Add Missing
+                    + Tambah Yang Terlepas
                   </button>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -1455,13 +1479,13 @@ export default function CheckFoodPage() {
                     </button>
                   ))}
                 </div>
-                <p className="text-[10px] text-slate-400 mt-2">Tap to exclude • Added items show in teal</p>
+                <p className="text-[10px] text-slate-400 mt-2">Tap untuk exclude • Item tambahan ditunjukkan dalam teal</p>
               </div>
 
               {/* LAUK TAMBAH - From API suggestions */}
               {baseResult.data.valid_lauk && baseResult.data.valid_lauk.length > 0 && (
                 <div className="mb-6">
-                  <p className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">🥚 Add Side Dishes</p>
+                  <p className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">🥚 Tambah Lauk Pauk</p>
                   <div className="flex flex-wrap gap-2">
                     {baseResult.data.valid_lauk.slice(0, 5).map((item: any, idx: number) => {
                       const isAdded = customItems.find(i => i.name === item.name);
@@ -1511,7 +1535,7 @@ export default function CheckFoodPage() {
 
               {/* DRINKS */}
               <div className="mb-6">
-                <p className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">🥤 Add Drink</p>
+                <p className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">🥤 Tambah Minuman</p>
                 <div className="flex flex-wrap gap-2">
                   {MALAYSIAN_FOOD_ANCHORS.filter(i => i.category === 'drink').slice(0, 4).map(item => {
                     const isAdded = customItems.find(i => i.id === item.id);
@@ -1562,33 +1586,72 @@ export default function CheckFoodPage() {
             </div>
           )}
 
-          {/* 🍽️ MEAL TYPE SELECTOR - Only show when NOT low confidence */}
+          {/* 🍽️ MEAL TYPE SELECTOR - Dynamic based on Ramadan mode */}
           {!isLowConfidence() && (
             <div className="bg-white rounded-2xl p-4 shadow-lg mb-4">
-              <p className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">🍽️ What meal is this?</p>
-              <div className="grid grid-cols-4 gap-2">
-                {(['Breakfast', 'Lunch', 'Dinner', 'Snack'] as const).map((type) => {
-                  const icons: Record<string, string> = {
-                    'Breakfast': '🌅',
-                    'Lunch': '☀️',
-                    'Dinner': '🌙',
-                    'Snack': '🍪'
-                  };
-                  return (
+              <p className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">
+                🍽️ Jenis Hidangan {isRamadanMode ? '(Mod Ramadan 🌙)' : ''}
+              </p>
+              <div className={`grid ${isRamadanMode ? 'grid-cols-2' : 'grid-cols-4'} gap-2`}>
+                {isRamadanMode ? (
+                  /* Ramadan Meal Types */
+                  <>
                     <button
-                      key={type}
-                      onClick={() => setMealType(type)}
+                      onClick={() => setMealType('Sahur')}
                       className={`py-3 rounded-xl font-bold text-sm transition-all flex flex-col items-center gap-1 ${
-                        mealType === type 
+                        mealType === 'Sahur' 
                           ? 'bg-teal-500 text-white shadow-lg shadow-teal-200 scale-105' 
                           : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
                       }`}
                     >
-                      <span className="text-lg">{icons[type]}</span>
-                      <span className="text-xs">{type}</span>
+                      <span className="text-lg">🌙</span>
+                      <span className="text-xs">Sahur</span>
+                      <span className="text-[9px] opacity-70">3-5:30 AM</span>
                     </button>
-                  );
-                })}
+                    <button
+                      onClick={() => setMealType('Iftar')}
+                      className={`py-3 rounded-xl font-bold text-sm transition-all flex flex-col items-center gap-1 ${
+                        mealType === 'Iftar' 
+                          ? 'bg-teal-500 text-white shadow-lg shadow-teal-200 scale-105' 
+                          : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                      }`}
+                    >
+                      <span className="text-lg">🌅</span>
+                      <span className="text-xs">Iftar</span>
+                      <span className="text-[9px] opacity-70">Selepas Maghrib</span>
+                    </button>
+                  </>
+                ) : (
+                  /* Normal Meal Types */
+                  ['Breakfast', 'Lunch', 'Dinner', 'Snack'].map((type) => {
+                    const icons: Record<string, string> = {
+                      'Breakfast': '🌅',
+                      'Lunch': '☀️',
+                      'Dinner': '🌙',
+                      'Snack': '🍪'
+                    };
+                    const labels: Record<string, string> = {
+                      'Breakfast': 'Sarapan',
+                      'Lunch': 'Tengahari',
+                      'Dinner': 'Malam',
+                      'Snack': 'Snek'
+                    };
+                    return (
+                      <button
+                        key={type}
+                        onClick={() => setMealType(type as any)}
+                        className={`py-3 rounded-xl font-bold text-sm transition-all flex flex-col items-center gap-1 ${
+                          mealType === type 
+                            ? 'bg-teal-500 text-white shadow-lg shadow-teal-200 scale-105' 
+                            : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                        }`}
+                      >
+                        <span className="text-lg">{icons[type]}</span>
+                        <span className="text-xs">{labels[type]}</span>
+                      </button>
+                    );
+                  })
+                )}
               </div>
             </div>
           )}
@@ -1598,7 +1661,7 @@ export default function CheckFoodPage() {
             <div className="bg-white rounded-2xl p-4 shadow-lg mb-4">
               {/* Meal Context */}
               <div className="mb-5">
-                <p className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">🏪 Where did you get this?</p>
+                <p className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">🏪 Dari Mana Anda Dapat Ini?</p>
                 <div className="grid grid-cols-3 gap-2">
                   {MEAL_CONTEXT_OPTIONS.map((option) => (
                     <button
@@ -1619,7 +1682,7 @@ export default function CheckFoodPage() {
 
               {/* Preparation Style */}
               <div>
-                <p className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">👨‍🍳 How was it prepared?</p>
+                <p className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">👨‍🍳 Bagaimana Ia Disediakan?</p>
                 <div className="grid grid-cols-4 gap-2">
                   {PREPARATION_STYLE_OPTIONS.map((option) => (
                     <button
@@ -1655,14 +1718,21 @@ export default function CheckFoodPage() {
                 disabled={loading}
                 className="w-full bg-gradient-to-r from-green-500 to-emerald-500 text-white py-4 rounded-2xl font-bold text-lg shadow-xl shadow-green-200 active:scale-[0.98] transition-transform disabled:opacity-50"
               >
-                {loading ? 'Saving...' : `✅ Log ${mealType} (${finalData.macros.calories} kcal)`}
+                {loading ? 'Menyimpan...' : `✅ Log ${
+                  mealType === 'Breakfast' ? 'Sarapan' : 
+                  mealType === 'Lunch' ? 'Tengahari' : 
+                  mealType === 'Dinner' ? 'Malam' : 
+                  mealType === 'Sahur' ? 'Sahur 🌙' :
+                  mealType === 'Iftar' ? 'Iftar 🌅' :
+                  'Snek'
+                } (${finalData.macros.calories} kcal)`}
               </button>
             )}
             <button 
               onClick={handleReset}
               className="w-full bg-white text-slate-400 py-3 rounded-2xl font-bold text-sm border border-slate-200 hover:bg-red-50 hover:text-red-500 hover:border-red-200 transition-colors"
             >
-              {isLowConfidence() ? 'Cancel & Try Again' : 'Discard & Start Over'}
+              {isLowConfidence() ? 'Batal & Cuba Lagi' : 'Buang & Mula Semula'}
             </button>
           </div>
         </div>
