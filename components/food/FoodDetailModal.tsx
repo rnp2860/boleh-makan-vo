@@ -109,7 +109,7 @@ export function FoodDetailModal({
                   <span className="text-xs font-medium px-2 py-1 bg-slate-100 text-slate-700 rounded-full">
                     {food.category.replace('_', ' ')}
                   </span>
-                  {food.tags.slice(0, 3).map((tag) => (
+                  {food.tags.slice(0, 3).map((tag: string) => (
                     <span key={tag} className="text-xs px-2 py-1 bg-emerald-50 text-emerald-700 rounded-full">
                       {tag}
                     </span>
