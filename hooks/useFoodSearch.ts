@@ -187,3 +187,44 @@ export function useFoodDetail(foodId: string | null) {
   
   return { food, isLoading, error };
 }
+
+// Hook for fetching food categories
+export interface FoodCategory {
+  name: string;
+  count: number;
+  icon: string;
+}
+
+export function useFoodCategories() {
+  const [categories, setCategories] = useState<FoodCategory[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        
+        const response = await fetch('/api/foods/categories');
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch categories');
+        }
+        
+        const data = await response.json();
+        setCategories(data);
+        
+      } catch (err) {
+        console.error('Categories fetch error:', err);
+        setError(err instanceof Error ? err.message : 'Unknown error');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchCategories();
+  }, []);
+
+  return { categories, isLoading, error };
+}
