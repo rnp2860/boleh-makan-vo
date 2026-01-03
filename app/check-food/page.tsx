@@ -6,7 +6,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Info, AlertTriangle, CheckCircle } from 'lucide-react';
 import { VitalityHUD } from '@/components/VitalityHUD';
 import { useFood } from '@/context/FoodContext';
 import { MALAYSIAN_FOOD_ANCHORS, FoodAnchor, FoodCategory } from '@/data/malaysian_food_anchors';
@@ -779,33 +779,58 @@ export default function CheckFoodPage() {
           <div className="space-y-4">
             
             {/* Camera Button - Primary */}
-            <button 
-              onClick={() => fileInputRef.current?.click()}
-              className="w-full bg-gradient-to-r from-teal-500 to-cyan-500 text-white rounded-2xl p-5 shadow-lg shadow-teal-200/50 flex items-center gap-4 active:scale-[0.98] transition-transform"
-            >
-              <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
-                <span className="text-3xl">📸</span>
+            <div>
+              <button 
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full bg-gradient-to-r from-teal-500 to-cyan-500 text-white rounded-2xl p-5 shadow-lg shadow-teal-200/50 flex items-center gap-4 active:scale-[0.98] transition-transform"
+              >
+                <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
+                  <span className="text-3xl">📸</span>
+                </div>
+                <div className="text-left">
+                  <h3 className="text-lg font-bold">Take a Photo</h3>
+                  <p className="text-teal-100 text-base">Snap or choose from gallery</p>
+                </div>
+              </button>
+              
+              {/* Disclaimer for Take a Photo */}
+              <div className="mt-2 px-3">
+                <p className="text-xs text-gray-500 flex items-start gap-1.5">
+                  <Info className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                  <span>
+                    AI scanning works best with Malaysian foods. For other cuisines, results may vary. 
+                    You can always edit the detected food.
+                  </span>
+                </p>
               </div>
-              <div className="text-left">
-                <h3 className="text-lg font-bold">Take a Photo</h3>
-                <p className="text-teal-100 text-base">Snap or choose from gallery</p>
-              </div>
-            </button>
+            </div>
 
             {/* Text Input Button - Secondary */}
-            <button 
-              onClick={() => setShowTextInput(true)}
-              className="w-full bg-white text-slate-700 rounded-2xl p-5 shadow-md border border-slate-200 flex items-center gap-4 active:scale-[0.98] transition-transform hover:border-teal-300"
-            >
-              <div className="w-14 h-14 bg-slate-100 rounded-xl flex items-center justify-center">
-                <span className="text-3xl">✏️</span>
+            <div>
+              <button 
+                onClick={() => setShowTextInput(true)}
+                className="w-full bg-white text-slate-700 rounded-2xl p-5 shadow-md border border-slate-200 flex items-center gap-4 active:scale-[0.98] transition-transform hover:border-teal-300"
+              >
+                <div className="w-14 h-14 bg-slate-100 rounded-xl flex items-center justify-center">
+                  <span className="text-3xl">✏️</span>
+                </div>
+                <div className="text-left flex-1">
+                  <h3 className="text-lg font-bold">Type It In</h3>
+                  <p className="text-slate-400 text-base">Quick log without photo</p>
+                </div>
+                <span className="text-xs font-bold text-teal-600 bg-teal-50 px-2 py-1 rounded-lg">RECOMMENDED</span>
+              </button>
+              
+              {/* Disclaimer for Type It In */}
+              <div className="mt-2 px-3">
+                <p className="text-xs text-gray-500 flex items-start gap-1.5">
+                  <Info className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                  <span>
+                    Search our database of 500+ Malaysian foods. Type food name in BM or English.
+                  </span>
+                </p>
               </div>
-              <div className="text-left flex-1">
-                <h3 className="text-lg font-bold">Type It In</h3>
-                <p className="text-slate-400 text-base">Quick log without photo</p>
-              </div>
-              <span className="text-xs font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded-lg">BASIC</span>
-            </button>
+            </div>
 
             <input 
               type="file" 
@@ -943,14 +968,27 @@ export default function CheckFoodPage() {
                   {/* 🇲🇾 MALAYSIAN DATABASE BADGE - Show when matched to our 485 Malaysian foods */}
                   {!isLowConfidence() && baseResult.source === 'malaysian_database' && (
                     <span className="bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                      <CheckCircle className="w-3 h-3" />
                       <span>🇲🇾</span> MALAYSIAN DATABASE
                     </span>
                   )}
-                  {!isLowConfidence() && baseResult.is_verified && baseResult.source !== 'malaysian_database' && (
-                    <span className="bg-green-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">✓ VERIFIED</span>
+                  {/* 🌍 INTERNATIONAL DATABASE BADGE */}
+                  {!isLowConfidence() && (baseResult.source === 'database' || baseResult.source === 'database_verified') && (
+                    <span className="bg-blue-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                      <CheckCircle className="w-3 h-3" />
+                      🌍 INTERNATIONAL DATABASE
+                    </span>
                   )}
-                  {!isLowConfidence() && !baseResult.is_verified && (
-                    <span className="bg-amber-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">AI ESTIMATE</span>
+                  {/* 🤖 AI ESTIMATE BADGE - When no database match */}
+                  {!isLowConfidence() && baseResult.source === 'vision_estimate' && (
+                    <span className="bg-amber-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3" />
+                      AI ESTIMATE - PLEASE VERIFY
+                    </span>
+                  )}
+                  {/* Legacy verified badge (fallback) */}
+                  {!isLowConfidence() && baseResult.is_verified && !baseResult.source && (
+                    <span className="bg-green-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">✓ VERIFIED</span>
                   )}
                   {/* 📊 LOW CONFIDENCE BADGE - Show when Unknown or < 60% */}
                   {isLowConfidence() && (
@@ -1178,6 +1216,23 @@ export default function CheckFoodPage() {
                   {baseResult.data.analysis_content || "Looks good! Remember to stay hydrated 💧"}
                 </p>
               </div>
+            </div>
+          )}
+
+          {/* 🔍 VERIFICATION PROMPT - Show for AI estimates */}
+          {!isLowConfidence() && baseResult.source === 'vision_estimate' && (
+            <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 mb-4">
+              <div className="flex items-center gap-3 mb-2">
+                <AlertTriangle className="w-6 h-6 text-amber-600 flex-shrink-0" />
+                <h3 className="font-bold text-amber-800">Please Verify</h3>
+              </div>
+              <p className="text-sm text-amber-700 mb-3">
+                This food wasn't found in our database. AI has estimated the nutrition values. 
+                <strong> Adakah ini betul? / Is this correct?</strong>
+              </p>
+              <p className="text-xs text-amber-600">
+                💡 Tip: Use the edit button above to correct the food name if needed, or adjust the portion size below.
+              </p>
             </div>
           )}
 

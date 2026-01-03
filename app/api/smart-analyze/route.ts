@@ -463,66 +463,79 @@ export async function POST(req: Request) {
 
     console.log(`✅ Identified: "${foodName}" | Category: ${visionCategory} | Confidence: ${visionConfidence}`);
 
-    // 🏦 STEP 2: Cross-reference AI result with MALAYSIAN DATABASE FIRST
-    // Try Malaysian database first (485 verified Malaysian foods)
-    console.log(`🔍 Searching Malaysian database for vision result: "${foodName}"`);
-    const malaysianDbMatch = await searchMalaysianFoodDatabase(foodName);
+    // 🏦 STEP 2: Smart 3-Tier Matching (Only try Malaysian DB if food has Malaysian keywords)
+    // 🇲🇾 MALAYSIAN KEYWORDS - indicators that food might be Malaysian
+    const MALAYSIAN_KEYWORDS = ['nasi', 'mee', 'mi', 'roti', 'kuih', 'sambal', 'rendang', 'laksa', 'satay', 'goreng', 'lemak', 'ayam', 'ikan', 'teh', 'kopi', 'char kuey teow', 'roti canai', 'lemak', 'dagang'];
+    const mightBeMalaysian = MALAYSIAN_KEYWORDS.some(kw => foodName.toLowerCase().includes(kw));
     
-    if (malaysianDbMatch && malaysianDbMatch.match_confidence >= 0.7) {
-      // 🎯 MALAYSIAN DATABASE HIT! Use accurate Malaysian nutrition data
-      console.log(`✅ Malaysian DB match for vision result "${foodName}" → "${malaysianDbMatch.name_en}" (${(malaysianDbMatch.match_confidence * 100).toFixed(0)}% confidence)`);
+    let malaysianDbMatch = null;
+    
+    // Only search Malaysian DB if the food name contains Malaysian keywords
+    if (mightBeMalaysian) {
+      console.log(`🇲🇾 Malaysian keywords detected in "${foodName}", searching Malaysian database...`);
+      malaysianDbMatch = await searchMalaysianFoodDatabase(foodName);
       
-      const conditions = healthConditions || [];
-      const drRezaTip = generateMalaysianFoodAdvice(malaysianDbMatch, conditions);
-      const components = getMalaysianFoodComponents(malaysianDbMatch);
-      
-      return NextResponse.json({
-        success: true,
-        source: 'malaysian_database',
-        verified: true,
-        confidence: malaysianDbMatch.match_confidence,
-        data: {
-          food_name: malaysianDbMatch.name_en,
-          food_name_bm: malaysianDbMatch.name_bm,
-          malaysian_food_id: malaysianDbMatch.id,
-          category: malaysianDbMatch.category,
-          components: components,
-          macros: {
-            calories: malaysianDbMatch.calories,
-            protein_g: malaysianDbMatch.protein,
-            carbs_g: malaysianDbMatch.carbs,
-            fat_g: malaysianDbMatch.fat,
-            sugar_g: malaysianDbMatch.sugar_g,
-            sodium_mg: malaysianDbMatch.sodium_mg,
-            saturated_fat_g: malaysianDbMatch.saturated_fat_g,
-            cholesterol_mg: malaysianDbMatch.cholesterol_mg,
-            phosphorus_mg: malaysianDbMatch.phosphorus_mg,
-            potassium_mg: malaysianDbMatch.potassium_mg,
-            fiber_g: malaysianDbMatch.fiber_g
-          },
-          serving_size: malaysianDbMatch.serving_description,
-          serving_grams: malaysianDbMatch.serving_grams,
-          diabetes_rating: malaysianDbMatch.diabetes_rating,
-          hypertension_rating: malaysianDbMatch.hypertension_rating,
-          cholesterol_rating: malaysianDbMatch.cholesterol_rating,
-          ckd_rating: malaysianDbMatch.ckd_rating,
-          valid_lauk: [],
-          analysis_content: drRezaTip,
-          is_potentially_pork: isPotentiallyPork,
-          detected_protein: detectedProtein,
-          visual_notes: visionNutrition ? `Vision detected: ${portionEstimation.size_category} portion (${portionEstimation.multiplier}x). Matched to verified Malaysian database.` : `Matched to verified Malaysian database: ${malaysianDbMatch.name_bm}`,
-          health_tags: buildHealthTags(malaysianDbMatch),
-          portion_estimation: type === 'image' ? portionEstimation : undefined,
-          base_nutrition: type === 'image' ? baseNutrition : undefined,
-          meal_context: type === 'image' ? visionNutrition?.meal_context : undefined,
-          preparation_style: type === 'image' ? visionNutrition?.preparation_style : undefined,
-        }
-      });
+      if (malaysianDbMatch && malaysianDbMatch.match_confidence >= 0.75) {
+        // 🎯 STRONG MALAYSIAN DATABASE MATCH! Use accurate Malaysian nutrition data
+        console.log(`✅ Strong Malaysian DB match: "${foodName}" → "${malaysianDbMatch.name_en}" (${(malaysianDbMatch.match_confidence * 100).toFixed(0)}% confidence)`);
+        
+        const conditions = healthConditions || [];
+        const drRezaTip = generateMalaysianFoodAdvice(malaysianDbMatch, conditions);
+        const components = getMalaysianFoodComponents(malaysianDbMatch);
+        
+        return NextResponse.json({
+          success: true,
+          source: 'malaysian_database',
+          verified: true,
+          confidence: malaysianDbMatch.match_confidence,
+          data: {
+            food_name: malaysianDbMatch.name_en,
+            food_name_bm: malaysianDbMatch.name_bm,
+            malaysian_food_id: malaysianDbMatch.id,
+            category: malaysianDbMatch.category,
+            components: components,
+            macros: {
+              calories: malaysianDbMatch.calories,
+              protein_g: malaysianDbMatch.protein,
+              carbs_g: malaysianDbMatch.carbs,
+              fat_g: malaysianDbMatch.fat,
+              sugar_g: malaysianDbMatch.sugar_g,
+              sodium_mg: malaysianDbMatch.sodium_mg,
+              saturated_fat_g: malaysianDbMatch.saturated_fat_g,
+              cholesterol_mg: malaysianDbMatch.cholesterol_mg,
+              phosphorus_mg: malaysianDbMatch.phosphorus_mg,
+              potassium_mg: malaysianDbMatch.potassium_mg,
+              fiber_g: malaysianDbMatch.fiber_g
+            },
+            serving_size: malaysianDbMatch.serving_description,
+            serving_grams: malaysianDbMatch.serving_grams,
+            diabetes_rating: malaysianDbMatch.diabetes_rating,
+            hypertension_rating: malaysianDbMatch.hypertension_rating,
+            cholesterol_rating: malaysianDbMatch.cholesterol_rating,
+            ckd_rating: malaysianDbMatch.ckd_rating,
+            valid_lauk: [],
+            analysis_content: drRezaTip,
+            is_potentially_pork: isPotentiallyPork,
+            detected_protein: detectedProtein,
+            visual_notes: visionNutrition ? `Vision detected: ${portionEstimation.size_category} portion (${portionEstimation.multiplier}x). Matched to verified Malaysian database.` : `Matched to verified Malaysian database: ${malaysianDbMatch.name_bm}`,
+            health_tags: buildHealthTags(malaysianDbMatch),
+            portion_estimation: type === 'image' ? portionEstimation : undefined,
+            base_nutrition: type === 'image' ? baseNutrition : undefined,
+            meal_context: type === 'image' ? visionNutrition?.meal_context : undefined,
+            preparation_style: type === 'image' ? visionNutrition?.preparation_style : undefined,
+          }
+        });
+      } else if (malaysianDbMatch) {
+        console.log(`⚠️ Weak Malaysian DB match (${(malaysianDbMatch.match_confidence * 100).toFixed(0)}%), will try international DB...`);
+      } else {
+        console.log(`ℹ️ No Malaysian DB match found, will try international DB...`);
+      }
+    } else {
+      console.log(`🌍 No Malaysian keywords in "${foodName}", skipping Malaysian DB, trying international DB...`);
     }
     
-    // 🏦 STEP 3: Fallback to generic database if no Malaysian match
-    // This improves accuracy by using verified nutrition data when available
-    console.log(`🔍 No Malaysian match found, trying generic database for: "${foodName}"`);
+    // 🏦 STEP 3: Try international/generic database
+    console.log(`🔍 Searching international database for: "${foodName}"`);
     const dbMatch = await searchFoodDatabase(foodName);
     
     // Also try a direct database lookup as fallback
