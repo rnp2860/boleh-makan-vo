@@ -64,7 +64,10 @@ export interface UserHealthProfile {
 export interface MealContext {
   foodName: string;
   originalFoodName?: string; // Preserve on edit
+  wasEdited?: boolean; // Flag to indicate edited meal
   serving: string;
+  servingMultiplier?: number;
+  source?: string; // 'database' | 'ai_estimated'
   nutrition: {
     calories: number;
     carbs_g: number;
@@ -155,19 +158,43 @@ DO say: "Cuba nasi lemak kuah kurang sambal, atau nasi kerabu - both lower in so
 
 **Use Traffic Light System for Each Condition:**
 
-Format your meal analysis like this:
+## RESPONSE FORMAT (MUST FOLLOW EXACTLY)
 
-**[FOOD NAME]** - Overall Rating for Your Conditions
+When analyzing ANY meal, use this EXACT format with each condition on a NEW LINE:
 
-**Untuk keadaan anda:**
-${conditions.includes('diabetes') || conditions.includes('diabetes_t2') || conditions.includes('diabetes_t1') || conditions.includes('prediabetes') ? '• 🩸 **Diabetes**: [Specific impact with numbers]' : ''}
-${conditions.includes('hypertension') ? '• 💉 **Darah Tinggi**: [Specific impact with numbers]' : ''}
-${conditions.includes('dyslipidemia') || conditions.includes('high_cholesterol') ? '• 💊 **Kolesterol**: [Specific impact with numbers]' : ''}
-${conditions.includes('ckd') || conditions.includes('ckd_stage_1') || conditions.includes('ckd_stage_2') || conditions.includes('ckd_stage_3') || conditions.includes('ckd_stage_4') || conditions.includes('ckd_stage_5') ? '• 🫘 **Buah Pinggang (CKD)**: [Specific impact with numbers]' : ''}
+**[Food Name]** - [🟢 Selamat / 🟡 Berhati-hati / 🔴 Hadkan]
 
-**Overall:** 🟢 SELAMAT / 🟡 BERHATI-HATI / 🔴 HADKAN
+📊 **Untuk keadaan anda:**
 
-**Tips:** [One actionable Malaysian suggestion]
+${conditions.includes('diabetes') || conditions.includes('diabetes_t2') || conditions.includes('diabetes_t1') || conditions.includes('prediabetes') ? `
+🩸 **Diabetes:** [🟢/🟡/🔴] Carbs Xg - [brief impact in Manglish]
+` : ''}${conditions.includes('hypertension') ? `
+❤️ **Darah Tinggi:** [🟢/🟡/🔴] Sodium Xmg - [brief impact in Manglish]
+` : ''}${conditions.includes('dyslipidemia') || conditions.includes('high_cholesterol') ? `
+🫀 **Kolesterol:** [🟢/🟡/🔴] Sat Fat Xg - [brief impact in Manglish]
+` : ''}${conditions.includes('ckd') || conditions.includes('ckd_stage_1') || conditions.includes('ckd_stage_2') || conditions.includes('ckd_stage_3') || conditions.includes('ckd_stage_4') || conditions.includes('ckd_stage_5') ? `
+🫘 **Buah Pinggang:** [🟢/🟡/🔴] Protein Xg, Potassium Xmg - [brief impact in Manglish]
+` : ''}
+💡 **Tips:** [One specific actionable suggestion with Malaysian food alternative]
+
+IMPORTANT FORMATTING RULES:
+- Each condition MUST be on its own line with a blank line before it
+- ALWAYS show the actual numbers (Carbs 85g, Sodium 950mg, etc.)
+- Only show conditions the user has selected in their profile
+- Keep each condition line concise but specific
+- Tips must suggest a Malaysian food alternative
+
+EXAMPLE OUTPUT for user with Diabetes + Hypertension:
+
+**Nasi Lemak Rendang** - 🟡 Berhati-hati
+
+📊 **Untuk keadaan anda:**
+
+🩸 **Diabetes:** 🔴 Carbs 95g - tinggi, boleh spike glucose lepas makan
+
+❤️ **Darah Tinggi:** 🔴 Sodium 950mg - hampir separuh daily limit anda
+
+💡 **Tips:** Cuba minta nasi separuh je, atau tukar ke nasi kerabu yang lebih rendah sodium dan carbs.
 
 **Consider Meal Context**
 
@@ -187,6 +214,16 @@ ${conditions.includes('ckd') || conditions.includes('ckd_stage_1') || conditions
 - Even if user shortens "Nasi Lemak Rendang Ayam" to "nasi lemak", remember the full original name
 - Reference the complete dish in your analysis
 - Don't lose context when meals are edited
+
+## HANDLING EDITED MEALS
+
+When a user edits/corrects the food name:
+- This means the AI scan was wrong and user is correcting it
+- Provide FULL detailed analysis, same quality as initial scan
+- Thank them briefly for the correction: "Thanks for the correction!"
+- Then give complete analysis with all conditions on separate lines
+- NEVER give a short 1-2 sentence response for edited meals
+- Use the EXACT same format as initial scans with all condition details
 
 ════════════════════════════════════════════════════════════════
 ⚠️ IMPORTANT RULES
@@ -444,12 +481,29 @@ FOR IFTAR (breaking fast):
  * Build user message with meal context for analysis
  */
 export function buildMealAnalysisMessage(mealContext: MealContext, userMessage?: string): string {
-  const foodName = mealContext.originalFoodName || mealContext.foodName;
+  const foodName = mealContext.foodName;
+  const wasEdited = mealContext.wasEdited || false;
+  const originalName = mealContext.originalFoodName;
   
-  let message = `Please analyze this meal for my health conditions:
+  let message = '';
+  
+  // Add edit context if this is an edited meal
+  if (wasEdited && originalName) {
+    message += `User EDITED the food name. Please provide FULL analysis (not shortened).
+
+Original Name: ${originalName}
+Corrected Name: ${foodName}
+
+IMPORTANT: This is an edited entry. User corrected the food name. Provide COMPLETE analysis with all their health conditions on separate lines, specific numbers, and a helpful tip. Do NOT give a short generic response.
+
+`;
+  }
+  
+  message += `Please analyze this meal for my health conditions:
 
 **Food:** ${foodName}
-**Serving:** ${mealContext.serving}
+**Serving:** ${mealContext.serving}${mealContext.servingMultiplier ? ` (${mealContext.servingMultiplier}x)` : ''}
+${mealContext.source ? `**Source:** ${mealContext.source}` : ''}
 
 **Nutrition:**
 - Calories: ${mealContext.nutrition.calories} kcal
@@ -460,6 +514,9 @@ export function buildMealAnalysisMessage(mealContext: MealContext, userMessage?:
 - Saturated Fat: ${mealContext.nutrition.saturated_fat_g || 'N/A'}g
 - Sugar: ${mealContext.nutrition.sugar_g || 'N/A'}g`;
 
+  if (mealContext.nutrition.fiber_g) {
+    message += `\n- Fiber: ${mealContext.nutrition.fiber_g}g`;
+  }
   if (mealContext.nutrition.cholesterol_mg) {
     message += `\n- Cholesterol: ${mealContext.nutrition.cholesterol_mg}mg`;
   }
@@ -480,7 +537,7 @@ export function buildMealAnalysisMessage(mealContext: MealContext, userMessage?:
     if (mealContext.ckd_rating) message += `\n- CKD: ${mealContext.ckd_rating}`;
   }
 
-  if (userMessage) {
+  if (userMessage && !wasEdited) {
     message += `\n\nUser's specific question: ${userMessage}`;
   }
 

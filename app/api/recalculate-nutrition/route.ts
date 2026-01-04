@@ -21,18 +21,41 @@ export async function POST(req: Request) {
 
     console.log('🔄 Recalculating nutrition:', { food_name, original_name });
 
-    // Build context for the AI
+    // Build detailed condition-specific analysis requirements
     let conditionNote = "";
+    let conditionAnalysisFormat = "";
+    
     if (user_profile?.healthConditions?.length > 0) {
-      conditionNote = `The user has: ${user_profile.healthConditions.join(', ')}. Highlight relevant risks.`;
+      const conditions = user_profile.healthConditions;
+      conditionNote = `The user has: ${conditions.join(', ')}. You MUST analyze each condition separately.`;
+      
+      // Build the required format for multi-condition analysis
+      conditionAnalysisFormat = `\n\n"analysis_content": "Brief overall comment (1 sentence)"\n\n"dr_reza_analysis": {\n  "overall_rating": "🟢 Selamat" | "🟡 Berhati-hati" | "🔴 Hadkan",\n  "conditions": [\n`;
+      
+      if (conditions.some((c: string) => c.includes('diabetes') || c === 'prediabetes')) {
+        conditionAnalysisFormat += `    {\n      "condition": "Diabetes",\n      "emoji": "🩸",\n      "rating": "🟢" | "🟡" | "🔴",\n      "impact": "Carbs XXg - [brief impact in Manglish]"\n    },\n`;
+      }
+      if (conditions.includes('hypertension')) {
+        conditionAnalysisFormat += `    {\n      "condition": "Darah Tinggi",\n      "emoji": "❤️",\n      "rating": "🟢" | "🟡" | "🔴",\n      "impact": "Sodium XXXmg - [brief impact in Manglish]"\n    },\n`;
+      }
+      if (conditions.some((c: string) => c.includes('cholesterol') || c.includes('dyslipidemia'))) {
+        conditionAnalysisFormat += `    {\n      "condition": "Kolesterol",\n      "emoji": "🫀",\n      "rating": "🟢" | "🟡" | "🔴",\n      "impact": "Sat Fat XXg - [brief impact in Manglish]"\n    },\n`;
+      }
+      if (conditions.some((c: string) => c.includes('ckd'))) {
+        conditionAnalysisFormat += `    {\n      "condition": "Buah Pinggang",\n      "emoji": "🫘",\n      "rating": "🟢" | "🟡" | "🔴",\n      "impact": "Protein XXg, Potassium XXXmg - [brief impact in Manglish]"\n    },\n`;
+      }
+      
+      conditionAnalysisFormat += `  ],\n  "tip": "Actionable Malaysian food alternative suggestion"\n}`;
     }
 
-    const prompt = `You are Dr. Reza, a Malaysian nutritionist expert.
+    const prompt = `You are Dr. Reza, a warm Malaysian nutritionist expert.
 
-The user is eating: "${food_name}"
+The user CORRECTED their food name to: "${food_name}"
 ${original_name ? `(They corrected it from: "${original_name}")` : ''}
 
 ${conditionNote}
+
+IMPORTANT: This is an EDITED meal. The user corrected the AI's initial guess. Provide FULL DETAILED analysis, NOT a short generic response.
 
 Provide accurate Malaysian nutrition data. Return ONLY valid JSON with this exact structure:
 {
@@ -48,8 +71,7 @@ Provide accurate Malaysian nutrition data. Return ONLY valid JSON with this exac
     "fat_g": total_fat,
     "sodium_mg": estimated_sodium,
     "sugar_g": estimated_sugar
-  },
-  "analysis_content": "Brief health tip (max 25 words)",
+  },${conditionAnalysisFormat || '\n  "analysis_content": "Detailed health analysis (2-3 sentences with specific numbers)"'}
   "risk_analysis": {
     "is_high_sugar": boolean,
     "is_high_sodium": boolean
@@ -57,6 +79,13 @@ Provide accurate Malaysian nutrition data. Return ONLY valid JSON with this exac
   "meal_context": "hawker_stall" | "home_cooked" | "restaurant" | "fast_food" | "unknown",
   "preparation_style": "deep_fried" | "stir_fried" | "steamed" | "soup_boiled" | "gravy_curry" | "grilled" | "raw_fresh" | "unknown"
 }
+
+CRITICAL FORMATTING REQUIREMENTS:
+- Each condition in dr_reza_analysis.conditions MUST be a separate object
+- Include actual numbers (Carbs 65g, Sodium 800mg, etc.)
+- Rating must be 🟢 (safe), 🟡 (caution), or 🔴 (limit)
+- Impact text should be brief Manglish explanation
+- Tip should suggest a Malaysian alternative food
 
 Use accurate Malaysian portion sizes. Be specific about preparation method impact on calories.`;
 
@@ -68,8 +97,8 @@ Use accurate Malaysian portion sizes. Be specific about preparation method impac
           content: prompt,
         },
       ],
-      max_tokens: 600,
-      temperature: 0.3, // Lower temperature for more consistent nutrition data
+      max_tokens: 800, // Increased for full analysis
+      temperature: 0.3,
     });
 
     const content = response.choices[0].message.content;
@@ -81,12 +110,14 @@ Use accurate Malaysian portion sizes. Be specific about preparation method impac
       console.log('✅ Recalculation complete:', {
         food_name: nutritionData.food_name,
         calories: nutritionData.macros?.calories,
+        has_dr_reza_analysis: !!nutritionData.dr_reza_analysis,
       });
 
       return NextResponse.json({
         success: true,
         data: nutritionData,
         recalculated: true,
+        was_edited: true,
       });
     } catch (parseError) {
       console.error('❌ JSON parse error:', parseError);
