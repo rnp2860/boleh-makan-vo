@@ -241,7 +241,7 @@ export default function DashboardPage() {
             className="object-cover" 
           />
         </div>
-        <div className="text-teal-600 font-bold animate-pulse">Loading Dr. Reza...</div>
+        <div className="text-teal-600 font-bold animate-pulse">Memuatkan Dr. Reza...</div>
       </div>
     );
   }

@@ -830,8 +830,8 @@ export default function CheckFoodPage() {
             <div className="mt-4 bg-white rounded-2xl px-6 py-4 shadow-lg border border-slate-100 relative max-w-xs">
               <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-white rotate-45 border-l border-t border-slate-100"></div>
               <p className="text-slate-700 text-center font-medium text-base leading-relaxed">
-                Hai! 👋 I'm <span className="text-teal-600 font-bold">Dr. Reza</span>. 
-                <br/>Show me what you're eating today!
+                Hai! 👋 Saya <span className="text-teal-600 font-bold">Dr. Reza</span>. 
+                <br/>Tunjuk saya apa anda makan hari ini!
               </p>
             </div>
           </div>
@@ -1038,7 +1038,7 @@ export default function CheckFoodPage() {
             </div>
             
             <p className="text-slate-600 font-bold text-lg mb-2">Menganalisis makanan anda...</p>
-            <p className="text-slate-400 text-sm">Dr. Reza sedang mengenal pasti bahan</p>
+            <p className="text-slate-400 text-sm">Dr. Reza sedang kenal pasti bahan</p>
             
             {/* Image preview while loading */}
             {image && (
@@ -1288,28 +1288,6 @@ export default function CheckFoodPage() {
                     </div>
                   );
                 })()}
-                
-                {/* 📏 QUICK PORTION SELECTOR */}
-                <div className="mt-3 pt-3 border-t border-white/20">
-                  <div className="flex items-center justify-between">
-                    <p className="text-white/70 text-[10px] font-bold uppercase">Saiz Porsi</p>
-                    <div className="flex gap-1">
-                      {([0.5, 1, 1.5] as const).map((size) => (
-                        <button
-                          key={size}
-                          onClick={() => setPortion(size)}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                            portion === size 
-                              ? 'bg-white text-teal-600 shadow-md' 
-                              : 'bg-white/20 text-white/80 hover:bg-white/30'
-                          }`}
-                        >
-                          {size === 0.5 ? '½ Kecil' : size === 1 ? '1x Biasa' : '1.5x Besar'}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
               </div>
             )}
           </div>
@@ -1323,7 +1301,7 @@ export default function CheckFoodPage() {
                   <Image src="/assets/avatar-header.png" alt="Dr Reza" width={40} height={40} className="object-cover" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-xs font-bold text-blue-600 mb-1">Dr. Reza says</p>
+                  <p className="text-xs font-bold text-blue-600 mb-1">Dr. Reza kata</p>
                   
                   {/* Overall Rating if present */}
                   {baseResult.data.dr_reza_analysis?.overall_rating && (
@@ -1341,7 +1319,7 @@ export default function CheckFoodPage() {
                   )}
                   
                   <p className="text-sm text-slate-700 leading-relaxed">
-                    {baseResult.data.analysis_content || "Looks good! Remember to stay hydrated 💧"}
+                    {baseResult.data.analysis_content || "Nampak okay! Jangan lupa minum air 💧"}
                   </p>
                 </div>
               </div>
