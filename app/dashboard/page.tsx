@@ -12,7 +12,7 @@ import { DailyProgress } from '@/components/DailyProgress';
 import MealDetailsModal from '@/components/MealDetailsModal';
 import DaySummaryShare from '@/components/DaySummaryShare';
 import LogVitalsModal from '@/components/LogVitalsModal';
-import BolehScoreWidget from '@/components/BolehScoreWidget';
+import BolehScore from '@/components/dashboard/BolehScore';
 import RiskChart, { FoodLogEntry, VitalEntry } from '@/components/RiskChart';
 import StreakWidget from '@/components/StreakWidget';
 import StreakCelebrationModal from '@/components/StreakCelebrationModal';
@@ -46,6 +46,13 @@ export default function DashboardPage() {
   const [riskChartFoodLogs, setRiskChartFoodLogs] = useState<FoodLogEntry[]>([]);
   const [riskChartVitals, setRiskChartVitals] = useState<VitalEntry[]>([]);
   const [riskChartLoading, setRiskChartLoading] = useState(true);
+
+  // Boleh Score data
+  const [todayScore, setTodayScore] = useState<number>(70);
+  const [yesterdayScore, setYesterdayScore] = useState<number>(70);
+  const [mealsLoggedToday, setMealsLoggedToday] = useState<number>(0);
+  const [vitalsLoggedToday, setVitalsLoggedToday] = useState<number>(0);
+  const [scoreLoading, setScoreLoading] = useState(true);
 
   // Get user ID for Boleh Score
   useEffect(() => {
@@ -173,6 +180,48 @@ export default function DashboardPage() {
   useEffect(() => {
     refetchChartData();
   }, [userId, selectedDate, chartRefreshKey]);
+
+  // Fetch Boleh Score data for today and yesterday
+  useEffect(() => {
+    const fetchScoreData = async () => {
+      if (!userId) return;
+      
+      setScoreLoading(true);
+      
+      try {
+        // Fetch today's score
+        const todayResponse = await fetch(`/api/user/score?user_id=${encodeURIComponent(userId)}`);
+        const todayResult = await todayResponse.json();
+        
+        if (todayResult.success && todayResult.data) {
+          setTodayScore(todayResult.data.score);
+          setMealsLoggedToday(todayResult.data.stats.meals_logged);
+          setVitalsLoggedToday(todayResult.data.stats.vitals_logged);
+        }
+        
+        // Fetch yesterday's score for comparison
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayDateStr = yesterday.toISOString().split('T')[0];
+        
+        const yesterdayResponse = await fetch(
+          `/api/user/score?user_id=${encodeURIComponent(userId)}&date=${yesterdayDateStr}`
+        );
+        const yesterdayResult = await yesterdayResponse.json();
+        
+        if (yesterdayResult.success && yesterdayResult.data) {
+          setYesterdayScore(yesterdayResult.data.score);
+        }
+      } catch (error) {
+        console.error('Error fetching score data:', error);
+      } finally {
+        setScoreLoading(false);
+      }
+    };
+    
+    fetchScoreData();
+  }, [userId]);
+
 
   // Handler for meal deletion that also refreshes the chart
   const handleDeleteMeal = async (mealId: string) => {
@@ -325,7 +374,26 @@ export default function DashboardPage() {
         {/* Streak Widget - Compact inline with Score */}
         <div className="flex gap-3">
           <div className="flex-1">
-            <BolehScoreWidget userId={userId} />
+            {scoreLoading ? (
+              <div className="bg-white rounded-3xl p-6 shadow-lg border border-slate-100">
+                <div className="flex items-center justify-center gap-4">
+                  <div className="w-32 h-32 rounded-full bg-slate-100 animate-pulse"></div>
+                  <div className="flex-1 space-y-3">
+                    <div className="h-6 bg-slate-100 rounded-lg w-32 animate-pulse"></div>
+                    <div className="h-4 bg-slate-100 rounded-lg w-48 animate-pulse"></div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <BolehScore 
+                score={todayScore}
+                previousScore={yesterdayScore}
+                streak={streak}
+                mealsLogged={mealsLoggedToday}
+                targetMeals={3}
+                vitalsLogged={vitalsLoggedToday}
+              />
+            )}
           </div>
         </div>
           
