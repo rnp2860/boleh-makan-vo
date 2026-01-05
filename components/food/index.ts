@@ -5,3 +5,4 @@ export { FoodDetailModal } from './FoodDetailModal';
 export { FoodCategoryBrowser } from './FoodCategoryBrowser';
 export { FoodSearch } from './FoodSearch';
 export { SearchSuggestions } from './SearchSuggestions';
+export { SmartFoodSearch } from './SmartFoodSearch';
