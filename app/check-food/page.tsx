@@ -124,6 +124,10 @@ export default function CheckFoodPage() {
   const [correctionInput, setCorrectionInput] = useState('');
   const [isReanalyzing, setIsReanalyzing] = useState(false);
   
+  // 📸 PHOTO CONFIRMATION - Show preview before analyze
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [showPhotoConfirm, setShowPhotoConfirm] = useState(false);
+  
   // 🍽️ MEAL TYPE SELECTOR (for Nutrition Reports)
   // Auto-select based on current time OR Ramadan mode
   const getDefaultMealType = (): 'Breakfast' | 'Lunch' | 'Dinner' | 'Snack' | 'Sahur' | 'Iftar' => {
@@ -349,33 +353,43 @@ export default function CheckFoodPage() {
     }
   };
 
-  // 📸 AUTO-ANALYZE ON IMAGE SELECT (with compression for speed)
+  // 📸 SHOW PREVIEW (No auto-analyze - user must confirm)
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       // 📍 SILENT CAPTURE: Request geolocation on image capture
       await captureGeolocation();
       
-      setLoading(true);
-      setBaseResult(null);
-      setPortion(1);
-      setKuahLevel('biasa');
-      setExcludedComponents([]);
-      setCustomItems([]);
-      
       const reader = new FileReader();
-      reader.onloadend = async () => {
+      reader.onloadend = () => {
         const rawImage = reader.result as string;
-        setImage(rawImage); // Show original for display
-        
-        // Compress for faster API analysis
-        const compressedImage = await compressImage(rawImage, 512, 0.6);
-        
-        // Auto-analyze with compressed image
-        await analyzeFood('image', compressedImage);
+        setPhotoPreview(rawImage); // Store for preview
+        setShowPhotoConfirm(true); // Show confirmation modal
       };
       reader.readAsDataURL(file);
     }
+  };
+  
+  // 📸 CONFIRM PHOTO ANALYSIS (User explicitly analyzes photo)
+  const handleConfirmPhotoAnalysis = async () => {
+    if (!photoPreview) return;
+    
+    setShowPhotoConfirm(false);
+    setLoading(true);
+    setBaseResult(null);
+    setPortion(1);
+    setKuahLevel('biasa');
+    setExcludedComponents([]);
+    setCustomItems([]);
+    
+    setImage(photoPreview); // Show original for display
+    
+    // Compress for faster API analysis
+    const compressedImage = await compressImage(photoPreview, 512, 0.6);
+    
+    // Analyze with compressed image
+    await analyzeFood('image', compressedImage);
+    setPhotoPreview(null);
   };
 
   // 📝 TEXT INPUT ANALYSIS
@@ -938,35 +952,35 @@ export default function CheckFoodPage() {
           {/* 📸 ACTION BUTTONS */}
           <div className="space-y-4">
             
-            {/* Camera Button - Primary */}
+            {/* Text Input Button - PRIMARY */}
+            <button 
+              onClick={() => setShowTextInput(true)}
+              className="w-full bg-gradient-to-r from-teal-500 to-cyan-500 text-white rounded-2xl p-5 shadow-lg shadow-teal-200/50 flex items-center gap-4 active:scale-[0.98] transition-transform"
+            >
+              <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
+                <span className="text-3xl">✏️</span>
+              </div>
+              <div className="text-left flex-1">
+                <h3 className="text-lg font-bold">Taip Makanan Anda</h3>
+                <p className="text-teal-100 text-sm">🇲🇾 500+ makanan Malaysia verified</p>
+              </div>
+            </button>
+
+            {/* Camera Button - SECONDARY (Suggest Only) */}
             <button 
               onClick={async () => {
                 // 📍 REQUEST LOCATION PERMISSION - The "Hawker Hook"
                 await requestLocationPermission();
                 fileInputRef.current?.click();
               }}
-              className="w-full bg-gradient-to-r from-teal-500 to-cyan-500 text-white rounded-2xl p-5 shadow-lg shadow-teal-200/50 flex items-center gap-4 active:scale-[0.98] transition-transform"
-            >
-              <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
-                <span className="text-3xl">📸</span>
-              </div>
-              <div className="text-left">
-                <h3 className="text-lg font-bold">Ambil Gambar</h3>
-                <p className="text-teal-100 text-sm">Snap atau pilih dari galeri</p>
-              </div>
-            </button>
-
-            {/* Text Input Button - Secondary */}
-            <button 
-              onClick={() => setShowTextInput(true)}
               className="w-full bg-white text-slate-700 rounded-2xl p-5 shadow-md border border-slate-200 flex items-center gap-4 active:scale-[0.98] transition-transform hover:border-teal-300"
             >
               <div className="w-14 h-14 bg-slate-100 rounded-xl flex items-center justify-center">
-                <span className="text-3xl">✏️</span>
+                <span className="text-3xl">📸</span>
               </div>
-              <div className="text-left flex-1">
-                <h3 className="text-lg font-bold">Taip Sendiri</h3>
-                <p className="text-slate-400 text-sm">Log cepat tanpa foto</p>
+              <div className="text-left">
+                <h3 className="text-lg font-bold">Scan Foto</h3>
+                <p className="text-slate-400 text-sm">(Cadangan sahaja, perlu confirm)</p>
               </div>
             </button>
 
@@ -982,12 +996,12 @@ export default function CheckFoodPage() {
           {/* Disclaimers Section - Below Buttons */}
           <div className="mt-6 space-y-2 px-1">
             <p className="text-xs text-gray-500 flex items-start gap-2">
-              <span>📸</span>
-              <span>Scan gambar paling sesuai untuk makanan Malaysia. Anda boleh edit hasil bila-bila masa.</span>
+              <span>✏️</span>
+              <span><strong>Taip</strong> cari 500+ makanan Malaysia verified dalam database kami (English & BM).</span>
             </p>
             <p className="text-xs text-gray-500 flex items-start gap-2">
-              <span>✏️</span>
-              <span>Taip untuk cari 500+ makanan Malaysia dalam BM atau English.</span>
+              <span>📸</span>
+              <span><strong>Scan Foto</strong> memberikan cadangan makanan. Anda MESTI sahkan sebelum save.</span>
             </p>
           </div>
 
@@ -996,10 +1010,10 @@ export default function CheckFoodPage() {
             <div className="flex items-start gap-3">
               <span className="text-xl">💡</span>
               <div>
-                <p className="text-sm font-bold text-teal-700 mb-1">Pro Tip</p>
+                <p className="text-sm font-bold text-teal-700 mb-1">Kenapa Taip Dahulu?</p>
                 <p className="text-xs text-teal-600 leading-relaxed">
-                  <strong>Ambil Gambar</strong> memberikan analisis paling tepat — saya boleh nampak saiz porsi, bahan-bahan, dan cara masak! 
-                  <span className="text-teal-500"> Taip Sendiri bagus untuk entry cepat, tapi mungkin terlepas beberapa detail.</span>
+                  <strong>Taip</strong> memberikan maklumat VERIFIED dari database Malaysia kami — cepat, tepat, dan dipercayai! 
+                  <span className="text-teal-500"> Scan foto bagus untuk cadangan, tapi perlu anda confirm dulu.</span>
                 </p>
               </div>
             </div>
@@ -1179,24 +1193,36 @@ export default function CheckFoodPage() {
               <div className={`${image ? 'absolute bottom-0 left-0 right-0' : ''} p-4`}>
                 <div className="flex items-center gap-2 mb-1 flex-wrap">
                   {/* 🇲🇾 MALAYSIAN DATABASE BADGE - Show when matched to our 485 Malaysian foods */}
-                  {!isLowConfidence() && baseResult.source === 'malaysian_database' && (
+                  {!isLowConfidence() && (baseResult.source === 'malaysian_database' || baseResult.source === 'malaysian_db') && (
                     <span className="bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
                       <CheckCircle className="w-3 h-3" />
-                      <span>🇲🇾</span> MALAYSIAN DATABASE
+                      🇲🇾 Verified DB
                     </span>
                   )}
                   {/* 🌍 INTERNATIONAL DATABASE BADGE */}
                   {!isLowConfidence() && (baseResult.source === 'database' || baseResult.source === 'database_verified') && (
                     <span className="bg-blue-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
                       <CheckCircle className="w-3 h-3" />
-                      🌍 INTERNATIONAL DATABASE
+                      🌍 Verified DB
                     </span>
                   )}
                   {/* 🤖 AI ESTIMATE BADGE - When no database match */}
-                  {!isLowConfidence() && baseResult.source === 'vision_estimate' && (
+                  {!isLowConfidence() && (baseResult.source === 'vision_estimate' || baseResult.source === 'ai_estimate') && (
                     <span className="bg-amber-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
                       <AlertTriangle className="w-3 h-3" />
-                      AI ESTIMATE - PLEASE VERIFY
+                      Estimated
+                    </span>
+                  )}
+                  {/* 📊 CONFIDENCE LABEL - Map from confidence score */}
+                  {!isLowConfidence() && confidenceScore && (
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                      confidenceScore >= 0.95 ? 'bg-green-100 text-green-700' :
+                      confidenceScore >= 0.80 ? 'bg-yellow-100 text-yellow-700' :
+                      'bg-orange-100 text-orange-700'
+                    }`}>
+                      {confidenceScore >= 0.95 ? '🟢 High' :
+                       confidenceScore >= 0.80 ? '🟡 Medium' :
+                       '🟠 Low'} Confidence
                     </span>
                   )}
                   {/* Legacy verified badge (fallback) */}
@@ -1804,20 +1830,34 @@ export default function CheckFoodPage() {
           {/* 💾 SAVE BUTTONS - Only show Log Meal when NOT low confidence */}
           <div className="space-y-3 mb-6">
             {!isLowConfidence() && (
-              <button 
-                onClick={handleSave}
-                disabled={loading}
-                className="w-full bg-gradient-to-r from-green-500 to-emerald-500 text-white py-4 rounded-2xl font-bold text-lg shadow-xl shadow-green-200 active:scale-[0.98] transition-transform disabled:opacity-50"
-              >
-                {loading ? 'Menyimpan...' : `✅ Log ${
-                  mealType === 'Breakfast' ? 'Sarapan' : 
-                  mealType === 'Lunch' ? 'Tengahari' : 
-                  mealType === 'Dinner' ? 'Malam' : 
-                  mealType === 'Sahur' ? 'Sahur 🌙' :
-                  mealType === 'Iftar' ? 'Iftar 🌅' :
-                  'Snek'
-                } (${finalData.macros.calories} kcal)`}
-              </button>
+              <>
+                <button 
+                  onClick={handleSave}
+                  disabled={loading}
+                  className="w-full bg-gradient-to-r from-green-500 to-emerald-500 text-white py-4 rounded-2xl font-bold text-lg shadow-xl shadow-green-200 active:scale-[0.98] transition-transform disabled:opacity-50"
+                >
+                  {loading ? 'Menyimpan...' : `✅ Confirm & Log ${
+                    mealType === 'Breakfast' ? 'Sarapan' : 
+                    mealType === 'Lunch' ? 'Tengahari' : 
+                    mealType === 'Dinner' ? 'Malam' : 
+                    mealType === 'Sahur' ? 'Sahur 🌙' :
+                    mealType === 'Iftar' ? 'Iftar 🌅' :
+                    'Snek'
+                  } (${finalData.macros.calories} kcal)`}
+                </button>
+                {/* 📝 CORRECT BUTTON - Open text search with prefilled name (for photo scans) */}
+                {image && (
+                  <button 
+                    onClick={() => {
+                      setTextInput(finalData.food_name);
+                      setShowTextInput(true);
+                    }}
+                    className="w-full bg-amber-500 text-white py-3 rounded-2xl font-bold text-sm shadow-md hover:bg-amber-600 transition-colors"
+                  >
+                    ✏️ Betulkan Nama Makanan
+                  </button>
+                )}
+              </>
             )}
             <button 
               onClick={handleReset}
@@ -1982,6 +2022,50 @@ export default function CheckFoodPage() {
               >
                 Add Ingredient
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========== 📸 PHOTO CONFIRMATION MODAL ========== */}
+      {showPhotoConfirm && photoPreview && (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center backdrop-blur-sm p-4">
+          <div className="bg-white w-full max-w-md rounded-3xl overflow-hidden animate-slideUp shadow-2xl">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-teal-500 to-cyan-500 p-4 text-center">
+              <h3 className="text-white text-xl font-bold">Sahkan Gambar</h3>
+              <p className="text-teal-100 text-sm mt-1">Saya akan cadangkan makanan — anda perlu sahkan</p>
+            </div>
+            
+            {/* Photo Preview */}
+            <div className="p-4">
+              <div className="rounded-2xl overflow-hidden shadow-lg mb-4">
+                <img src={photoPreview} alt="Preview" className="w-full h-64 object-cover" />
+              </div>
+              
+              <p className="text-slate-600 text-sm text-center mb-4">
+                Saya akan <strong>mencadangkan</strong> makanan ini. Anda boleh edit atau betulkan sebelum save.
+              </p>
+              
+              {/* Options */}
+              <div className="space-y-3">
+                <button
+                  onClick={handleConfirmPhotoAnalysis}
+                  className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-teal-500 to-cyan-500 text-white font-bold text-lg shadow-lg shadow-teal-200 active:scale-[0.98] transition-transform"
+                >
+                  🔍 Analisis Gambar Ini
+                </button>
+                
+                <button
+                  onClick={() => {
+                    setShowPhotoConfirm(false);
+                    setPhotoPreview(null);
+                  }}
+                  className="w-full py-3 text-slate-400 font-medium"
+                >
+                  Batal
+                </button>
+              </div>
             </div>
           </div>
         </div>
