@@ -284,11 +284,13 @@ export async function POST(req: Request) {
       if (DEBUG_SMART_ANALYZE) console.debug('[smart-analyze] parsed vision result', visionResult);
       
       const candidates: VisionCandidate[] = Array.isArray(visionResult.candidates) && visionResult.candidates.length
-        ? visionResult.candidates.map((c: any) => ({
-            name: c.name,
-            confidence: c.confidence ?? c.confidence_score ?? 0.5,
-            reason: c.reason
-          })).filter(c => c.name)
+        ? visionResult.candidates
+            .map((c: any): VisionCandidate => ({
+              name: c.name,
+              confidence: c.confidence ?? c.confidence_score ?? 0.5,
+              reason: c.reason
+            }))
+            .filter((c: VisionCandidate) => Boolean(c.name))
         : visionResult.food_name
           ? [{ name: visionResult.food_name, confidence: visionResult.confidence_score || 0.5, reason: 'single guess' }]
           : [];
