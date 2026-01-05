@@ -541,7 +541,7 @@ export async function POST(req: Request) {
       // If DB match found, return immediately
       if (chosenResolution && chosenResolution.source === 'malaysian_db' && chosenResolution.matchedFood) {
         const matched = chosenResolution.matchedFood;
-        const drRezaTip = generateMalaysianFoodAdvice({
+        const malaysianMatch = {
           id: matched.id,
           name_en: matched.name_en,
           name_bm: matched.name_bm,
@@ -562,10 +562,15 @@ export async function POST(req: Request) {
           diabetes_rating: matched.ratings.diabetes_rating as any,
           hypertension_rating: matched.ratings.hypertension_rating as any,
           cholesterol_rating: matched.ratings.cholesterol_rating as any,
-          ckd_rating: matched.ratings.ckd_rating as any
-        });
+          ckd_rating: matched.ratings.ckd_rating as any,
+          source: 'malaysian_database' as const,
+          match_confidence: chosenResolution.confidence,
+          match_type: chosenResolution.debug.strategy as any
+        };
+        const drRezaTip = generateMalaysianFoodAdvice(malaysianMatch, conditions);
         
-        const halalStatus = checkHalalStatus(matched.name_en, matched.components || []);
+        const halalComponents = getTypicalComponents(matched.name_en, matched.macros);
+        const halalStatus = checkHalalStatus(matched.name_en, halalComponents);
         const isHighSodium = (matched.macros.sodium_mg || 0) > 800;
         const isHighSugar = (matched.macros.sugar_g || 0) > 15;
 
@@ -590,9 +595,9 @@ export async function POST(req: Request) {
               phosphorus_mg: matched.macros.phosphorus_mg || 0,
               potassium_mg: matched.macros.potassium_mg || 0
             },
-            components: matched.components || getTypicalComponents(matched.name_en, matched.macros),
+            components: getMalaysianFoodComponents(malaysianMatch),
             analysis_content: drRezaTip,
-            valid_lauk: getMalaysianFoodComponents(matched.name_en),
+            valid_lauk: getMalaysianFoodComponents(malaysianMatch),
             health_tags: buildHealthTags({
               sodium_mg: matched.macros.sodium_mg,
               sugar_g: matched.macros.sugar_g,
@@ -601,7 +606,7 @@ export async function POST(req: Request) {
             }),
             halal_status: halalStatus,
             is_potentially_pork: halalStatus.status === 'non_halal',
-            detected_protein,
+            detected_protein: detectedProtein,
             portion_estimation: portionEstimation,
             base_nutrition: baseNutrition,
             detected_components: detectedComponents,
