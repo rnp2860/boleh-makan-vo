@@ -3,6 +3,11 @@
 
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import { resolveFood } from '@/lib/food/resolveFood';
+import { 
+  getMalaysianFoodComponents,
+  generateMalaysianFoodAdvice
+} from '@/lib/malaysianFoodDatabaseLookup';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -20,6 +25,123 @@ export async function POST(req: Request) {
     }
 
     console.log('🔄 Recalculating nutrition:', { food_name, original_name });
+    
+    // 🎯 STEP 1: Try canonical food resolution FIRST
+    // This ensures user edits NEVER downgrade a DB match to an estimate
+    const resolution = await resolveFood({
+      inputType: 'text',
+      rawName: food_name,
+      userConditions: user_profile?.healthConditions || []
+    });
+    
+    console.log(`🎯 Resolution: source=${resolution.source}, confidence=${(resolution.confidence * 100).toFixed(0)}%, strategy=${resolution.debug.strategy}`);
+    
+    // If we have a Malaysian DB match, return it immediately (NEVER downgrade to AI)
+    if (resolution.source === 'malaysian_db' && resolution.matchedFood) {
+      const matched = resolution.matchedFood;
+      const conditions = user_profile?.healthConditions || [];
+      
+      console.log(`✅ DB match found: "${matched.name_en}" - returning verified data (NOT AI estimate)`);
+      
+      const drRezaTip = generateMalaysianFoodAdvice({
+        id: matched.id,
+        name_en: matched.name_en,
+        name_bm: matched.name_bm,
+        category: matched.category,
+        serving_description: matched.serving_description,
+        serving_grams: matched.serving_grams,
+        calories: matched.macros.calories_kcal,
+        protein: matched.macros.protein_g,
+        carbs: matched.macros.carbs_g,
+        fat: matched.macros.total_fat_g,
+        sugar_g: matched.macros.sugar_g || 0,
+        sodium_mg: matched.macros.sodium_mg || 0,
+        saturated_fat_g: matched.macros.saturated_fat_g,
+        cholesterol_mg: matched.macros.cholesterol_mg,
+        phosphorus_mg: matched.macros.phosphorus_mg,
+        potassium_mg: matched.macros.potassium_mg,
+        fiber_g: matched.macros.fiber_g,
+        diabetes_rating: matched.ratings.diabetes_rating as any,
+        hypertension_rating: matched.ratings.hypertension_rating as any,
+        cholesterol_rating: matched.ratings.cholesterol_rating as any,
+        ckd_rating: matched.ratings.ckd_rating as any,
+        source: 'malaysian_database',
+        match_confidence: resolution.confidence,
+        match_type: resolution.debug.strategy as any
+      }, conditions);
+      
+      const components = getMalaysianFoodComponents({
+        id: matched.id,
+        name_en: matched.name_en,
+        name_bm: matched.name_bm,
+        category: matched.category,
+        serving_description: matched.serving_description,
+        serving_grams: matched.serving_grams,
+        calories: matched.macros.calories_kcal,
+        protein: matched.macros.protein_g,
+        carbs: matched.macros.carbs_g,
+        fat: matched.macros.total_fat_g,
+        sugar_g: matched.macros.sugar_g || 0,
+        sodium_mg: matched.macros.sodium_mg || 0,
+        saturated_fat_g: matched.macros.saturated_fat_g,
+        cholesterol_mg: matched.macros.cholesterol_mg,
+        phosphorus_mg: matched.macros.phosphorus_mg,
+        potassium_mg: matched.macros.potassium_mg,
+        fiber_g: matched.macros.fiber_g,
+        diabetes_rating: matched.ratings.diabetes_rating as any,
+        hypertension_rating: matched.ratings.hypertension_rating as any,
+        cholesterol_rating: matched.ratings.cholesterol_rating as any,
+        ckd_rating: matched.ratings.ckd_rating as any,
+        source: 'malaysian_database',
+        match_confidence: resolution.confidence,
+        match_type: resolution.debug.strategy as any
+      });
+      
+      return NextResponse.json({
+        success: true,
+        source: 'malaysian_database',
+        verified: true,
+        confidence: resolution.confidence,
+        data: {
+          food_name: matched.name_en,
+          food_name_bm: matched.name_bm,
+          malaysian_food_id: matched.id,
+          category: matched.category,
+          components: components,
+          macros: {
+            calories: matched.macros.calories_kcal,
+            protein_g: matched.macros.protein_g,
+            carbs_g: matched.macros.carbs_g,
+            fat_g: matched.macros.total_fat_g,
+            sugar_g: matched.macros.sugar_g,
+            sodium_mg: matched.macros.sodium_mg,
+            saturated_fat_g: matched.macros.saturated_fat_g,
+            cholesterol_mg: matched.macros.cholesterol_mg,
+            phosphorus_mg: matched.macros.phosphorus_mg,
+            potassium_mg: matched.macros.potassium_mg,
+            fiber_g: matched.macros.fiber_g
+          },
+          serving_size: matched.serving_description,
+          serving_grams: matched.serving_grams,
+          diabetes_rating: matched.ratings.diabetes_rating,
+          hypertension_rating: matched.ratings.hypertension_rating,
+          cholesterol_rating: matched.ratings.cholesterol_rating,
+          ckd_rating: matched.ratings.ckd_rating,
+          analysis_content: drRezaTip,
+          risk_analysis: {
+            is_high_sugar: (matched.macros.sugar_g || 0) > 15,
+            is_high_sodium: (matched.macros.sodium_mg || 0) > 800
+          },
+          meal_context: 'unknown',
+          preparation_style: 'unknown'
+        },
+        recalculated: true,
+        was_edited: true,
+      });
+    }
+    
+    // No DB match - fall back to AI estimation
+    console.log(`⚠️ No DB match found - falling back to AI estimation for: "${food_name}"`);
 
     // Build detailed condition-specific analysis requirements
     let conditionNote = "";
