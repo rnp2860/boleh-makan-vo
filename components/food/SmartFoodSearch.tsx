@@ -12,6 +12,7 @@ interface SmartFoodSearchProps {
   placeholder?: string;
   maxResults?: number;
   showFilters?: boolean;
+  initialQuery?: string;
 }
 
 export function SmartFoodSearch({
@@ -20,11 +21,12 @@ export function SmartFoodSearch({
   placeholder = 'Search foods (e.g., "low gi nasi", "diabetic friendly kuih")',
   maxResults = 20,
   showFilters = true,
+  initialQuery = '',
 }: SmartFoodSearchProps) {
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(initialQuery);
   const [result, setResult] = useState<SmartSearchResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState(initialQuery);
 
   // Debounce search query
   useEffect(() => {

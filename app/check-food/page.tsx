@@ -17,6 +17,8 @@ import {
   PREPARATION_STYLE_OPTIONS 
 } from '@/types/database';
 import { trackMealLogged, trackFoodCorrected } from '@/lib/analytics';
+import { SmartFoodSearch } from '@/components/food';
+import { MalaysianFood } from '@/lib/malaysian-foods/types';
 
 // 🗜️ IMAGE COMPRESSION - Optimized for API speed
 const compressImage = (base64Str: string, maxWidth = 512, quality = 0.6) => {
@@ -68,6 +70,13 @@ const containsKeyword = (text: string, keywords: string[]): boolean => {
   return keywords.some(keyword => lowerText.includes(keyword.toLowerCase()));
 };
 
+// 🎯 Map confidence score to label
+const getConfidenceLabel = (confidence: number): { label: string; color: string } => {
+  if (confidence >= 0.95) return { label: 'High', color: 'text-green-600' };
+  if (confidence >= 0.80) return { label: 'Medium', color: 'text-yellow-600' };
+  return { label: 'Low', color: 'text-orange-600' };
+};
+
 export default function CheckFoodPage() {
   const [image, setImage] = useState<string | null>(null);
   const [baseResult, setBaseResult] = useState<any>(null);
@@ -96,11 +105,9 @@ export default function CheckFoodPage() {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [searching, setSearching] = useState(false);
 
-  // 📝 TEXT INPUT (Alternative to voice)
-  const [showTextInput, setShowTextInput] = useState(false);
-  const [textInput, setTextInput] = useState('');
-  const [textInputResults, setTextInputResults] = useState<any[]>([]);
-  const [textInputSearching, setTextInputSearching] = useState(false);
+  // 📝 SMART FOOD SEARCH MODAL
+  const [showSmartSearch, setShowSmartSearch] = useState(false);
+  const [smartSearchInitialQuery, setSmartSearchInitialQuery] = useState('');
 
   // 🥗 ADDED INGREDIENTS (user can add missed items)
   const [addedIngredients, setAddedIngredients] = useState<{name: string, calories: number, macros: {p: number, c: number, f: number}}[]>([]);
@@ -257,29 +264,67 @@ export default function CheckFoodPage() {
     }
   };
 
-  // 🔎 DEBOUNCED SUPABASE SEARCH for Type It In
-  useEffect(() => {
-    if (!showTextInput) return;
+  // 🥗 Handle food selection from SmartFoodSearch
+  const handleSmartFoodSelect = (food: MalaysianFood) => {
+    console.log('✅ Food selected from SmartFoodSearch:', food);
     
-    const delayDebounceFn = setTimeout(async () => {
-      if (textInput.length > 1) {
-        setTextInputSearching(true);
-        try {
-          const res = await fetch(`/api/search-food?q=${encodeURIComponent(textInput)}`);
-          const data = await res.json();
-          setTextInputResults(Array.isArray(data) ? data.slice(0, 8) : []);
-        } catch (e) { 
-          console.error(e);
-          setTextInputResults([]);
-        }
-        setTextInputSearching(false);
-      } else {
-        setTextInputResults([]);
-      }
-    }, 300);
-
-    return () => clearTimeout(delayDebounceFn);
-  }, [textInput, showTextInput]);
+    // Map MalaysianFood to baseResult structure
+    const processedResult = {
+      data: {
+        food_name: food.nameEn,
+        category: food.category,
+        components: [{
+          name: food.nameEn,
+          calories: food.caloriesKcal,
+          macros: { 
+            p: food.proteinG || 0, 
+            c: food.carbsG, 
+            f: food.totalFatG || 0 
+          }
+        }],
+        macros: {
+          calories: food.caloriesKcal,
+          protein_g: food.proteinG || 0,
+          carbs_g: food.carbsG,
+          fat_g: food.totalFatG || 0,
+          sodium_mg: food.sodiumMg || 0,
+          sugar_g: food.sugarG || 0,
+          fiber_g: food.fiberG || 0,
+        },
+        analysis_content: `${food.nameEn} (${food.nameBm}) - ${food.servingDescription}`,
+        risk_analysis: { 
+          is_high_sodium: (food.sodiumMg || 0) > 600,
+          is_high_sugar: (food.sugarG || 0) > 15 
+        },
+        valid_lauk: [],
+        halal_status: { status: 'halal', reason: 'Verified from Malaysian database' },
+        health_tags: [
+          ...(food.giCategory === 'low' ? ['Low GI'] : []),
+          ...(food.diabetesRating === 'safe' ? ['Diabetic Safe'] : []),
+          ...(food.hypertensionRating === 'safe' ? ['Low Sodium'] : []),
+        ],
+        is_potentially_pork: false,
+        detected_protein: 'none',
+      },
+      is_verified: food.verified,
+      source: 'malaysian_db',
+    };
+    
+    // Set confidence high for DB matches (0.98)
+    setConfidenceScore(0.98);
+    
+    // Set the result
+    setBaseResult(processedResult);
+    setEditedName(food.nameEn);
+    setAiSuggestedName(food.nameEn);
+    
+    // Close modal
+    setShowSmartSearch(false);
+    setSmartSearchInitialQuery('');
+    
+    // Clear image state if coming from text search
+    setImage(null);
+  };
 
   // 🔎 DEBOUNCED SUPABASE SEARCH for Add Modal
   useEffect(() => {
@@ -321,10 +366,10 @@ export default function CheckFoodPage() {
     setCustomItems([]);
     setAddedIngredients([]);
     setError('');
-    setTextInput('');
     setCorrectionInput('');
     setConfidenceScore(1);
     setMealContext('hawker_stall');
+    setSmartSearchInitialQuery('');
     setPreparationStyle('unknown');
     setGeolocation(null); // 📍 Clear location data on reset
     setLocationToast('');
@@ -393,20 +438,10 @@ export default function CheckFoodPage() {
   };
 
   // 📝 TEXT INPUT ANALYSIS
-  const handleTextSubmit = async () => {
-    if (!textInput.trim()) return;
-    setShowTextInput(false);
-    setTextInputResults([]);
-    // Reset states for fresh analysis
-    setImage(null); // No image for text input - will show placeholder
-    setBaseResult(null);
-    setPortion(1);
-    setKuahLevel('biasa');
-    setExcludedComponents([]);
-    setCustomItems([]);
-    setAddedIngredients([]);
-    await analyzeFood('text', textInput.trim());
-    setTextInput('');
+  // Open SmartFoodSearch modal
+  const openSmartSearch = (initialQuery = '') => {
+    setSmartSearchInitialQuery(initialQuery);
+    setShowSmartSearch(true);
   };
 
   // 🧠 MAIN ANALYSIS
@@ -954,7 +989,7 @@ export default function CheckFoodPage() {
             
             {/* Text Input Button - PRIMARY */}
             <button 
-              onClick={() => setShowTextInput(true)}
+              onClick={() => openSmartSearch()}
               className="w-full bg-gradient-to-r from-teal-500 to-cyan-500 text-white rounded-2xl p-5 shadow-lg shadow-teal-200/50 flex items-center gap-4 active:scale-[0.98] transition-transform"
             >
               <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
@@ -1041,102 +1076,42 @@ export default function CheckFoodPage() {
         </div>
       )}
 
-      {/* ========== TEXT INPUT MODAL ========== */}
-      {showTextInput && (
+      {/* ========== SMART FOOD SEARCH MODAL ========== */}
+      {showSmartSearch && (
         <div className="fixed inset-0 bg-black/50 z-[60] flex items-end justify-center backdrop-blur-sm">
-          <div className="bg-white w-full max-h-[80vh] rounded-t-3xl overflow-hidden animate-slideUp flex flex-col">
-            <div className="p-6 pb-4 flex-shrink-0">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-full overflow-hidden">
-                  <Image src="/assets/avatar-header.png" alt="Dr. Reza" width={40} height={40} className="object-cover" />
+          <div className="bg-white w-full max-h-[85vh] rounded-t-3xl overflow-hidden animate-slideUp flex flex-col">
+            <div className="p-6 pb-4 flex-shrink-0 border-b border-slate-200">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full overflow-hidden">
+                    <Image src="/assets/avatar-header.png" alt="Dr. Reza" width={40} height={40} className="object-cover" />
+                  </div>
+                  <div>
+                    <p className="text-slate-800 font-bold">🇲🇾 Cari Makanan Malaysia</p>
+                    <p className="text-xs text-slate-500">500+ verified foods in database</p>
+                  </div>
                 </div>
-                <p className="text-slate-700 font-medium">What did you eat?</p>
-              </div>
-              <input 
-                autoFocus
-                type="text"
-                value={textInput}
-                onChange={(e) => setTextInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && textInput.trim()) {
-                    handleTextSubmit();
-                  }
-                }}
-                placeholder="e.g. Nasi Lemak Ayam Goreng"
-                className="w-full p-4 bg-slate-50 rounded-xl text-lg font-medium text-slate-800 placeholder-slate-400 outline-none border-2 border-transparent focus:border-teal-400 transition-colors"
-              />
-            </div>
-
-            {/* Autocomplete Dropdown */}
-            {textInput.length > 1 && (
-              <div className="flex-1 overflow-y-auto border-t border-slate-200">
-                {textInputSearching ? (
-                  <div className="p-8 text-center text-slate-400">
-                    <div className="w-6 h-6 border-2 border-teal-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-                    Searching...
-                  </div>
-                ) : textInputResults.length > 0 ? (
-                  <div className="p-4 space-y-2">
-                    <p className="text-xs font-bold text-slate-500 uppercase px-2 mb-2">
-                      💡 Suggestions from database:
-                    </p>
-                    {textInputResults.map((item, idx) => (
-                      <button
-                        key={item.id || idx}
-                        onClick={() => {
-                          setTextInput(item.name || item.name_en);
-                          setTextInputResults([]);
-                          setTimeout(() => handleTextSubmit(), 100);
-                        }}
-                        className="w-full text-left p-3 rounded-xl bg-slate-50 hover:bg-teal-50 border border-slate-100 hover:border-teal-200 transition-colors"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-bold text-slate-700 text-sm">
-                              {item.name || item.name_en}
-                            </p>
-                            {item.name_bm && (
-                              <p className="text-xs text-slate-500">{item.name_bm}</p>
-                            )}
-                          </div>
-                          <span className="text-xs font-bold text-slate-400 bg-white px-2 py-1 rounded-lg">
-                            {item.calories} kcal
-                          </span>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="p-8 text-center text-slate-400">
-                    <p className="text-sm">Type to search database...</p>
-                    <p className="text-xs mt-2 text-slate-300">
-                      Or press Enter to analyze with AI
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            <div className="p-4 border-t border-slate-100 flex-shrink-0">
-              <div className="flex gap-3">
                 <button 
                   onClick={() => { 
-                    setShowTextInput(false); 
-                    setTextInput(''); 
-                    setTextInputResults([]);
+                    setShowSmartSearch(false); 
+                    setSmartSearchInitialQuery('');
                   }} 
-                  className="flex-1 py-4 rounded-xl bg-slate-100 text-slate-500 font-bold text-lg"
+                  className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-colors"
                 >
-                  Cancel
-                </button>
-                <button 
-                  onClick={handleTextSubmit}
-                  disabled={!textInput.trim()}
-                  className="flex-1 py-4 rounded-xl bg-teal-500 text-white font-bold text-lg disabled:opacity-50"
-                >
-                  Analyze
+                  <span className="text-slate-600 text-xl">&times;</span>
                 </button>
               </div>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-6">
+              <SmartFoodSearch
+                onSelectFood={handleSmartFoodSelect}
+                userConditions={userProfile?.healthConditions || []}
+                maxResults={20}
+                showFilters={true}
+                initialQuery={smartSearchInitialQuery}
+                placeholder="Search... (e.g. 'low gi nasi', 'roti canai')"
+              />
             </div>
           </div>
         </div>
@@ -1285,20 +1260,52 @@ export default function CheckFoodPage() {
                     </button>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2">
-                    <h2 className={`text-2xl font-black ${image ? 'text-white' : 'text-slate-800'}`}>
-                      {finalData.food_name}
-                    </h2>
-                    {/* Edit button - always show for low confidence, or on tap for others */}
-                    <button
-                      onClick={() => { setEditedName(finalData.food_name); setIsEditingName(true); }}
-                      className={`p-1.5 rounded-full ${image ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-600'} hover:bg-white/30 transition-colors`}
-                      title="Edit food name"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
-                      </svg>
-                    </button>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className={`text-2xl font-black ${image ? 'text-white' : 'text-slate-800'}`}>
+                        {finalData.food_name}
+                      </h2>
+                      {/* Edit/Correct button */}
+                      {image ? (
+                        <button
+                          onClick={() => openSmartSearch(finalData.food_name)}
+                          className="px-3 py-1 rounded-lg bg-white/20 hover:bg-white/30 text-white text-sm font-bold transition-colors"
+                          title="Correct this suggestion"
+                        >
+                          Correct
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => { setEditedName(finalData.food_name); setIsEditingName(true); }}
+                          className="p-1.5 rounded-full bg-slate-200 text-slate-600 hover:bg-slate-300 transition-colors"
+                          title="Edit food name"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                    {/* Source Badge & Confidence Label */}
+                    <div className="flex items-center gap-2 mt-2">
+                      {baseResult.source === 'malaysian_db' || baseResult.is_verified ? (
+                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold ${image ? 'bg-green-500/90 text-white' : 'bg-green-100 text-green-700'}`}>
+                          🇲🇾 Verified DB
+                        </span>
+                      ) : (
+                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold ${image ? 'bg-amber-500/90 text-white' : 'bg-amber-100 text-amber-700'}`}>
+                          Estimated
+                        </span>
+                      )}
+                      {(() => {
+                        const { label, color } = getConfidenceLabel(confidenceScore);
+                        return (
+                          <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold ${image ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'}`}>
+                            Confidence: {label}
+                          </span>
+                        );
+                      })()}
+                    </div>
                   </div>
                 )}
                 
