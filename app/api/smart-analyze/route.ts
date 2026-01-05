@@ -502,8 +502,8 @@ export async function POST(req: Request) {
 
     if (DEBUG_SMART_ANALYZE) console.debug(`✅ Identified: "${foodName}" | Category: ${visionCategory} | Confidence: ${visionConfidence}`);
 
-    // 🏦 STEP 2: Use canonical food resolution (ALWAYS tries Malaysian DB first)
-      const candidateResolutions: Array<{ candidate: VisionCandidate; resolution: ResolvedFood }> = [];
+      // 🏦 STEP 2: Use canonical food resolution (ALWAYS tries Malaysian DB first)
+      const candidateResolutions: Array<{ candidate: VisionCandidate; resolution: ResolvedFoodLocal }> = [];
       for (const candidate of candidates) {
         const resolution = await resolveFood({
           inputType: 'image',
