@@ -524,8 +524,19 @@ export async function POST(req: Request) {
       }
 
       const best = pickBestVisionResolution(candidates, candidateResolutions);
-      const chosenResolution = best ? best.resolution : candidateResolutions[0]?.resolution;
-      const chosenCandidate = best ? best.candidate : candidates[0];
+      let chosenResolution = best ? best.resolution : candidateResolutions[0]?.resolution;
+      let chosenCandidate = best ? best.candidate : (candidates[0] || { name: foodName, confidence: visionConfidence });
+      if (!chosenResolution) {
+        chosenResolution = {
+          source: 'ai_estimate',
+          confidence: 0.5,
+          matchedFood: undefined,
+          debug: {
+            strategy: 'ai_fallback',
+            searchTerm: chosenCandidate?.name || foodName || ''
+          }
+        } as ResolvedFoodLocal;
+      }
 
       if (DEBUG_SMART_ANALYZE && chosenResolution) {
         console.debug('[smart-analyze] chosen resolution', {
