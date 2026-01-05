@@ -33,8 +33,10 @@ import {
   generateMalaysianFoodAdvice
 } from '@/lib/malaysianFoodDatabaseLookup';
 import { resolveFood } from '@/lib/food/resolveFood';
+import type { ResolvedFood } from '@/lib/food/resolveFood';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const DEBUG_SMART_ANALYZE = process.env.DEBUG_SMART_ANALYZE === '1';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
@@ -148,6 +150,22 @@ function checkHalalStatus(foodName: string, components: any[]): { status: 'halal
   return { status: 'unknown' };
 }
 
+type VisionCandidate = { name: string; confidence?: number; reason?: string };
+
+// Pure helper for selecting best resolution; exported for tests
+export function pickBestVisionResolution(
+  candidates: VisionCandidate[],
+  resolutions: Array<{ candidate: VisionCandidate; resolution: ResolvedFood }>
+): { candidate: VisionCandidate; resolution: ResolvedFood } | null {
+  if (!resolutions.length) return null;
+  const dbMatches = resolutions.filter(r => r.resolution.source === 'malaysian_db');
+  if (dbMatches.length) {
+    return dbMatches.sort((a, b) => (b.resolution.confidence || 0) - (a.resolution.confidence || 0))[0];
+  }
+  // fallback to first resolution (aligns with first candidate)
+  return resolutions[0];
+}
+
 // 🥗 TYPICAL COMPONENTS with sugar & sodium estimates
 function getTypicalComponents(foodName: string, baseMacros: any): any[] {
   const lower = foodName.toLowerCase();
@@ -226,6 +244,7 @@ export async function POST(req: Request) {
       visual_reasoning: 'Default portion assumption'
     };
     let baseNutrition: any = null;
+    let candidates: VisionCandidate[] = [];
 
     // 🧠 STEP 1: IDENTIFY THE FOOD (Using comprehensive vision analysis)
     if (type === 'image') {
@@ -259,12 +278,28 @@ export async function POST(req: Request) {
       });
       
       // Parse the comprehensive vision response
-      const visionResult = JSON.parse(visionResponse.choices[0].message.content || '{}');
-      console.log("🔍 Vision result:", visionResult);
+      const rawVision = visionResponse.choices[0].message.content || '{}';
+      if (DEBUG_SMART_ANALYZE) console.debug('[smart-analyze] raw vision response', rawVision);
+      const visionResult = JSON.parse(rawVision);
+      if (DEBUG_SMART_ANALYZE) console.debug('[smart-analyze] parsed vision result', visionResult);
       
-      foodName = visionResult.food_name || "Unknown Food";
+      const candidates: VisionCandidate[] = Array.isArray(visionResult.candidates) && visionResult.candidates.length
+        ? visionResult.candidates.map((c: any) => ({
+            name: c.name,
+            confidence: c.confidence ?? c.confidence_score ?? 0.5,
+            reason: c.reason
+          })).filter(c => c.name)
+        : visionResult.food_name
+          ? [{ name: visionResult.food_name, confidence: visionResult.confidence_score || 0.5, reason: 'single guess' }]
+          : [];
+
+      if (!candidates.length) {
+        candidates.push({ name: 'Unknown Food', confidence: 0.3, reason: 'model returned empty' });
+      }
+
+      foodName = candidates[0].name || "Unknown Food";
       visionCategory = visionResult.category || 'Other';
-      visionConfidence = visionResult.confidence_score || 0.5;
+      visionConfidence = candidates[0].confidence || 0.5;
       isPotentiallyPork = visionResult.is_potentially_pork || false;
       
       // 📏 Use ADJUSTED nutrition (with portion multiplier) if available, otherwise fall back
@@ -463,16 +498,120 @@ export async function POST(req: Request) {
       visionConfidence = validation.confidence_score || 0.8;
     }
 
-    console.log(`✅ Identified: "${foodName}" | Category: ${visionCategory} | Confidence: ${visionConfidence}`);
+    if (DEBUG_SMART_ANALYZE) console.debug(`✅ Identified: "${foodName}" | Category: ${visionCategory} | Confidence: ${visionConfidence}`);
 
     // 🏦 STEP 2: Use canonical food resolution (ALWAYS tries Malaysian DB first)
-    const resolution = await resolveFood({
-      inputType: 'image',
-      visionName: foodName,
-      userConditions: conditions
-    });
-    
-    console.log(`🎯 Resolution result: source=${resolution.source}, confidence=${(resolution.confidence * 100).toFixed(0)}%, strategy=${resolution.debug.strategy}`);
+      const candidateResolutions: Array<{ candidate: VisionCandidate; resolution: ResolvedFood }> = [];
+      for (const candidate of candidates) {
+        const resolution = await resolveFood({
+          inputType: 'image',
+          visionName: candidate.name,
+          userConditions: conditions
+        });
+        candidateResolutions.push({ candidate, resolution });
+        if (DEBUG_SMART_ANALYZE) {
+          console.debug('[smart-analyze] candidate resolution', {
+            candidate: candidate.name,
+            candidate_confidence: candidate.confidence,
+            source: resolution.source,
+            matched: resolution.matchedFood?.name_en || resolution.matchedFood?.name_bm,
+            confidence: resolution.confidence,
+            strategy: resolution.debug.strategy
+          });
+        }
+      }
+
+      const best = pickBestVisionResolution(candidates, candidateResolutions);
+      const chosenResolution = best ? best.resolution : candidateResolutions[0]?.resolution;
+      const chosenCandidate = best ? best.candidate : candidates[0];
+
+      if (DEBUG_SMART_ANALYZE && chosenResolution) {
+        console.debug('[smart-analyze] chosen resolution', {
+          candidate: chosenCandidate?.name,
+          candidate_confidence: chosenCandidate?.confidence,
+          source: chosenResolution.source,
+          matched: chosenResolution.matchedFood?.name_en || chosenResolution.matchedFood?.name_bm,
+          confidence: chosenResolution.confidence,
+          strategy: chosenResolution.debug.strategy
+        });
+      }
+
+      // If DB match found, return immediately
+      if (chosenResolution && chosenResolution.source === 'malaysian_db' && chosenResolution.matchedFood) {
+        const matched = chosenResolution.matchedFood;
+        const drRezaTip = generateMalaysianFoodAdvice({
+          id: matched.id,
+          name_en: matched.name_en,
+          name_bm: matched.name_bm,
+          category: matched.category,
+          serving_description: matched.serving_description,
+          serving_grams: matched.serving_grams,
+          calories: matched.macros.calories_kcal,
+          protein: matched.macros.protein_g,
+          carbs: matched.macros.carbs_g,
+          fat: matched.macros.total_fat_g,
+          sugar_g: matched.macros.sugar_g || 0,
+          sodium_mg: matched.macros.sodium_mg || 0,
+          saturated_fat_g: matched.macros.saturated_fat_g,
+          cholesterol_mg: matched.macros.cholesterol_mg,
+          phosphorus_mg: matched.macros.phosphorus_mg,
+          potassium_mg: matched.macros.potassium_mg,
+          fiber_g: matched.macros.fiber_g,
+          diabetes_rating: matched.ratings.diabetes_rating as any,
+          hypertension_rating: matched.ratings.hypertension_rating as any,
+          cholesterol_rating: matched.ratings.cholesterol_rating as any,
+          ckd_rating: matched.ratings.ckd_rating as any
+        });
+        
+        const halalStatus = checkHalalStatus(matched.name_en, matched.components || []);
+        const isHighSodium = (matched.macros.sodium_mg || 0) > 800;
+        const isHighSugar = (matched.macros.sugar_g || 0) > 15;
+
+        return NextResponse.json({
+          success: true,
+          verified: true,
+          source: 'malaysian_db',
+          data: {
+            food_name: matched.name_en,
+            food_name_bm: matched.name_bm,
+            category: matched.category,
+            macros: {
+              calories: matched.macros.calories_kcal,
+              protein_g: matched.macros.protein_g,
+              carbs_g: matched.macros.carbs_g,
+              fat_g: matched.macros.total_fat_g,
+              sodium_mg: matched.macros.sodium_mg || 0,
+              sugar_g: matched.macros.sugar_g || 0,
+              fiber_g: matched.macros.fiber_g || 0,
+              saturated_fat_g: matched.macros.saturated_fat_g || 0,
+              cholesterol_mg: matched.macros.cholesterol_mg || 0,
+              phosphorus_mg: matched.macros.phosphorus_mg || 0,
+              potassium_mg: matched.macros.potassium_mg || 0
+            },
+            components: matched.components || getTypicalComponents(matched.name_en, matched.macros),
+            analysis_content: drRezaTip,
+            valid_lauk: getMalaysianFoodComponents(matched.name_en),
+            health_tags: buildHealthTags({
+              sodium_mg: matched.macros.sodium_mg,
+              sugar_g: matched.macros.sugar_g,
+              saturated_fat_g: matched.macros.saturated_fat_g,
+              protein: matched.macros.protein_g
+            }),
+            halal_status: halalStatus,
+            is_potentially_pork: halalStatus.status === 'non_halal',
+            detected_protein,
+            portion_estimation: portionEstimation,
+            base_nutrition: baseNutrition,
+            detected_components: detectedComponents,
+            confidence_score: chosenResolution.confidence,
+            vision_candidate: chosenCandidate?.name,
+          }
+        });
+      }
+      
+      // No DB match from candidates; fall through with chosenResolution (could be AI estimate)
+      const resolution = chosenResolution;
+      foodName = chosenCandidate?.name || foodName;
     
     // If DB match found, return immediately
     if (resolution.source === 'malaysian_db' && resolution.matchedFood) {
