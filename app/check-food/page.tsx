@@ -70,6 +70,9 @@ const containsKeyword = (text: string, keywords: string[]): boolean => {
   return keywords.some(keyword => lowerText.includes(keyword.toLowerCase()));
 };
 
+// 🔎 Debug flag for verbose logging (disable in prod)
+const DEBUG = true;
+
 // 🎯 Map confidence score to label
 const getConfidenceLabel = (confidence: number): { label: string; color: string } => {
   if (confidence >= 0.95) return { label: 'High', color: 'text-green-600' };
@@ -108,6 +111,14 @@ export default function CheckFoodPage() {
   // 📝 SMART FOOD SEARCH MODAL
   const [showSmartSearch, setShowSmartSearch] = useState(false);
   const [smartSearchInitialQuery, setSmartSearchInitialQuery] = useState('');
+  const [selectedFood, setSelectedFood] = useState<MalaysianFood | null>(null);
+  const [resultLocked, setResultLocked] = useState(false);
+
+  useEffect(() => {
+    if (DEBUG && selectedFood) {
+      console.debug('[selectedFood] state updated', selectedFood);
+    }
+  }, [selectedFood]);
 
   // 🥗 ADDED INGREDIENTS (user can add missed items)
   const [addedIngredients, setAddedIngredients] = useState<{name: string, calories: number, macros: {p: number, c: number, f: number}}[]>([]);
@@ -266,11 +277,14 @@ export default function CheckFoodPage() {
 
   // 🥗 Handle food selection from SmartFoodSearch
   const handleSmartFoodSelect = (food: MalaysianFood) => {
-    console.log('✅ Food selected from SmartFoodSearch:', food);
+    if (DEBUG) console.debug('[SmartFoodSearch] selected food', { id: food.id, nameEn: food.nameEn, nameBm: food.nameBm });
+    setSelectedFood(food);
+    setResultLocked(true);
     
     // Map MalaysianFood to baseResult structure
     const processedResult = {
       data: {
+        food_id: food.id,
         food_name: food.nameEn,
         category: food.category,
         components: [{
@@ -360,6 +374,8 @@ export default function CheckFoodPage() {
   const handleReset = () => {
     setImage(null);
     setBaseResult(null);
+    setSelectedFood(null);
+    setResultLocked(false);
     setPortion(1);
     setKuahLevel('biasa');
     setExcludedComponents([]);
@@ -386,10 +402,12 @@ export default function CheckFoodPage() {
   const handleCorrectionSubmit = async () => {
     if (!correctionInput.trim()) return;
     setIsReanalyzing(true);
+    setResultLocked(false); // allow explicit user correction to run analysis
     
     try {
       // Re-analyze using text input - image is preserved automatically
-      await analyzeFood('text', correctionInput.trim());
+      if (DEBUG) console.debug('[handleCorrectionSubmit] re-analyze with text', { text: correctionInput.trim() });
+      await analyzeFood('text', correctionInput.trim(), { allowWhenLocked: true });
       setCorrectionInput('');
     } catch (err) {
       console.error('Re-analysis failed:', err);
@@ -419,6 +437,8 @@ export default function CheckFoodPage() {
   const handleConfirmPhotoAnalysis = async () => {
     if (!photoPreview) return;
     
+    setResultLocked(false); // new photo analysis should unlock previous selections
+    setSelectedFood(null);
     setShowPhotoConfirm(false);
     setLoading(true);
     setBaseResult(null);
@@ -440,12 +460,19 @@ export default function CheckFoodPage() {
   // 📝 TEXT INPUT ANALYSIS
   // Open SmartFoodSearch modal
   const openSmartSearch = (initialQuery = '') => {
+    setResultLocked(false); // allow fresh selection
+    setSelectedFood(null);
     setSmartSearchInitialQuery(initialQuery);
     setShowSmartSearch(true);
   };
 
   // 🧠 MAIN ANALYSIS
-  const analyzeFood = async (type: 'image' | 'text', data: string) => {
+  const analyzeFood = async (type: 'image' | 'text', data: string, options?: { allowWhenLocked?: boolean }) => {
+    if (resultLocked && !options?.allowWhenLocked) {
+      if (DEBUG) console.debug('[analyzeFood] blocked because resultLocked', { type, data });
+      return;
+    }
+    if (DEBUG) console.debug('[analyzeFood] start', { type, data, allowWhenLocked: options?.allowWhenLocked });
     setLoading(true);
     setError('');
 
@@ -607,6 +634,7 @@ export default function CheckFoodPage() {
   // 📝 Handle Name Edit with Smart Recalculation
   const handleNameEdit = async () => {
     if (!baseResult || !editedName.trim()) return;
+    if (DEBUG) console.debug('[handleNameEdit] start', { from: baseResult.data?.food_name, to: editedName });
     
     const newName = editedName.trim();
     const oldName = baseResult.data.food_name;
@@ -620,6 +648,7 @@ export default function CheckFoodPage() {
     // 🔄 Trigger recalculation for new food name
     setIsRecalculating(true);
     setIsEditingName(false);
+    setResultLocked(false); // allow recalculation for explicit user edit
     
     try {
       console.log('🔄 Recalculating nutrition for:', newName);
@@ -1928,6 +1957,10 @@ export default function CheckFoodPage() {
                   <p className="text-slate-400 mb-2">No results found</p>
                   <button 
                     onClick={() => { 
+                      if (resultLocked) {
+                        if (DEBUG) console.debug('[addModal] analyze blocked because resultLocked', { searchQuery });
+                        return;
+                      }
                       analyzeFood('text', searchQuery); 
                       setShowAddModal(null); 
                     }}
