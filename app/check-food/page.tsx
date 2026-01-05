@@ -738,6 +738,12 @@ export default function CheckFoodPage() {
     if (finalData) {
       setLoading(true);
       try {
+        // 📍 SILENT SENSOR: Capture location for both Camera AND Text Entries
+        // If we don't already have location data, try to capture it now
+        if (!geolocation) {
+          await captureGeolocation();
+        }
+        
         const processedImage = image ? await compressImage(image) : undefined;
         
         // 🌙 Track Ramadan meal logging in localStorage
@@ -795,7 +801,10 @@ export default function CheckFoodPage() {
               ai_suggested_name: aiSuggestedName || finalData.food_name,
               was_user_corrected: wasUserCorrected,
               // 📍 GEOLOCATION: Silent Sensor for Hawker Stall Detection
-              geolocation: geolocation
+              gps_lat: geolocation?.latitude || null,
+              gps_long: geolocation?.longitude || null,
+              gps_accuracy: geolocation?.accuracy || null,
+              gps_timestamp: geolocation?.timestamp || null
             })
           });
           
