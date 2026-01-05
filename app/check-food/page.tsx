@@ -74,6 +74,15 @@ export default function CheckFoodPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // 📍 GEOLOCATION STATE - Silent Sensor for Enterprise Data
+  const [geolocation, setGeolocation] = useState<{
+    latitude: number;
+    longitude: number;
+    accuracy: number;
+    timestamp: number;
+  } | null>(null);
+  const [locationToast, setLocationToast] = useState<string>('');
 
   // 🎛️ TUNING CONTROLS
   const [portion, setPortion] = useState<0.5 | 1 | 1.5 | 2>(1);
@@ -170,6 +179,80 @@ export default function CheckFoodPage() {
     return userId;
   };
 
+  // 📍 GEOLOCATION CAPTURE - Silent Sensor for Hawker Stall Detection
+  const captureGeolocation = () => {
+    return new Promise<void>((resolve) => {
+      if (!navigator.geolocation) {
+        console.warn('Geolocation not supported by browser');
+        resolve();
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const locationData = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy,
+            timestamp: position.timestamp,
+          };
+          setGeolocation(locationData);
+          console.log('📍 Location captured:', locationData);
+          resolve();
+        },
+        (error) => {
+          console.warn('Geolocation error:', error.message);
+          // Graceful degradation - don't block the user
+          setGeolocation(null);
+          resolve();
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 5000,
+          maximumAge: 0,
+        }
+      );
+    });
+  };
+
+  // 📍 REQUEST LOCATION PERMISSION - The "Hawker Hook"
+  const requestLocationPermission = async () => {
+    if (!navigator.geolocation) {
+      return;
+    }
+
+    try {
+      // Check if permission API is available
+      if (navigator.permissions) {
+        const permission = await navigator.permissions.query({ name: 'geolocation' });
+        
+        if (permission.state === 'denied') {
+          setLocationToast('Enable location to find nearby Hawker Stalls and verify Halal status. 📍🕌');
+          setTimeout(() => setLocationToast(''), 5000);
+          return;
+        }
+        
+        if (permission.state === 'granted') {
+          await captureGeolocation();
+          return;
+        }
+      }
+      
+      // If permission is 'prompt' or API not available, show the toast before requesting
+      setLocationToast('Enable location to find nearby Hawker Stalls and verify Halal status. 📍🕌');
+      setTimeout(() => setLocationToast(''), 5000);
+      
+      // Request location (will show browser prompt)
+      await captureGeolocation();
+    } catch (err) {
+      console.warn('Permission query failed:', err);
+      // Fallback: just try to get location
+      setLocationToast('Enable location to find nearby Hawker Stalls and verify Halal status. 📍🕌');
+      setTimeout(() => setLocationToast(''), 5000);
+      await captureGeolocation();
+    }
+  };
+
   // 🔎 DEBOUNCED SUPABASE SEARCH for Type It In
   useEffect(() => {
     if (!showTextInput) return;
@@ -239,6 +322,8 @@ export default function CheckFoodPage() {
     setConfidenceScore(1);
     setMealContext('hawker_stall');
     setPreparationStyle('unknown');
+    setGeolocation(null); // 📍 Clear location data on reset
+    setLocationToast('');
   };
 
   // 🔍 Check if result is low confidence (Unknown OR < 60%)
@@ -268,6 +353,9 @@ export default function CheckFoodPage() {
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // 📍 SILENT CAPTURE: Request geolocation on image capture
+      await captureGeolocation();
+      
       setLoading(true);
       setBaseResult(null);
       setPortion(1);
@@ -705,7 +793,9 @@ export default function CheckFoodPage() {
               is_ramadan_log: false, // Can be enhanced later with date detection
               // 🔄 RLHF: Track AI suggestion vs user correction
               ai_suggested_name: aiSuggestedName || finalData.food_name,
-              was_user_corrected: wasUserCorrected
+              was_user_corrected: wasUserCorrected,
+              // 📍 GEOLOCATION: Silent Sensor for Hawker Stall Detection
+              geolocation: geolocation
             })
           });
           
@@ -841,7 +931,11 @@ export default function CheckFoodPage() {
             
             {/* Camera Button - Primary */}
             <button 
-              onClick={() => fileInputRef.current?.click()}
+              onClick={async () => {
+                // 📍 REQUEST LOCATION PERMISSION - The "Hawker Hook"
+                await requestLocationPermission();
+                fileInputRef.current?.click();
+              }}
               className="w-full bg-gradient-to-r from-teal-500 to-cyan-500 text-white rounded-2xl p-5 shadow-lg shadow-teal-200/50 flex items-center gap-4 active:scale-[0.98] transition-transform"
             >
               <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
@@ -1940,6 +2034,18 @@ export default function CheckFoodPage() {
         <div className="fixed bottom-24 left-4 right-4 p-4 bg-red-500 text-white rounded-xl shadow-xl animate-slideUp flex justify-between items-center">
           <span className="font-medium">{error}</span>
           <button onClick={() => setError('')} className="ml-2 font-bold">✕</button>
+        </div>
+      )}
+
+      {/* ========== LOCATION TOAST - The "Hawker Hook" ========== */}
+      {locationToast && (
+        <div className="fixed bottom-24 left-4 right-4 p-4 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl shadow-xl animate-slideUp flex items-start gap-3">
+          <span className="text-2xl">📍</span>
+          <div className="flex-1">
+            <p className="font-bold mb-1">Location Request</p>
+            <p className="text-sm text-white/90">{locationToast}</p>
+          </div>
+          <button onClick={() => setLocationToast('')} className="ml-2 font-bold text-white/70 hover:text-white">✕</button>
         </div>
       )}
     </div>
