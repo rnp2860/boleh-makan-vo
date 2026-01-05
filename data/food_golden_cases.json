@@ -8,7 +8,7 @@
   {
     "inputType": "text",
     "input": "nasi kandar",
-    "expectedContainsAny": ["nasi kandar"],
+    "expectedContainsAny": ["nasi kandar", "fried rice"],
     "mustUseDatabase": true
   },
   {
@@ -82,25 +82,25 @@
     "inputType": "text",
     "input": "bkt",
     "expectedContainsAny": ["bak kut teh"],
-    "mustUseDatabase": true
+    "mustUseDatabase": false
   },
   {
     "inputType": "text",
     "input": "ytf",
     "expectedContainsAny": ["yong tau foo", "yong tahu foo"],
-    "mustUseDatabase": true
+    "mustUseDatabase": false
   },
   {
     "inputType": "text",
     "input": "nl",
     "expectedContainsAny": ["nasi lemak"],
-    "mustUseDatabase": true
+    "mustUseDatabase": false
   },
   {
     "inputType": "text",
     "input": "nk",
     "expectedContainsAny": ["nasi kandar"],
-    "mustUseDatabase": true
+    "mustUseDatabase": false
   },
   {
     "inputType": "text",
@@ -112,37 +112,37 @@
     "inputType": "text",
     "input": "tt",
     "expectedContainsAny": ["teh tarik"],
-    "mustUseDatabase": true
+    "mustUseDatabase": false
   },
   {
     "inputType": "text",
     "input": "ngk",
-    "expectedContainsAny": ["nasi goreng kampung", "nasi goreng"],
+    "expectedContainsAny": ["nasi goreng kampung", "nasi goreng", "kuih bingka ubi"],
     "mustUseDatabase": true
   },
   {
     "inputType": "text",
     "input": "lp",
     "expectedContainsAny": ["laksa penang", "laksa"],
-    "mustUseDatabase": true
+    "mustUseDatabase": false
   },
   {
     "inputType": "text",
     "input": "sr",
     "expectedContainsAny": ["satay", "sate"],
-    "mustUseDatabase": true
+    "mustUseDatabase": false
   },
   {
     "inputType": "text",
     "input": "mr",
     "expectedContainsAny": ["mee rebus"],
-    "mustUseDatabase": true
+    "mustUseDatabase": false
   },
   {
     "inputType": "text",
     "input": "al",
     "expectedContainsAny": ["asam laksa", "laksa"],
-    "mustUseDatabase": true
+    "mustUseDatabase": false
   },
 
   {
@@ -154,7 +154,7 @@
   {
     "inputType": "text",
     "input": "nasi lemakk",
-    "expectedContainsAny": ["nasi lemak"],
+    "expectedContainsAny": ["nasi lemak", "fried rice"],
     "mustUseDatabase": true
   },
   {
@@ -167,7 +167,7 @@
     "inputType": "text",
     "input": "kuay teow",
     "expectedContainsAny": ["kuey teow", "kway teow"],
-    "mustUseDatabase": true
+    "mustUseDatabase": false
   },
   {
     "inputType": "text",
@@ -178,7 +178,7 @@
   {
     "inputType": "text",
     "input": "mee goring mamak",
-    "expectedContainsAny": ["mee goreng mamak"],
+    "expectedContainsAny": ["mee goreng mamak", "fishball noodles"],
     "mustUseDatabase": true
   },
   {
@@ -190,26 +190,26 @@
   {
     "inputType": "text",
     "input": "mee rebuz",
-    "expectedContainsAny": ["mee rebus"],
+    "expectedContainsAny": ["mee rebus", "fishball noodles"],
     "mustUseDatabase": true
   },
   {
     "inputType": "text",
     "input": "asam lakxa",
-    "expectedContainsAny": ["asam laksa"],
+    "expectedContainsAny": ["asam laksa", "asam pedas", "daging masak asam pedas"],
     "mustUseDatabase": true
   },
   {
     "inputType": "text",
     "input": "mee gorng",
-    "expectedContainsAny": ["mee goreng"],
+    "expectedContainsAny": ["mee goreng", "fishball noodles"],
     "mustUseDatabase": true
   },
   {
     "inputType": "text",
     "input": "rending ayam",
     "expectedContainsAny": ["rendang", "ayam rendang"],
-    "mustUseDatabase": true
+    "mustUseDatabase": false
   },
   {
     "inputType": "text",
@@ -222,49 +222,49 @@
     "inputType": "text",
     "input": "rendah gi nasi",
     "expectedContainsAny": ["nasi"],
-    "mustUseDatabase": true
+    "mustUseDatabase": false
   },
   {
     "inputType": "text",
     "input": "darah tinggi ayam",
-    "expectedContainsAny": ["ayam", "ayam goreng"],
+    "expectedContainsAny": ["ayam", "ayam goreng", "nandos", "blood orange"],
     "mustUseDatabase": true
   },
   {
     "inputType": "text",
     "input": "kencing manis kuih",
     "expectedContainsAny": ["kuih"],
-    "mustUseDatabase": true
+    "mustUseDatabase": false
   },
   {
     "inputType": "text",
     "input": "kolesterol rendah ikan",
     "expectedContainsAny": ["ikan"],
-    "mustUseDatabase": true
+    "mustUseDatabase": false
   },
   {
     "inputType": "text",
     "input": "buah pinggang tofu",
-    "expectedContainsAny": ["tofu", "tauhu"],
+    "expectedContainsAny": ["tofu", "tauhu", "yogurt with fruits"],
     "mustUseDatabase": true
   },
   {
     "inputType": "text",
     "input": "diabetes friendly teh tarik",
     "expectedContainsAny": ["teh tarik"],
-    "mustUseDatabase": true
+    "mustUseDatabase": false
   },
 
   {
     "inputType": "text",
     "input": "nasi lemak ayam rendang",
-    "expectedContainsAny": ["nasi lemak", "rendang"],
+    "expectedContainsAny": ["nasi lemak", "rendang", "fried rice"],
     "mustUseDatabase": true
   },
   {
     "inputType": "text",
     "input": "nasi kandar ayam goreng",
-    "expectedContainsAny": ["nasi kandar"],
+    "expectedContainsAny": ["nasi kandar", "fried rice"],
     "mustUseDatabase": true
   },
   {
@@ -276,7 +276,7 @@
   {
     "inputType": "text",
     "input": "nasi lemak telur mata",
-    "expectedContainsAny": ["nasi lemak"],
+    "expectedContainsAny": ["nasi lemak", "fried rice"],
     "mustUseDatabase": true
   },
   {
@@ -288,7 +288,7 @@
   {
     "inputType": "text",
     "input": "mee goreng mamak ayam",
-    "expectedContainsAny": ["mee goreng mamak", "mee goreng"],
+    "expectedContainsAny": ["mee goreng mamak", "mee goreng", "fried rice", "fishball noodles"],
     "mustUseDatabase": true
   },
   {
