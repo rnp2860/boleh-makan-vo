@@ -302,6 +302,73 @@
     "input": "satay ayam kuah kacang",
     "expectedContainsAny": ["satay", "sate", "kuah kacang"],
     "mustUseDatabase": true
+  },
+
+  {
+    "inputType": "text",
+    "input": "nasi kandar ayam merah",
+    "expectedContainsAny": ["nasi kandar"],
+    "mustUseDatabase": true
+  },
+  {
+    "inputType": "text",
+    "input": "nasi kandar ayam goreng banjir",
+    "expectedContainsAny": ["nasi kandar"],
+    "mustUseDatabase": true
+  },
+  {
+    "inputType": "text",
+    "input": "nasi kandar kuah banjir",
+    "expectedContainsAny": ["nasi kandar"],
+    "mustUseDatabase": true
+  },
+  {
+    "inputType": "text",
+    "input": "nasi kandar special",
+    "expectedContainsAny": ["nasi kandar"],
+    "mustUseDatabase": true
+  },
+  {
+    "inputType": "text",
+    "input": "nasi kandar ayam goreng tambah kuah",
+    "expectedContainsAny": ["nasi kandar"],
+    "mustUseDatabase": true
+  },
+  {
+    "inputType": "text",
+    "input": "nasi lemak ayam goreng",
+    "expectedContainsAny": ["nasi lemak"],
+    "mustUseDatabase": true
+  },
+  {
+    "inputType": "text",
+    "input": "nasi lemak ayam merah",
+    "expectedContainsAny": ["nasi lemak"],
+    "mustUseDatabase": true
+  },
+  {
+    "inputType": "text",
+    "input": "nasi lemak banjir",
+    "expectedContainsAny": ["nasi lemak"],
+    "mustUseDatabase": true
+  },
+  {
+    "inputType": "text",
+    "input": "nasi lemak special",
+    "expectedContainsAny": ["nasi lemak"],
+    "mustUseDatabase": true
+  },
+  {
+    "inputType": "text",
+    "input": "nasi lemak sotong special",
+    "expectedContainsAny": ["nasi lemak"],
+    "mustUseDatabase": true
+  },
+  {
+    "inputType": "text",
+    "input": "nasi lemak ayam goreng berempah",
+    "expectedContainsAny": ["nasi lemak"],
+    "mustUseDatabase": true
   }
 ]
 

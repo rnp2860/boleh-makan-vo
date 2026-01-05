@@ -165,16 +165,55 @@ interface DBSearchResult {
   candidatesFound: number;
 }
 
+const DESCRIPTOR_PHRASES = [
+  'ayam merah',
+  'ayam goreng',
+  'ikan goreng',
+  'darah tinggi',
+  'buah pinggang',
+  'kuah banjir',
+  'kuah campur',
+  'kuah kacang',
+  'tambah kuah',
+  'tambah',
+  'tambahan',
+  'special',
+  'banjir',
+];
+
+const STOPWORDS = new Set([
+  'ayam',
+  'ikan',
+  'goreng',
+  'merah',
+  'kuah',
+  'banjir',
+  'special',
+  'tambah',
+  'tambahan',
+  'kacang',
+  'telur',
+  'sotong',
+  'udang',
+  'darah',
+  'tinggi',
+]);
+
 async function searchMalaysianDB(query: string): Promise<DBSearchResult> {
   try {
     const supabase = getSupabaseClient();
-    const normalizedQuery = query.toLowerCase().trim();
+    const normalizedInput = normalizeText(query);
+    const descriptorStripped = stripDescriptors(normalizedInput);
+    const normalizedQuery = descriptorStripped || normalizedInput;
     
     // Split into words for flexible matching
     const words = normalizedQuery.split(/\s+/).filter(w => w.length > 0);
+    const meaningfulTokens = getMeaningfulTokens(words);
     
     console.log(`🔍 [Malaysian DB] Searching for: "${query}"`);
-    console.log(`   Normalized: "${normalizedQuery}", Words: [${words.join(', ')}]`);
+    console.log(
+      `   Normalized: "${normalizedInput}", Stripped: "${normalizedQuery}", Words: [${words.join(', ')}], Meaningful: [${meaningfulTokens.join(', ')}]`
+    );
     
     // STRATEGY 1: EXACT MATCH (highest priority)
     const { data: exactMatches, error: exactError } = await supabase
@@ -250,13 +289,34 @@ async function searchMalaysianDB(query: string): Promise<DBSearchResult> {
       }
     }
     
-    // STRATEGY 4: PARTIAL TOKEN MATCH (single main word)
-    const mainWord = words[0] || normalizedQuery;
-    if (mainWord.length >= 3) {
+    // STRATEGY 4: PARTIAL TOKEN MATCH (top meaningful tokens with AND)
+    const partialTokens = (meaningfulTokens.length > 0 ? meaningfulTokens : words).slice(0, 2);
+    if (partialTokens.length === 2) {
+      const andFilter = buildTokenAndFilter(partialTokens[0], partialTokens[1]);
       const { data: partialMatches, error: partialError } = await supabase
         .from('malaysian_foods')
         .select('*')
-        .or(`name_en.ilike.%${mainWord}%,name_bm.ilike.%${mainWord}%`)
+        .or(andFilter)
+        .limit(5);
+      
+      if (!partialError && partialMatches && partialMatches.length > 0) {
+        console.log(`   ~ Partial match (AND tokens): ${partialMatches[0].name_en}`);
+        return {
+          matched: true,
+          confidence: CONFIDENCE_THRESHOLDS.PARTIAL_MATCH,
+          strategy: 'partial',
+          food: mapDBRowToMatchedFood(partialMatches[0]),
+          candidatesFound: partialMatches.length,
+        };
+      }
+    }
+
+    const fallbackPartialToken = (meaningfulTokens[0] || words[0] || '').trim();
+    if (fallbackPartialToken.length >= 3) {
+      const { data: partialMatches, error: partialError } = await supabase
+        .from('malaysian_foods')
+        .select('*')
+        .or(`name_en.ilike.%${fallbackPartialToken}%,name_bm.ilike.%${fallbackPartialToken}%`)
         .limit(5);
       
       if (!partialError && partialMatches && partialMatches.length > 0) {
@@ -294,6 +354,37 @@ async function searchMalaysianDB(query: string): Promise<DBSearchResult> {
 // ============================================
 // HELPER FUNCTIONS
 // ============================================
+
+function normalizeText(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function stripDescriptors(value: string): string {
+  let cleaned = value;
+  for (const phrase of DESCRIPTOR_PHRASES) {
+    const regex = new RegExp(`\\b${escapeRegExp(phrase)}\\b`, 'g');
+    cleaned = cleaned.replace(regex, ' ');
+  }
+  return normalizeText(cleaned);
+}
+
+function getMeaningfulTokens(words: string[]): string[] {
+  return words.filter((word) => word && !STOPWORDS.has(word));
+}
+
+function buildTokenAndFilter(first: string, second: string): string {
+  const filters = [
+    `and(name_en.ilike.%${first}%,name_en.ilike.%${second}%)`,
+    `and(name_bm.ilike.%${first}%,name_bm.ilike.%${second}%)`,
+    `and(name_en.ilike.%${first}%,name_bm.ilike.%${second}%)`,
+    `and(name_en.ilike.%${second}%,name_bm.ilike.%${first}%)`,
+  ];
+  return filters.join(',');
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
 function mapDBRowToMatchedFood(row: any): MatchedFood {
   return {
