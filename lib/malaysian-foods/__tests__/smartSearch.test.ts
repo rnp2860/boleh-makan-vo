@@ -9,7 +9,17 @@ import {
   getRecommendedFoods,
 } from '../smartSearch';
 
-describe('Smart Search Service', () => {
+const SUPABASE_CONFIGURED = Boolean(
+  process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+);
+const describeIfConfigured = SUPABASE_CONFIGURED ? describe : describe.skip;
+
+if (!SUPABASE_CONFIGURED) {
+  // eslint-disable-next-line no-console
+  console.warn('Skipping Smart Search tests because Supabase env vars are not configured.');
+}
+
+describeIfConfigured('Smart Search Service', () => {
   
   // ============================================
   // BASIC SEARCH TESTS

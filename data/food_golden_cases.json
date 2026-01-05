@@ -1,0 +1,307 @@
+[
+  {
+    "inputType": "text",
+    "input": "nasi lemak",
+    "expectedContainsAny": ["nasi lemak"],
+    "mustUseDatabase": true
+  },
+  {
+    "inputType": "text",
+    "input": "nasi kandar",
+    "expectedContainsAny": ["nasi kandar"],
+    "mustUseDatabase": true
+  },
+  {
+    "inputType": "text",
+    "input": "char kuey teow",
+    "expectedContainsAny": ["char kuey teow", "kuey teow"],
+    "mustUseDatabase": true
+  },
+  {
+    "inputType": "text",
+    "input": "mee goreng mamak",
+    "expectedContainsAny": ["mee goreng mamak", "mee goreng"],
+    "mustUseDatabase": true
+  },
+  {
+    "inputType": "text",
+    "input": "roti canai",
+    "expectedContainsAny": ["roti canai"],
+    "mustUseDatabase": true
+  },
+  {
+    "inputType": "text",
+    "input": "teh tarik",
+    "expectedContainsAny": ["teh tarik"],
+    "mustUseDatabase": true
+  },
+  {
+    "inputType": "text",
+    "input": "nasi goreng kampung",
+    "expectedContainsAny": ["nasi goreng", "goreng kampung"],
+    "mustUseDatabase": true
+  },
+  {
+    "inputType": "text",
+    "input": "laksa penang",
+    "expectedContainsAny": ["laksa penang", "laksa"],
+    "mustUseDatabase": true
+  },
+  {
+    "inputType": "text",
+    "input": "ayam rendang",
+    "expectedContainsAny": ["rendang", "ayam rendang"],
+    "mustUseDatabase": true
+  },
+  {
+    "inputType": "text",
+    "input": "satay ayam",
+    "expectedContainsAny": ["satay", "sate"],
+    "mustUseDatabase": true
+  },
+  {
+    "inputType": "text",
+    "input": "mee rebus",
+    "expectedContainsAny": ["mee rebus"],
+    "mustUseDatabase": true
+  },
+  {
+    "inputType": "text",
+    "input": "asam laksa",
+    "expectedContainsAny": ["asam laksa", "laksa"],
+    "mustUseDatabase": true
+  },
+
+  {
+    "inputType": "text",
+    "input": "ckt",
+    "expectedContainsAny": ["char kuey teow", "char koay teow"],
+    "mustUseDatabase": true
+  },
+  {
+    "inputType": "text",
+    "input": "bkt",
+    "expectedContainsAny": ["bak kut teh"],
+    "mustUseDatabase": true
+  },
+  {
+    "inputType": "text",
+    "input": "ytf",
+    "expectedContainsAny": ["yong tau foo", "yong tahu foo"],
+    "mustUseDatabase": true
+  },
+  {
+    "inputType": "text",
+    "input": "nl",
+    "expectedContainsAny": ["nasi lemak"],
+    "mustUseDatabase": true
+  },
+  {
+    "inputType": "text",
+    "input": "nk",
+    "expectedContainsAny": ["nasi kandar"],
+    "mustUseDatabase": true
+  },
+  {
+    "inputType": "text",
+    "input": "mgm",
+    "expectedContainsAny": ["mee goreng mamak"],
+    "mustUseDatabase": true
+  },
+  {
+    "inputType": "text",
+    "input": "tt",
+    "expectedContainsAny": ["teh tarik"],
+    "mustUseDatabase": true
+  },
+  {
+    "inputType": "text",
+    "input": "ngk",
+    "expectedContainsAny": ["nasi goreng kampung", "nasi goreng"],
+    "mustUseDatabase": true
+  },
+  {
+    "inputType": "text",
+    "input": "lp",
+    "expectedContainsAny": ["laksa penang", "laksa"],
+    "mustUseDatabase": true
+  },
+  {
+    "inputType": "text",
+    "input": "sr",
+    "expectedContainsAny": ["satay", "sate"],
+    "mustUseDatabase": true
+  },
+  {
+    "inputType": "text",
+    "input": "mr",
+    "expectedContainsAny": ["mee rebus"],
+    "mustUseDatabase": true
+  },
+  {
+    "inputType": "text",
+    "input": "al",
+    "expectedContainsAny": ["asam laksa", "laksa"],
+    "mustUseDatabase": true
+  },
+
+  {
+    "inputType": "text",
+    "input": "nasik lemak",
+    "expectedContainsAny": ["nasi lemak"],
+    "mustUseDatabase": true
+  },
+  {
+    "inputType": "text",
+    "input": "nasi lemakk",
+    "expectedContainsAny": ["nasi lemak"],
+    "mustUseDatabase": true
+  },
+  {
+    "inputType": "text",
+    "input": "roti chanai",
+    "expectedContainsAny": ["roti canai"],
+    "mustUseDatabase": true
+  },
+  {
+    "inputType": "text",
+    "input": "kuay teow",
+    "expectedContainsAny": ["kuey teow", "kway teow"],
+    "mustUseDatabase": true
+  },
+  {
+    "inputType": "text",
+    "input": "char kway teow",
+    "expectedContainsAny": ["char kuey teow", "char kway teow"],
+    "mustUseDatabase": true
+  },
+  {
+    "inputType": "text",
+    "input": "mee goring mamak",
+    "expectedContainsAny": ["mee goreng mamak"],
+    "mustUseDatabase": true
+  },
+  {
+    "inputType": "text",
+    "input": "laksa peneng",
+    "expectedContainsAny": ["laksa penang"],
+    "mustUseDatabase": true
+  },
+  {
+    "inputType": "text",
+    "input": "mee rebuz",
+    "expectedContainsAny": ["mee rebus"],
+    "mustUseDatabase": true
+  },
+  {
+    "inputType": "text",
+    "input": "asam lakxa",
+    "expectedContainsAny": ["asam laksa"],
+    "mustUseDatabase": true
+  },
+  {
+    "inputType": "text",
+    "input": "mee gorng",
+    "expectedContainsAny": ["mee goreng"],
+    "mustUseDatabase": true
+  },
+  {
+    "inputType": "text",
+    "input": "rending ayam",
+    "expectedContainsAny": ["rendang", "ayam rendang"],
+    "mustUseDatabase": true
+  },
+  {
+    "inputType": "text",
+    "input": "satay ayammm",
+    "expectedContainsAny": ["satay", "sate"],
+    "mustUseDatabase": true
+  },
+
+  {
+    "inputType": "text",
+    "input": "rendah gi nasi",
+    "expectedContainsAny": ["nasi"],
+    "mustUseDatabase": true
+  },
+  {
+    "inputType": "text",
+    "input": "darah tinggi ayam",
+    "expectedContainsAny": ["ayam", "ayam goreng"],
+    "mustUseDatabase": true
+  },
+  {
+    "inputType": "text",
+    "input": "kencing manis kuih",
+    "expectedContainsAny": ["kuih"],
+    "mustUseDatabase": true
+  },
+  {
+    "inputType": "text",
+    "input": "kolesterol rendah ikan",
+    "expectedContainsAny": ["ikan"],
+    "mustUseDatabase": true
+  },
+  {
+    "inputType": "text",
+    "input": "buah pinggang tofu",
+    "expectedContainsAny": ["tofu", "tauhu"],
+    "mustUseDatabase": true
+  },
+  {
+    "inputType": "text",
+    "input": "diabetes friendly teh tarik",
+    "expectedContainsAny": ["teh tarik"],
+    "mustUseDatabase": true
+  },
+
+  {
+    "inputType": "text",
+    "input": "nasi lemak ayam rendang",
+    "expectedContainsAny": ["nasi lemak", "rendang"],
+    "mustUseDatabase": true
+  },
+  {
+    "inputType": "text",
+    "input": "nasi kandar ayam goreng",
+    "expectedContainsAny": ["nasi kandar"],
+    "mustUseDatabase": true
+  },
+  {
+    "inputType": "text",
+    "input": "nasi lemak sotong",
+    "expectedContainsAny": ["nasi lemak"],
+    "mustUseDatabase": true
+  },
+  {
+    "inputType": "text",
+    "input": "nasi lemak telur mata",
+    "expectedContainsAny": ["nasi lemak"],
+    "mustUseDatabase": true
+  },
+  {
+    "inputType": "text",
+    "input": "char kuey teow udang",
+    "expectedContainsAny": ["char kuey teow", "kuey teow"],
+    "mustUseDatabase": true
+  },
+  {
+    "inputType": "text",
+    "input": "mee goreng mamak ayam",
+    "expectedContainsAny": ["mee goreng mamak", "mee goreng"],
+    "mustUseDatabase": true
+  },
+  {
+    "inputType": "text",
+    "input": "laksa penang ikan",
+    "expectedContainsAny": ["laksa penang", "laksa"],
+    "mustUseDatabase": true
+  },
+  {
+    "inputType": "text",
+    "input": "satay ayam kuah kacang",
+    "expectedContainsAny": ["satay", "sate", "kuah kacang"],
+    "mustUseDatabase": true
+  }
+]
+
