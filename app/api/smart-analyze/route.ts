@@ -33,7 +33,7 @@ import {
   generateMalaysianFoodAdvice
 } from '@/lib/malaysianFoodDatabaseLookup';
 import { resolveFood } from '@/lib/food/resolveFood';
-import type { ResolvedFood } from '@/lib/food/resolveFood';
+type ResolvedFoodLocal = Awaited<ReturnType<typeof resolveFood>>;
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const DEBUG_SMART_ANALYZE = process.env.DEBUG_SMART_ANALYZE === '1';
@@ -155,8 +155,8 @@ type VisionCandidate = { name: string; confidence?: number; reason?: string };
 // Pure helper for selecting best resolution; exported for tests
 export function pickBestVisionResolution(
   candidates: VisionCandidate[],
-  resolutions: Array<{ candidate: VisionCandidate; resolution: ResolvedFood }>
-): { candidate: VisionCandidate; resolution: ResolvedFood } | null {
+  resolutions: Array<{ candidate: VisionCandidate; resolution: ResolvedFoodLocal }>
+): { candidate: VisionCandidate; resolution: ResolvedFoodLocal } | null {
   if (!resolutions.length) return null;
   const dbMatches = resolutions.filter(r => r.resolution.source === 'malaysian_db');
   if (dbMatches.length) {
