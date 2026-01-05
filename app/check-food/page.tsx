@@ -1885,8 +1885,7 @@ export default function CheckFoodPage() {
                 {image && (
                   <button 
                     onClick={() => {
-                      setTextInput(finalData.food_name);
-                      setShowTextInput(true);
+                      openSmartSearch(finalData.food_name);
                     }}
                     className="w-full bg-amber-500 text-white py-3 rounded-2xl font-bold text-sm shadow-md hover:bg-amber-600 transition-colors"
                   >
