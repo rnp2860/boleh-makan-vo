@@ -181,6 +181,19 @@ const DESCRIPTOR_PHRASES = [
   'banjir',
 ];
 
+const CROSS_CUISINE_TERMS = new Set([
+  'chips',
+  'fries',
+  'burger',
+  'sandwich',
+  'wrap',
+  'taco',
+  'pizza',
+  'pasta',
+  'and',
+  '&'
+]);
+
 const STOPWORDS = new Set([
   'ayam',
   'ikan',
@@ -278,6 +291,10 @@ async function searchMalaysianDB(query: string): Promise<DBSearchResult> {
         }
         
         // Partial match - some words present
+        if (shouldRejectPartialMatch(words, meaningfulTokens, matchName)) {
+          console.log(`   ✗ Rejected partial fuzzy match due to low overlap: ${topMatch.name_en}`);
+          return { matched: false, confidence: 0, strategy: 'ai_fallback', candidatesFound: fuzzyMatches.length };
+        }
         console.log(`   ~ Fuzzy match (partial): ${topMatch.name_en}`);
         return {
           matched: true,
@@ -301,6 +318,11 @@ async function searchMalaysianDB(query: string): Promise<DBSearchResult> {
       
       if (!partialError && partialMatches && partialMatches.length > 0) {
         console.log(`   ~ Partial match (AND tokens): ${partialMatches[0].name_en}`);
+        const matchName = `${partialMatches[0].name_en} ${partialMatches[0].name_bm}`.toLowerCase();
+        if (shouldRejectPartialMatch(words, meaningfulTokens, matchName)) {
+          console.log(`   ✗ Rejected partial AND match due to low overlap: ${partialMatches[0].name_en}`);
+          return { matched: false, confidence: 0, strategy: 'ai_fallback', candidatesFound: partialMatches.length };
+        }
         return {
           matched: true,
           confidence: CONFIDENCE_THRESHOLDS.PARTIAL_MATCH,
@@ -321,6 +343,11 @@ async function searchMalaysianDB(query: string): Promise<DBSearchResult> {
       
       if (!partialError && partialMatches && partialMatches.length > 0) {
         console.log(`   ~ Partial match: ${partialMatches[0].name_en}`);
+        const matchName = `${partialMatches[0].name_en} ${partialMatches[0].name_bm}`.toLowerCase();
+        if (shouldRejectPartialMatch(words, meaningfulTokens, matchName)) {
+          console.log(`   ✗ Rejected fallback partial due to low overlap: ${partialMatches[0].name_en}`);
+          return { matched: false, confidence: 0, strategy: 'ai_fallback', candidatesFound: partialMatches.length };
+        }
         return {
           matched: true,
           confidence: CONFIDENCE_THRESHOLDS.PARTIAL_MATCH,
@@ -370,6 +397,19 @@ function stripDescriptors(value: string): string {
 
 function getMeaningfulTokens(words: string[]): string[] {
   return words.filter((word) => word && !STOPWORDS.has(word));
+}
+
+function countMeaningfulOverlap(queryTokens: string[], matchName: string): number {
+  const matchTokens = new Set(matchName.split(/\s+/).filter(Boolean));
+  return queryTokens.reduce((count, token) => count + (matchTokens.has(token) ? 1 : 0), 0);
+}
+
+function shouldRejectPartialMatch(queryWords: string[], meaningfulTokens: string[], matchName: string): boolean {
+  const hasCrossCuisine = queryWords.some((w) => CROSS_CUISINE_TERMS.has(w));
+  const overlap = countMeaningfulOverlap(meaningfulTokens, matchName);
+  if (hasCrossCuisine && overlap < 2) return true;
+  if (queryWords.length >= 2 && overlap === 0) return true;
+  return false;
 }
 
 function buildTokenAndFilter(first: string, second: string): string {

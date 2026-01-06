@@ -369,6 +369,12 @@
     "input": "nasi lemak ayam goreng berempah",
     "expectedContainsAny": ["nasi lemak"],
     "mustUseDatabase": true
+  },
+  {
+    "inputType": "text",
+    "input": "fish and chips",
+    "expectedContainsAny": ["fish", "chips"],
+    "mustUseDatabase": false
   }
 ]
 

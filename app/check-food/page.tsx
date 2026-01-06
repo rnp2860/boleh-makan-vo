@@ -396,10 +396,20 @@ export default function CheckFoodPage() {
   const handleConfirmPhotoAnalysis = async () => {
     if (!photoPreview) return;
 
-    // If a meal is already identified via text/search, attach the photo without re-identifying
+    // If a meal is already identified via text/search, enrich with photo (keep identity)
     if (baseResult) {
-      setImage(photoPreview);
       setShowPhotoConfirm(false);
+      setLoading(true);
+      setResultLocked(true);
+      setImage(photoPreview);
+      const compressedImage = await compressImage(photoPreview, 512, 0.6);
+      await analyzeFood('enrich', {
+        image: compressedImage,
+        lockedFoodName: baseResult.data?.food_name,
+        lockedFoodId: baseResult.data?.food_id || baseResult.data?.malaysian_food_id,
+        lockedCategory: baseResult.data?.category,
+        lockedMacros: baseResult.data?.macros
+      }, { allowWhenLocked: true });
       setPhotoPreview(null);
       return;
     }
@@ -434,7 +444,7 @@ export default function CheckFoodPage() {
   };
 
   // 🧠 MAIN ANALYSIS
-  const analyzeFood = async (type: 'image' | 'text', data: string, options?: { allowWhenLocked?: boolean }) => {
+  const analyzeFood = async (type: 'image' | 'text' | 'enrich', data: any, options?: { allowWhenLocked?: boolean }) => {
     if (resultLocked && !options?.allowWhenLocked) {
       if (DEBUG) console.debug('[analyzeFood] blocked because resultLocked', { type, data });
       return;

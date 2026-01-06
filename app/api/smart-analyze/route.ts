@@ -247,8 +247,12 @@ export async function POST(req: Request) {
     let candidates: VisionCandidate[] = [];
 
     // 🧠 STEP 1: IDENTIFY THE FOOD (Using comprehensive vision analysis)
-    if (type === 'image') {
+    if (type === 'image' || type === 'enrich') {
       console.log("🔍 Starting vision analysis...");
+
+      if (type === 'enrich' && (!data?.image || !data?.lockedFoodName)) {
+        return NextResponse.json({ success: false, error: 'Missing image or locked food name for enrichment' }, { status: 400 });
+      }
       
       // 🔄 RLHF: Fetch user corrections and inject into prompt
       const corrections = await fetchRecentCorrections();
@@ -258,19 +262,25 @@ export async function POST(req: Request) {
       
       console.log(`🧠 RLHF: Using prompt with ${corrections.length} corrections`);
       
+      const systemPrompt = type === 'enrich'
+        ? `You are enriching details for a known dish: "${(data?.lockedFoodName || '').toString()}". DO NOT change the dish identity. Only estimate portion size, detected components/ingredients, possible sides, preparation style, meal context, and sugar source clues. Return JSON with candidates (must include the locked name), detected_components, detected_protein, portion_estimation, base_nutrition, adjusted_nutrition, category, confidence_score, valid_lauk, and any visual notes.`
+        : enhancedPrompt;
+
+      const userContent: any[] = [
+        { type: "text", text: type === 'enrich' ? "Enrich this known dish. Keep the name fixed. Extract portion, components, context." : "Analyze this Malaysian food image and return the required JSON." },
+        { type: "image_url", image_url: { url: type === 'enrich' ? data?.image : data, detail: "low" } }
+      ];
+
       const visionResponse = await openai.chat.completions.create({
         model: "gpt-4o-mini",
         messages: [
           {
             role: "system",
-            content: enhancedPrompt
+            content: systemPrompt
           },
           {
             role: "user",
-            content: [
-              { type: "text", text: "Analyze this Malaysian food image and return the required JSON." },
-              { type: "image_url", image_url: { url: data, detail: "low" } }
-            ]
+            content: userContent
           }
         ],
         response_format: { type: "json_object" },
@@ -299,7 +309,12 @@ export async function POST(req: Request) {
         candidates.push({ name: 'Unknown Food', confidence: 0.3, reason: 'model returned empty' });
       }
 
-      foodName = candidates[0].name || "Unknown Food";
+      if (type === 'enrich' && data?.lockedFoodName) {
+        candidates.unshift({ name: data.lockedFoodName, confidence: 0.95, reason: 'locked identity' });
+        foodName = data.lockedFoodName;
+      } else {
+        foodName = candidates[0].name || "Unknown Food";
+      }
       visionCategory = visionResult.category || 'Other';
       visionConfidence = candidates[0].confidence || 0.5;
       isPotentiallyPork = visionResult.is_potentially_pork || false;
@@ -874,7 +889,7 @@ export async function POST(req: Request) {
         : 'database';
 
       // 📏 Apply portion multiplier to database nutrition if it's an image with portion estimation
-      const portionMultiplier = type === 'image' ? portionEstimation.multiplier : 1.0;
+      const portionMultiplier = (type === 'image' || type === 'enrich') ? portionEstimation.multiplier : 1.0;
       const adjustedCalories = Math.round((finalDbMatch.calories || 0) * portionMultiplier);
       const adjustedProtein = Math.round((finalDbMatch.protein || 0) * portionMultiplier);
       const adjustedCarbs = Math.round((finalDbMatch.carbs || 0) * portionMultiplier);
