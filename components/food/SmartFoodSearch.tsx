@@ -27,6 +27,7 @@ export function SmartFoodSearch({
   const [result, setResult] = useState<SmartSearchResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [debouncedQuery, setDebouncedQuery] = useState(initialQuery);
+  const [isEstimating, setIsEstimating] = useState(false);
 
   // Debounce search query
   useEffect(() => {
@@ -90,6 +91,66 @@ export function SmartFoodSearch({
     // setResult(null);
   };
 
+  const handleAIEstimate = async () => {
+    setIsEstimating(true);
+    try {
+      const res = await fetch('/api/ai-estimate-food', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          food_name: debouncedQuery,
+          user_conditions: userConditions || []
+        })
+      });
+      
+      const data = await res.json();
+      
+      if (data.success && data.food) {
+        const aiFood: MalaysianFood = {
+          id: data.food.id,
+          nameEn: data.food.nameEn || data.food.food_name,
+          nameBm: data.food.nameBm || data.food.food_name,
+          aliases: [],
+          category: data.food.category || 'snacks',
+          tags: data.food.health_tags || [],
+          servingDescription: data.food.serving_size || '1 serving',
+          servingGrams: 400,
+          caloriesKcal: data.food.calories,
+          carbsG: data.food.carbs_g,
+          sugarG: data.food.sugar_g || 0,
+          fiberG: data.food.fiber_g || 0,
+          sodiumMg: data.food.sodium_mg || 0,
+          totalFatG: data.food.fat_g,
+          proteinG: data.food.protein_g,
+          popularityScore: 0,
+          source: 'ai_estimated',
+          verified: false,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        } as any;
+        
+        // Add extra properties for compatibility
+        (aiFood as any).dr_reza_analysis = data.food.dr_reza_analysis;
+        (aiFood as any).analysis_content = data.food.analysis_content;
+        (aiFood as any).halal_status = data.food.halal_status;
+        (aiFood as any).health_tags = data.food.health_tags;
+        (aiFood as any).is_potentially_pork = data.food.is_potentially_pork;
+        (aiFood as any).risk_analysis = data.food.risk_analysis;
+        
+        if (onSelectFood) {
+          onSelectFood(aiFood);
+        }
+      } else {
+        alert(data.error || 'AI estimation failed. Please try a more specific food name.');
+      }
+    } catch (err) {
+      console.error('AI estimation error:', err);
+      alert('Failed to estimate food. Please check your connection and try again.');
+    } finally {
+      setIsEstimating(false);
+    }
+  };
+
   return (
     <div className="w-full space-y-4">
       {/* Search Input */}
@@ -134,12 +195,36 @@ export function SmartFoodSearch({
             </div>
           )}
 
-          {/* No Results */}
-          {result.results.length === 0 && !isLoading && (
-            <div className="text-center py-8 text-gray-500">
-              <p className="text-lg mb-2">No foods found</p>
-              <p className="text-sm">
-                Try different keywords or remove some filters
+          {/* AI Fallback - Show when no DB results */}
+          {result.results.length === 0 && debouncedQuery.length > 2 && !isLoading && (
+            <div className="p-6 text-center space-y-4">
+              <div className="text-slate-400">
+                <p className="font-semibold mb-2 text-slate-600">❌ Not in our database</p>
+                <p className="text-sm">
+                  We have 1,600+ Malaysian foods verified, but "<span className="font-semibold text-slate-700">{debouncedQuery}</span>" isn't one of them yet.
+                </p>
+              </div>
+              
+              <button
+                onClick={handleAIEstimate}
+                disabled={isEstimating}
+                className="w-full bg-gradient-to-r from-amber-500 to-orange-500 text-white py-3 px-4 rounded-xl font-bold text-sm hover:shadow-lg transition-shadow disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {isEstimating ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Dr. Reza sedang kira...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>🤖</span>
+                    <span>Ask Dr. Reza to Estimate</span>
+                  </>
+                )}
+              </button>
+              
+              <p className="text-xs text-slate-400">
+                AI will estimate nutrition based on typical recipes
               </p>
             </div>
           )}
