@@ -142,10 +142,6 @@ export default function CheckFoodPage() {
   const [correctionInput, setCorrectionInput] = useState('');
   const [isReanalyzing, setIsReanalyzing] = useState(false);
   
-  // 📸 PHOTO CONFIRMATION - Show preview before analyze
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const [showPhotoConfirm, setShowPhotoConfirm] = useState(false);
-  
   // 🍽️ MEAL TYPE SELECTOR (for Nutrition Reports)
   // Auto-select based on current time OR Ramadan mode
   const getDefaultMealType = (): 'Breakfast' | 'Lunch' | 'Dinner' | 'Snack' | 'Sahur' | 'Iftar' => {
@@ -341,8 +337,6 @@ export default function CheckFoodPage() {
     setPreparationStyle('unknown');
     setGeolocation(null); // 📍 Clear location data on reset
     setLocationToast('');
-    setPhotoPreview(null);
-    setShowPhotoConfirm(false);
   };
 
   // 🔍 Check if result is low confidence (Unknown OR < 60%)
@@ -370,12 +364,10 @@ export default function CheckFoodPage() {
     }
   };
 
-  // 📸 SHOW PREVIEW (No auto-analyze - user must confirm)
+  // 📸 INSTANT PHOTO HANDLING (No confirmation modal)
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) {
-      setPhotoPreview(null);
-      setShowPhotoConfirm(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
@@ -383,55 +375,30 @@ export default function CheckFoodPage() {
     await captureGeolocation();
     
     const reader = new FileReader();
-    reader.onloadend = () => {
+    reader.onloadend = async () => {
       const rawImage = reader.result as string;
-      setPhotoPreview(rawImage); // Store for preview
-      setShowPhotoConfirm(true); // Show confirmation modal
       if (fileInputRef.current) fileInputRef.current.value = '';
+      
+      // If a meal is already identified via text/search, enrich with photo (keep identity)
+      if (baseResult) {
+        setLoading(true);
+        setResultLocked(true);
+        setImage(rawImage);
+        const compressedImage = await compressImage(rawImage, 512, 0.6);
+        await analyzeFood('enrich', {
+          image: compressedImage,
+          lockedFoodName: baseResult.data?.food_name,
+          lockedFoodId: baseResult.data?.food_id || baseResult.data?.malaysian_food_id,
+          lockedCategory: baseResult.data?.category,
+          lockedMacros: baseResult.data?.macros
+        }, { allowWhenLocked: true });
+        return;
+      }
+      
+      // No food selected yet - just store the image
+      setImage(rawImage);
     };
     reader.readAsDataURL(file);
-  };
-  
-  // 📸 CONFIRM PHOTO ANALYSIS (User explicitly analyzes photo)
-  const handleConfirmPhotoAnalysis = async () => {
-    if (!photoPreview) return;
-
-    // If a meal is already identified via text/search, enrich with photo (keep identity)
-    if (baseResult) {
-      setShowPhotoConfirm(false);
-      setLoading(true);
-      setResultLocked(true);
-      setImage(photoPreview);
-      const compressedImage = await compressImage(photoPreview, 512, 0.6);
-      await analyzeFood('enrich', {
-        image: compressedImage,
-        lockedFoodName: baseResult.data?.food_name,
-        lockedFoodId: baseResult.data?.food_id || baseResult.data?.malaysian_food_id,
-        lockedCategory: baseResult.data?.category,
-        lockedMacros: baseResult.data?.macros
-      }, { allowWhenLocked: true });
-      setPhotoPreview(null);
-      return;
-    }
-
-    setResultLocked(false); // new photo analysis should unlock previous selections
-    setSelectedFood(null);
-    setShowPhotoConfirm(false);
-    setLoading(true);
-    setBaseResult(null);
-    setPortion(1);
-    setKuahLevel('biasa');
-    setExcludedComponents([]);
-    setCustomItems([]);
-    
-    setImage(photoPreview); // Show original for display
-    
-    // Compress for faster API analysis
-    const compressedImage = await compressImage(photoPreview, 512, 0.6);
-    
-    // Analyze with compressed image
-    await analyzeFood('image', compressedImage);
-    setPhotoPreview(null);
   };
 
   // 📝 TEXT INPUT ANALYSIS
@@ -1982,50 +1949,6 @@ export default function CheckFoodPage() {
               >
                 Add Ingredient
               </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ========== 📸 PHOTO CONFIRMATION MODAL ========== */}
-      {showPhotoConfirm && photoPreview && (
-        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center backdrop-blur-sm p-4">
-          <div className="bg-white w-full max-w-md rounded-3xl overflow-hidden animate-slideUp shadow-2xl">
-            {/* Header */}
-            <div className="bg-gradient-to-r from-teal-500 to-cyan-500 p-4 text-center">
-              <h3 className="text-white text-xl font-bold">Sahkan Gambar</h3>
-              <p className="text-teal-100 text-sm mt-1">Saya akan cadangkan makanan — anda perlu sahkan</p>
-            </div>
-            
-            {/* Photo Preview */}
-            <div className="p-4">
-              <div className="rounded-2xl overflow-hidden shadow-lg mb-4">
-                <img src={photoPreview} alt="Preview" className="w-full h-64 object-cover" />
-              </div>
-              
-              <p className="text-slate-600 text-sm text-center mb-4">
-                Saya akan <strong>mencadangkan</strong> makanan ini. Anda boleh edit atau betulkan sebelum save.
-              </p>
-              
-              {/* Options */}
-              <div className="space-y-3">
-                <button
-                  onClick={handleConfirmPhotoAnalysis}
-                  className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-teal-500 to-cyan-500 text-white font-bold text-lg shadow-lg shadow-teal-200 active:scale-[0.98] transition-transform"
-                >
-                  🔍 Analisis Gambar Ini
-                </button>
-                
-                <button
-                  onClick={() => {
-                    setShowPhotoConfirm(false);
-                    setPhotoPreview(null);
-                  }}
-                  className="w-full py-3 text-slate-400 font-medium"
-                >
-                  Batal
-                </button>
-              </div>
             </div>
           </div>
         </div>
