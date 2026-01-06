@@ -386,36 +386,10 @@ export async function POST(req: Request) {
       
       console.log(`🎯 Resolution result: source=${resolution.source}, confidence=${(resolution.confidence * 100).toFixed(0)}%`);
       
-      // If DB match found, return immediately
+      // If DB match found, generate full analysis
       if (resolution.source === 'malaysian_db' && resolution.matchedFood) {
         const matched = resolution.matchedFood;
         const conditions = healthConditions || [];
-        const drRezaTip = generateMalaysianFoodAdvice({
-          id: matched.id,
-          name_en: matched.name_en,
-          name_bm: matched.name_bm,
-          category: matched.category,
-          serving_description: matched.serving_description,
-          serving_grams: matched.serving_grams,
-          calories: matched.macros.calories_kcal,
-          protein: matched.macros.protein_g,
-          carbs: matched.macros.carbs_g,
-          fat: matched.macros.total_fat_g,
-          sugar_g: matched.macros.sugar_g || 0,
-          sodium_mg: matched.macros.sodium_mg || 0,
-          saturated_fat_g: matched.macros.saturated_fat_g,
-          cholesterol_mg: matched.macros.cholesterol_mg,
-          phosphorus_mg: matched.macros.phosphorus_mg,
-          potassium_mg: matched.macros.potassium_mg,
-          fiber_g: matched.macros.fiber_g,
-          diabetes_rating: matched.ratings.diabetes_rating as any,
-          hypertension_rating: matched.ratings.hypertension_rating as any,
-          cholesterol_rating: matched.ratings.cholesterol_rating as any,
-          ckd_rating: matched.ratings.ckd_rating as any,
-          source: 'malaysian_database',
-          match_confidence: resolution.confidence,
-          match_type: resolution.debug.strategy as any
-        }, conditions);
         
         const components = getMalaysianFoodComponents({
           id: matched.id,
@@ -443,6 +417,113 @@ export async function POST(req: Request) {
           match_confidence: resolution.confidence,
           match_type: resolution.debug.strategy as any
         });
+        
+        // Build meal data for Dr. Reza advisor
+        const mealData: MealData = {
+          food_name: matched.name_en,
+          category: matched.category,
+          calories: matched.macros.calories_kcal,
+          protein: matched.macros.protein_g,
+          carbs: matched.macros.carbs_g,
+          fat: matched.macros.total_fat_g,
+          sugar: matched.macros.sugar_g || 0,
+          sodium: matched.macros.sodium_mg || 0
+        };
+        
+        // Build the enhanced prompt with daily context
+        const enhancedPrompt = buildDrRezaPromptWithContext(mealData, dailyContext);
+        
+        // Get glucose prediction
+        const glucosePrediction = predictGlucoseImpact(matched.name_en, mealData.carbs, mealData.sugar, matched.category);
+        
+        // Generate structured Dr. Reza advice
+        const drRezaResponse = await openai.chat.completions.create({
+          model: "gpt-4o-mini",
+          messages: [
+            {
+              role: "system",
+              content: enhancedPrompt
+            },
+            {
+              role: "user",
+              content: `Analyze this meal and provide your advice as JSON. Remember to reference their daily totals and predict glucose impact if they have diabetes.`
+            }
+          ],
+          max_tokens: 400,
+          response_format: { type: "json_object" },
+        });
+        
+        // Parse Dr. Reza's structured response
+        const drRezaContent = drRezaResponse.choices[0].message.content?.trim() || '{}';
+        const drRezaParsed = parseDrRezaResponse(drRezaContent);
+        
+        // Format the advice for display (with fallback to simple advice)
+        const drRezaTip = drRezaParsed 
+          ? formatDrRezaAdvice(drRezaParsed, generateMalaysianFoodAdvice({
+              id: matched.id,
+              name_en: matched.name_en,
+              name_bm: matched.name_bm,
+              category: matched.category,
+              serving_description: matched.serving_description,
+              serving_grams: matched.serving_grams,
+              calories: matched.macros.calories_kcal,
+              protein: matched.macros.protein_g,
+              carbs: matched.macros.carbs_g,
+              fat: matched.macros.total_fat_g,
+              sugar_g: matched.macros.sugar_g || 0,
+              sodium_mg: matched.macros.sodium_mg || 0,
+              saturated_fat_g: matched.macros.saturated_fat_g,
+              cholesterol_mg: matched.macros.cholesterol_mg,
+              phosphorus_mg: matched.macros.phosphorus_mg,
+              potassium_mg: matched.macros.potassium_mg,
+              fiber_g: matched.macros.fiber_g,
+              diabetes_rating: matched.ratings.diabetes_rating as any,
+              hypertension_rating: matched.ratings.hypertension_rating as any,
+              cholesterol_rating: matched.ratings.cholesterol_rating as any,
+              ckd_rating: matched.ratings.ckd_rating as any,
+              source: 'malaysian_database',
+              match_confidence: resolution.confidence,
+              match_type: resolution.debug.strategy as any
+            }, conditions))
+          : generateMalaysianFoodAdvice({
+              id: matched.id,
+              name_en: matched.name_en,
+              name_bm: matched.name_bm,
+              category: matched.category,
+              serving_description: matched.serving_description,
+              serving_grams: matched.serving_grams,
+              calories: matched.macros.calories_kcal,
+              protein: matched.macros.protein_g,
+              carbs: matched.macros.carbs_g,
+              fat: matched.macros.total_fat_g,
+              sugar_g: matched.macros.sugar_g || 0,
+              sodium_mg: matched.macros.sodium_mg || 0,
+              saturated_fat_g: matched.macros.saturated_fat_g,
+              cholesterol_mg: matched.macros.cholesterol_mg,
+              phosphorus_mg: matched.macros.phosphorus_mg,
+              potassium_mg: matched.macros.potassium_mg,
+              fiber_g: matched.macros.fiber_g,
+              diabetes_rating: matched.ratings.diabetes_rating as any,
+              hypertension_rating: matched.ratings.hypertension_rating as any,
+              cholesterol_rating: matched.ratings.cholesterol_rating as any,
+              ckd_rating: matched.ratings.ckd_rating as any,
+              source: 'malaysian_database',
+              match_confidence: resolution.confidence,
+              match_type: resolution.debug.strategy as any
+            }, conditions);
+        
+        // Build health tags
+        const healthTags = buildHealthTags({
+          sodium_mg: matched.macros.sodium_mg,
+          sugar_g: matched.macros.sugar_g,
+          saturated_fat_g: matched.macros.saturated_fat_g,
+          protein: matched.macros.protein_g
+        });
+        
+        // Build risk analysis
+        const isHighSodium = (matched.macros.sodium_mg || 0) > 800;
+        const isHighSugar = (matched.macros.sugar_g || 0) > 15;
+        const isHighProtein = matched.macros.protein_g > 25;
         
         return NextResponse.json({
           success: true,
@@ -474,17 +555,19 @@ export async function POST(req: Request) {
             hypertension_rating: matched.ratings.hypertension_rating,
             cholesterol_rating: matched.ratings.cholesterol_rating,
             ckd_rating: matched.ratings.ckd_rating,
-            valid_lauk: [],
+            valid_lauk: components,
             analysis_content: drRezaTip,
+            dr_reza_analysis: drRezaParsed || null,
+            glucose_prediction: glucosePrediction,
             is_potentially_pork: false,
             matched_protein: null,
             visual_notes: `From Malaysian food database (${resolution.debug.strategy} match): ${matched.name_bm}`,
-            health_tags: buildHealthTags({
-              sodium_mg: matched.macros.sodium_mg,
-              sugar_g: matched.macros.sugar_g,
-              saturated_fat_g: matched.macros.saturated_fat_g,
-              protein: matched.macros.protein_g
-            })
+            health_tags: healthTags,
+            risk_analysis: {
+              is_high_sodium: isHighSodium,
+              is_high_sugar: isHighSugar,
+              is_high_protein: isHighProtein
+            }
           }
         });
       }
