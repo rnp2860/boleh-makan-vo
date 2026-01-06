@@ -250,15 +250,38 @@ export async function POST(req: Request) {
     if (type === 'image' || type === 'enrich') {
       console.log("🔍 Starting vision analysis...");
 
+      // ✅ Verify OpenAI API key exists
+      if (!process.env.OPENAI_API_KEY) {
+        console.error('❌ OPENAI_API_KEY is not configured');
+        return NextResponse.json({ 
+          success: false, 
+          error: 'Vision analysis not configured. Please type the food name manually.' 
+        }, { status: 500 });
+      }
+
       if (type === 'enrich' && (!data?.image || !data?.lockedFoodName)) {
         return NextResponse.json({ success: false, error: 'Missing image or locked food name for enrichment' }, { status: 400 });
       }
       
       // 🔄 RLHF: Fetch user corrections and inject into prompt
       const corrections = await fetchRecentCorrections();
-      const enhancedPrompt = corrections.length > 0 
+      let enhancedPrompt = corrections.length > 0 
         ? buildVisionPromptWithCorrections(corrections)
         : MALAYSIAN_FOOD_VISION_PROMPT;
+      
+      // 🚫 Add anti-OCR instructions to prevent reading text from receipts/labels
+      const antiOCRInstructions = `
+
+⚠️ CRITICAL: IGNORE ALL TEXT IN THE IMAGE ⚠️
+- DO NOT read or transcribe any text, labels, receipts, or dates visible in the image
+- Focus ONLY on the visual food/dish itself
+- Ignore any printed text, handwritten notes, prices, dates, or product labels
+- If you see text like dates (e.g., "8/28/2017"), numbers (e.g., "125937"), or names unrelated to food (e.g., "Kavitha"), IGNORE them completely
+- Your response should describe the FOOD VISIBLE, not text appearing near the food
+
+`;
+      
+      enhancedPrompt = antiOCRInstructions + enhancedPrompt;
       
       console.log(`🧠 RLHF: Using prompt with ${corrections.length} corrections`);
       
@@ -267,46 +290,101 @@ export async function POST(req: Request) {
         : enhancedPrompt;
 
       const userContent: any[] = [
-        { type: "text", text: type === 'enrich' ? "Enrich this known dish. Keep the name fixed. Extract portion, components, context." : "Analyze this Malaysian food image and return the required JSON." },
+        { type: "text", text: type === 'enrich' ? "Enrich this known dish. Keep the name fixed. Extract portion, components, context." : "Analyze this Malaysian food image and return the required JSON. Remember: IGNORE all text/labels in the image, focus only on the food." },
         { type: "image_url", image_url: { url: type === 'enrich' ? data?.image : data, detail: "low" } }
       ];
 
-      const visionResponse = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: "system",
-            content: systemPrompt
-          },
-          {
-            role: "user",
-            content: userContent
+      let visionResult: any = {};
+      let candidates: VisionCandidate[] = [];
+      
+      try {
+        const visionResponse = await openai.chat.completions.create({
+          model: "gpt-4o-mini",
+          messages: [
+            {
+              role: "system",
+              content: systemPrompt
+            },
+            {
+              role: "user",
+              content: userContent
+            }
+          ],
+          response_format: { type: "json_object" },
+          max_tokens: 500,
+        });
+      
+        // Parse the comprehensive vision response
+        const rawVision = visionResponse.choices[0].message.content || '{}';
+        if (DEBUG_SMART_ANALYZE) console.debug('[smart-analyze] raw vision response', rawVision);
+        visionResult = JSON.parse(rawVision);
+        if (DEBUG_SMART_ANALYZE) console.debug('[smart-analyze] parsed vision result', visionResult);
+        
+        // 🚫 VALIDATION: Detect and reject nonsense OCR text responses
+        const isNonsenseName = (name: string): boolean => {
+          if (!name || typeof name !== 'string') return true;
+          
+          // Check for dates (e.g., "8/28/2017", "2017-08-28")
+          if (/\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}/.test(name)) {
+            console.warn('⚠️ Rejected: Contains date pattern', name);
+            return true;
           }
-        ],
-        response_format: { type: "json_object" },
-        max_tokens: 500,
-      });
-      
-      // Parse the comprehensive vision response
-      const rawVision = visionResponse.choices[0].message.content || '{}';
-      if (DEBUG_SMART_ANALYZE) console.debug('[smart-analyze] raw vision response', rawVision);
-      const visionResult = JSON.parse(rawVision);
-      if (DEBUG_SMART_ANALYZE) console.debug('[smart-analyze] parsed vision result', visionResult);
-      
-      const candidates: VisionCandidate[] = Array.isArray(visionResult.candidates) && visionResult.candidates.length
-        ? visionResult.candidates
-            .map((c: any): VisionCandidate => ({
-              name: c.name,
-              confidence: c.confidence ?? c.confidence_score ?? 0.5,
-              reason: c.reason
-            }))
-            .filter((c: VisionCandidate) => Boolean(c.name))
-        : visionResult.food_name
-          ? [{ name: visionResult.food_name, confidence: visionResult.confidence_score || 0.5, reason: 'single guess' }]
-          : [];
+          
+          // Check for long number sequences (prices, IDs, etc.)
+          if (/\d{5,}/.test(name)) {
+            console.warn('⚠️ Rejected: Contains long number sequence', name);
+            return true;
+          }
+          
+          // Check for excessive length (OCR tends to create long strings)
+          if (name.length > 60) {
+            console.warn('⚠️ Rejected: Name too long (likely OCR text)', name);
+            return true;
+          }
+          
+          // Check for multiple numbers in the name (likely receipt text)
+          const numberCount = (name.match(/\d+/g) || []).length;
+          if (numberCount > 2) {
+            console.warn('⚠️ Rejected: Too many numbers in name', name);
+            return true;
+          }
+          
+          // Check for common receipt/label keywords
+          const receiptKeywords = ['receipt', 'invoice', 'order', 'transaction', 'barcode', 'qr code', 'scan'];
+          if (receiptKeywords.some(keyword => name.toLowerCase().includes(keyword))) {
+            console.warn('⚠️ Rejected: Contains receipt keyword', name);
+            return true;
+          }
+          
+          return false;
+        };
+        
+        candidates = Array.isArray(visionResult.candidates) && visionResult.candidates.length
+          ? visionResult.candidates
+              .map((c: any): VisionCandidate => ({
+                name: c.name,
+                confidence: c.confidence ?? c.confidence_score ?? 0.5,
+                reason: c.reason
+              }))
+              .filter((c: VisionCandidate) => Boolean(c.name) && !isNonsenseName(c.name))
+          : visionResult.food_name && !isNonsenseName(visionResult.food_name)
+            ? [{ name: visionResult.food_name, confidence: visionResult.confidence_score || 0.5, reason: 'single guess' }]
+            : [];
 
-      if (!candidates.length) {
-        candidates.push({ name: 'Unknown Food', confidence: 0.3, reason: 'model returned empty' });
+        if (!candidates.length) {
+          console.error('❌ Vision analysis returned no valid food names (all rejected as OCR text)');
+          return NextResponse.json({
+            success: false,
+            error: 'Could not identify food clearly. The image may contain too much text or labels. Please try: better lighting, closer photo of the food itself, or type the name manually.'
+          }, { status: 400 });
+        }
+      } catch (error: any) {
+        console.error('❌ OpenAI Vision Error:', error.message || error);
+        return NextResponse.json({
+          success: false,
+          error: 'Vision analysis failed. Please type the food name manually instead.',
+          details: process.env.NODE_ENV === 'development' ? error.message : undefined
+        }, { status: 500 });
       }
 
       if (type === 'enrich' && data?.lockedFoodName) {
