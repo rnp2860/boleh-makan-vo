@@ -1,6 +1,6 @@
 # 🍽️ BOLEH MAKAN - Master Project Record
-**Version:** 1.3.0  
-**Last Updated:** January 5, 2026  
+**Version:** 1.3.1  
+**Last Updated:** January 6, 2026  
 **Platform:** Next.js 16 + Supabase + OpenAI  
 
 ---
@@ -701,6 +701,19 @@ GEMINI_API_KEY=...
 ---
 
 ## 📜 Changelog
+
+### January 6, 2026
+
+#### ✅ P0: Check-food Option A Refinement & Safety
+- **Text-first + photo enrichment:** Text-selected DB meals now stay locked; optional photo triggers an enrichment vision prompt to pull portion, components, context, and Dr. Reza advice without re-identifying the dish (`app/check-food/page.tsx`, `app/api/smart-analyze/route.ts`).
+- **Safer DB matching:** Multi-word international queries (e.g., “fish and chips”) no longer get hijacked by single-token Malaysian matches; partial/fuzzy matches require stronger token overlap and avoid cross-cuisine terms (`lib/food/resolveFood.ts` + golden regression `data/food_golden_cases.json`).
+- **UI polish:** Darker input text/borders for readability on mobile; file picker cancel clears state cleanly; duplicate badges removed in results card (`app/check-food/page.tsx`).
+- **Advisor parity:** Text flow now routes through the same advisor/analysis richness used in photo flow when enriched.
+
+#### 🧪 QA
+- `npm test`
+- `npm run test:golden`
+- `npm run build` (passes; existing Next.js warnings about dynamic admin routes/metadataBase unchanged)
 
 ### January 5, 2026
 
