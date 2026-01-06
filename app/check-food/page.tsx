@@ -320,6 +320,25 @@ export default function CheckFoodPage() {
   };
 
   const handleReset = () => {
+    // Keep image if it exists, only reset food identity
+    setBaseResult(null);
+    setSelectedFood(null);
+    setResultLocked(false);
+    setPortion(1);
+    setKuahLevel('biasa');
+    setExcludedComponents([]);
+    setCustomItems([]);
+    setAddedIngredients([]);
+    setError('');
+    setCorrectionInput('');
+    setConfidenceScore(1);
+    setMealContext('hawker_stall');
+    setSmartSearchInitialQuery('');
+    setPreparationStyle('unknown');
+    // Don't clear: image, geolocation
+  };
+
+  const handleBuangSemua = () => {
     setImage(null);
     setBaseResult(null);
     setSelectedFood(null);
@@ -335,7 +354,7 @@ export default function CheckFoodPage() {
     setMealContext('hawker_stall');
     setSmartSearchInitialQuery('');
     setPreparationStyle('unknown');
-    setGeolocation(null); // 📍 Clear location data on reset
+    setGeolocation(null);
     setLocationToast('');
   };
 
@@ -1076,6 +1095,13 @@ export default function CheckFoodPage() {
                 <span>✏️</span>
                 <span>Taip Nama Makanan</span>
                 <span>→</span>
+              </button>
+              
+              <button 
+                onClick={handleBuangSemua}
+                className="w-full mt-3 bg-white text-slate-400 py-3 rounded-2xl font-bold text-sm border border-slate-200 hover:bg-red-50 hover:text-red-500 hover:border-red-200 transition-colors"
+              >
+                Buang Semua & Mula Semula
               </button>
               
               <p className="text-xs text-amber-600 mt-3 text-center">
@@ -1859,7 +1885,7 @@ export default function CheckFoodPage() {
               onClick={handleReset}
               className="w-full bg-white text-slate-400 py-3 rounded-2xl font-bold text-sm border border-slate-200 hover:bg-red-50 hover:text-red-500 hover:border-red-200 transition-colors"
             >
-              {isLowConfidence() ? 'Batal & Cuba Lagi' : 'Buang & Mula Semula'}
+              {isLowConfidence() ? 'Batal & Cuba Lagi' : 'Reset Makanan (Keep Photo)'}
             </button>
           </div>
         </div>
