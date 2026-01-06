@@ -389,6 +389,8 @@ export default function CheckFoodPage() {
     setPreparationStyle('unknown');
     setGeolocation(null); // 📍 Clear location data on reset
     setLocationToast('');
+    setPhotoPreview(null);
+    setShowPhotoConfirm(false);
   };
 
   // 🔍 Check if result is low confidence (Unknown OR < 60%)
@@ -436,7 +438,15 @@ export default function CheckFoodPage() {
   // 📸 CONFIRM PHOTO ANALYSIS (User explicitly analyzes photo)
   const handleConfirmPhotoAnalysis = async () => {
     if (!photoPreview) return;
-    
+
+    // If a meal is already identified via text/search, attach the photo without re-identifying
+    if (baseResult) {
+      setImage(photoPreview);
+      setShowPhotoConfirm(false);
+      setPhotoPreview(null);
+      return;
+    }
+
     setResultLocked(false); // new photo analysis should unlock previous selections
     setSelectedFood(null);
     setShowPhotoConfirm(false);
@@ -982,124 +992,88 @@ export default function CheckFoodPage() {
         <ArrowLeft className="w-5 h-5 text-slate-700" />
       </Link>
       
-      {/* ========== WELCOME SCREEN ========== */}
-      {!image && !baseResult && !loading && (
-        <div className="px-6 pt-8 animate-fade-in">
-          
-          {/* 👨‍⚕️ DR. REZA HEADER */}
-          <div className="flex flex-col items-center mb-8">
-            <div className="relative">
-              <div className="w-24 h-24 rounded-full border-4 border-white shadow-xl overflow-hidden bg-gradient-to-br from-teal-400 to-cyan-500">
-                <Image 
-                  src="/assets/avatar-header.png" 
-                  alt="Dr. Reza" 
-                  fill 
-                  className="object-cover" 
-                  priority 
-                />
-              </div>
-              <div className="absolute -bottom-1 -right-1 w-8 h-8 bg-green-500 rounded-full border-4 border-white flex items-center justify-center">
-                <span className="text-white text-xs">✓</span>
-              </div>
+      {/* ========== DESCRIBE MEAL ENTRY ========== */}
+      {!loading && (
+        <div className="px-6 pt-8 animate-fade-in space-y-5">
+          <div className="flex items-start gap-3">
+            <div className="relative w-14 h-14 rounded-full border-4 border-white shadow-xl overflow-hidden bg-gradient-to-br from-teal-400 to-cyan-500">
+              <Image 
+                src="/assets/avatar-header.png" 
+                alt="Dr. Reza" 
+                fill 
+                className="object-cover" 
+                priority 
+              />
             </div>
-            
-            {/* Speech Bubble */}
-            <div className="mt-4 bg-white rounded-2xl px-6 py-4 shadow-lg border border-slate-100 relative max-w-xs">
-              <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-white rotate-45 border-l border-t border-slate-100"></div>
-              <p className="text-slate-700 text-center font-medium text-base leading-relaxed">
-                Hai! 👋 Saya <span className="text-teal-600 font-bold">Dr. Reza</span>. 
-                <br/>Tunjuk saya apa anda makan hari ini!
-              </p>
+            <div>
+              <p className="text-xs font-bold text-teal-600 uppercase tracking-wider">Describe your meal</p>
+              <p className="text-sm text-slate-600">Taip dahulu, tambah gambar jika mahu.</p>
             </div>
           </div>
 
-          {/* 📸 ACTION BUTTONS */}
-          <div className="space-y-4">
-            
-            {/* Text Input Button - PRIMARY */}
-            <button 
-              onClick={() => openSmartSearch()}
-              className="w-full bg-gradient-to-r from-teal-500 to-cyan-500 text-white rounded-2xl p-5 shadow-lg shadow-teal-200/50 flex items-center gap-4 active:scale-[0.98] transition-transform"
-            >
-              <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
-                <span className="text-3xl">✏️</span>
+          <div className="bg-white rounded-2xl p-4 shadow-md border border-slate-100 space-y-3">
+            <div className="flex flex-col gap-3">
+              <div className="flex-1">
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Deskripsi makanan</p>
+                <button 
+                  type="button"
+                  onClick={() => openSmartSearch(baseResult?.data?.food_name || smartSearchInitialQuery)}
+                  disabled={loading}
+                  className="w-full text-left bg-slate-50 border border-slate-200 hover:border-teal-300 rounded-xl px-4 py-3 flex items-center gap-3 transition-colors disabled:opacity-60"
+                >
+                  <span className="text-xl">✏️</span>
+                  <div className="flex-1">
+                    <p className="text-slate-800 font-bold">
+                      {baseResult?.data?.food_name || 'Taip atau pilih dari senarai'}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {baseResult ? 'Ditentukan melalui carian teks' : 'Contoh: nasi lemak + ayam goreng'}
+                    </p>
+                  </div>
+                </button>
               </div>
-              <div className="text-left flex-1">
-                <h3 className="text-lg font-bold">Taip Makanan Anda</h3>
-                <p className="text-teal-100 text-sm">🇲🇾 500+ makanan Malaysia verified</p>
-              </div>
-            </button>
 
-            {/* Camera Button - SECONDARY (Suggest Only) */}
-            <button 
-              onClick={async () => {
-                // 📍 REQUEST LOCATION PERMISSION - The "Hawker Hook"
-                await requestLocationPermission();
-                fileInputRef.current?.click();
-              }}
-              className="w-full bg-white text-slate-700 rounded-2xl p-5 shadow-md border border-slate-200 flex items-center gap-4 active:scale-[0.98] transition-transform hover:border-teal-300"
-            >
-              <div className="w-14 h-14 bg-slate-100 rounded-xl flex items-center justify-center">
-                <span className="text-3xl">📸</span>
+              <div className="flex flex-col gap-2">
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Gambar (pilihan)</p>
+                <button 
+                  type="button"
+                  onClick={async () => {
+                    await requestLocationPermission();
+                    fileInputRef.current?.click();
+                  }}
+                  disabled={loading}
+                  className="inline-flex items-center justify-center gap-2 self-start bg-white border border-dashed border-teal-300 text-teal-700 rounded-xl px-4 py-2 font-semibold hover:bg-teal-50 transition-colors disabled:opacity-60"
+                >
+                  <span>Tambah gambar (pilihan)</span>
+                </button>
+                {image && (
+                  <p className="text-xs text-teal-600 font-medium">1 gambar akan disertakan bersama log ini.</p>
+                )}
               </div>
-              <div className="text-left">
-                <h3 className="text-lg font-bold">Scan Foto</h3>
-                <p className="text-slate-400 text-sm">(Cadangan sahaja, perlu confirm)</p>
-              </div>
-            </button>
+            </div>
 
-            <input 
-              type="file" 
-              accept="image/*" 
-              ref={fileInputRef} 
-              onChange={handleFileChange} 
-              className="hidden" 
-            />
-          </div>
-
-          {/* Disclaimers Section - Below Buttons */}
-          <div className="mt-6 space-y-2 px-1">
-            <p className="text-xs text-gray-500 flex items-start gap-2">
-              <span>✏️</span>
-              <span><strong>Taip</strong> cari 500+ makanan Malaysia verified dalam database kami (English & BM).</span>
-            </p>
-            <p className="text-xs text-gray-500 flex items-start gap-2">
-              <span>📸</span>
-              <span><strong>Scan Foto</strong> memberikan cadangan makanan. Anda MESTI sahkan sebelum save.</span>
+            <p className="text-xs text-slate-500">
+              Taip untuk tetapkan identiti makanan. Gambar hanya sokongan dan tidak akan tukar pilihan teks anda.
             </p>
           </div>
 
-          {/* Pro tip */}
-          <div className="bg-teal-50 border border-teal-100 rounded-xl p-4 mt-6 mx-1">
+          <input 
+            type="file" 
+            accept="image/*" 
+            ref={fileInputRef} 
+            onChange={handleFileChange} 
+            className="hidden" 
+          />
+
+          <div className="bg-teal-50 border border-teal-100 rounded-xl p-4">
             <div className="flex items-start gap-3">
               <span className="text-xl">💡</span>
               <div>
-                <p className="text-sm font-bold text-teal-700 mb-1">Kenapa Taip Dahulu?</p>
+                <p className="text-sm font-bold text-teal-700 mb-1">Kenapa taip dulu?</p>
                 <p className="text-xs text-teal-600 leading-relaxed">
-                  <strong>Taip</strong> memberikan maklumat VERIFIED dari database Malaysia kami — cepat, tepat, dan dipercayai! 
-                  <span className="text-teal-500"> Scan foto bagus untuk cadangan, tapi perlu anda confirm dulu.</span>
+                  Carian teks gunakan database Malaysia kami untuk identiti tepat. Gambar adalah pilihan tambahan untuk rujukan atau portion.
                 </p>
               </div>
-            </div>
-          </div>
-
-          {/* Footer with Dr. Reza Speech Bubble */}
-          <div className="flex items-end justify-center gap-3 mt-6">
-            {/* Dr. Reza Full Body - Using img tag for better mobile compatibility */}
-            <div className="w-24 h-36 flex-shrink-0 relative">
-              <img 
-                src="/assets/avatar-fullbody-pointing.png" 
-                alt="Dr. Reza" 
-                className="w-full h-full object-contain"
-                style={{ maxWidth: '96px', maxHeight: '144px' }}
-              />
-            </div>
-            {/* Speech Bubble */}
-            <div className="relative bg-white rounded-2xl px-5 py-4 shadow-md border border-slate-100 mb-8">
-              <div className="absolute -left-2 bottom-6 w-3 h-3 bg-white rotate-45 border-l border-b border-slate-100"></div>
-              <p className="text-base text-slate-700 font-medium">
-                "I'll analyze it instantly!" ⚡
-              </p>
             </div>
           </div>
         </div>
