@@ -1497,13 +1497,13 @@ export default function CheckFoodPage() {
               {/* Multi-Condition Impacts - NEW FORMAT */}
               {baseResult.data.dr_reza_analysis?.condition_impacts && 
                baseResult.data.dr_reza_analysis.condition_impacts.length > 0 && (
-                <div className="bg-white rounded-2xl border-2 border-slate-200 overflow-hidden">
+                <div className="bg-white rounded-2xl border-2 border-slate-200 overflow-hidden mb-4">
                   <div className="bg-gradient-to-r from-slate-100 to-slate-50 px-4 py-2 border-b border-slate-200">
                     <p className="text-xs font-bold text-slate-700 uppercase tracking-wide">
                       📊 Untuk keadaan anda:
                     </p>
                   </div>
-                  <div className="p-3 space-y-2">
+                  <div className="p-3 space-y-3">
                     {baseResult.data.dr_reza_analysis.condition_impacts.map((impact: any, idx: number) => {
                       const bgColor = impact.rating === 'limit' ? 'bg-red-50 border-red-300' :
                                      impact.rating === 'caution' ? 'bg-amber-50 border-amber-300' :
@@ -1513,22 +1513,27 @@ export default function CheckFoodPage() {
                                        'text-green-800';
                       
                       return (
-                        <div key={idx} className={`${bgColor} border rounded-lg p-3`}>
-                          <div className="flex items-center justify-between mb-1">
+                        <div key={idx} className={`${bgColor} border-2 rounded-xl p-4 space-y-2.5`}>
+                          {/* Header Row */}
+                          <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                              <span className="text-lg">{impact.emoji}</span>
-                              <span className={`text-sm font-bold ${textColor}`}>
+                              <span className="text-2xl">{impact.emoji}</span>
+                              <span className={`text-base font-bold ${textColor}`}>
                                 {impact.condition}
                               </span>
                             </div>
-                            <span className="text-lg">{impact.rating_emoji}</span>
+                            <span className="text-2xl">{impact.rating_emoji}</span>
                           </div>
-                          <p className={`text-sm ${textColor} font-semibold`}>
+                          
+                          {/* Warning (Main message) */}
+                          <p className={`text-sm font-semibold ${textColor} leading-relaxed`}>
                             {impact.warning}
                           </p>
+                          
+                          {/* Details (Additional context) - if exists */}
                           {impact.details && (
-                            <p className={`text-xs ${textColor} opacity-80 mt-1`}>
-                              {impact.details}
+                            <p className={`text-xs ${textColor} opacity-80 leading-relaxed pt-2 border-t ${textColor.replace('text-', 'border-')} border-opacity-20`}>
+                              💡 {impact.details}
                             </p>
                           )}
                         </div>
