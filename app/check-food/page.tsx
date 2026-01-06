@@ -926,6 +926,22 @@ export default function CheckFoodPage() {
         <ArrowLeft className="w-5 h-5 text-slate-700" />
       </Link>
       
+      {/* 📸 CAMERA SHORTCUT - Subtle secondary action */}
+      <button
+        onClick={async () => {
+          await requestLocationPermission();
+          fileInputRef.current?.click();
+        }}
+        disabled={loading}
+        className="absolute top-4 right-4 z-50 w-10 h-10 bg-white/90 backdrop-blur-md rounded-full shadow-lg flex items-center justify-center hover:bg-white hover:scale-105 transition-all active:scale-95 border border-slate-200/50 disabled:opacity-50"
+        aria-label="Take or upload photo"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 text-slate-700">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM18.75 10.5h.008v.008h-.008V10.5z" />
+        </svg>
+      </button>
+      
       {/* ========== DESCRIBE MEAL ENTRY ========== */}
       {!loading && (
         <div className="px-6 pt-8 animate-fade-in space-y-5">
