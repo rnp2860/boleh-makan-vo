@@ -276,68 +276,20 @@ export default function CheckFoodPage() {
   };
 
   // 🥗 Handle food selection from SmartFoodSearch
-  const handleSmartFoodSelect = (food: MalaysianFood) => {
+  const handleSmartFoodSelect = async (food: MalaysianFood) => {
     if (DEBUG) console.debug('[SmartFoodSearch] selected food', { id: food.id, nameEn: food.nameEn, nameBm: food.nameBm });
     setSelectedFood(food);
-    setResultLocked(true);
-    
-    // Map MalaysianFood to baseResult structure
-    const processedResult = {
-      data: {
-        food_id: food.id,
-        food_name: food.nameEn,
-        category: food.category,
-        components: [{
-          name: food.nameEn,
-          calories: food.caloriesKcal,
-          macros: { 
-            p: food.proteinG || 0, 
-            c: food.carbsG, 
-            f: food.totalFatG || 0 
-          }
-        }],
-        macros: {
-          calories: food.caloriesKcal,
-          protein_g: food.proteinG || 0,
-          carbs_g: food.carbsG,
-          fat_g: food.totalFatG || 0,
-          sodium_mg: food.sodiumMg || 0,
-          sugar_g: food.sugarG || 0,
-          fiber_g: food.fiberG || 0,
-        },
-        analysis_content: `${food.nameEn} (${food.nameBm}) - ${food.servingDescription}`,
-        risk_analysis: { 
-          is_high_sodium: (food.sodiumMg || 0) > 600,
-          is_high_sugar: (food.sugarG || 0) > 15 
-        },
-        valid_lauk: [],
-        halal_status: { status: 'halal', reason: 'Verified from Malaysian database' },
-        health_tags: [
-          ...(food.giCategory === 'low' ? ['Low GI'] : []),
-          ...(food.diabetesRating === 'safe' ? ['Diabetic Safe'] : []),
-          ...(food.hypertensionRating === 'safe' ? ['Low Sodium'] : []),
-        ],
-        is_potentially_pork: false,
-        detected_protein: 'none',
-      },
-      is_verified: food.verified,
-      source: 'malaysian_db',
-    };
-    
-    // Set confidence high for DB matches (0.98)
-    setConfidenceScore(0.98);
-    
-    // Set the result
-    setBaseResult(processedResult);
-    setEditedName(food.nameEn);
-    setAiSuggestedName(food.nameEn);
-    
-    // Close modal
+    setResultLocked(false);
     setShowSmartSearch(false);
     setSmartSearchInitialQuery('');
-    
-    // Clear image state if coming from text search
-    setImage(null);
+    setImage(null); // text-first flow owns the identity
+    try {
+      await analyzeFood('text', food.nameEn, { allowWhenLocked: true });
+      setResultLocked(true);
+    } catch (err) {
+      console.error('SmartFoodSearch analyze failed', err);
+      setResultLocked(false);
+    }
   };
 
   // 🔎 DEBOUNCED SUPABASE SEARCH for Add Modal
@@ -421,18 +373,23 @@ export default function CheckFoodPage() {
   // 📸 SHOW PREVIEW (No auto-analyze - user must confirm)
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      // 📍 SILENT CAPTURE: Request geolocation on image capture
-      await captureGeolocation();
-      
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const rawImage = reader.result as string;
-        setPhotoPreview(rawImage); // Store for preview
-        setShowPhotoConfirm(true); // Show confirmation modal
-      };
-      reader.readAsDataURL(file);
+    if (!file) {
+      setPhotoPreview(null);
+      setShowPhotoConfirm(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
     }
+    // 📍 SILENT CAPTURE: Request geolocation on image capture
+    await captureGeolocation();
+    
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const rawImage = reader.result as string;
+      setPhotoPreview(rawImage); // Store for preview
+      setShowPhotoConfirm(true); // Show confirmation modal
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+    reader.readAsDataURL(file);
   };
   
   // 📸 CONFIRM PHOTO ANALYSIS (User explicitly analyzes photo)
@@ -981,7 +938,7 @@ export default function CheckFoodPage() {
   // 🎨 RENDER
   // ============================================
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 pb-32 relative">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 pb-32 pt-14 relative">
       
       {/* 🔙 BACK TO DASHBOARD - Exit Hatch */}
       <Link
@@ -1019,14 +976,14 @@ export default function CheckFoodPage() {
                   type="button"
                   onClick={() => openSmartSearch(baseResult?.data?.food_name || smartSearchInitialQuery)}
                   disabled={loading}
-                  className="w-full text-left bg-slate-50 border border-slate-200 hover:border-teal-300 rounded-xl px-4 py-3 flex items-center gap-3 transition-colors disabled:opacity-60"
+                  className="w-full text-left bg-white border border-slate-300 hover:border-teal-400 rounded-xl px-4 py-3 flex items-center gap-3 transition-colors shadow-sm disabled:opacity-60"
                 >
                   <span className="text-xl">✏️</span>
                   <div className="flex-1">
-                    <p className="text-slate-800 font-bold">
+                    <p className="text-slate-900 font-bold">
                       {baseResult?.data?.food_name || 'Taip atau pilih dari senarai'}
                     </p>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-slate-600">
                       {baseResult ? 'Ditentukan melalui carian teks' : 'Contoh: nasi lemak + ayam goreng'}
                     </p>
                   </div>
@@ -1288,26 +1245,6 @@ export default function CheckFoodPage() {
                           </svg>
                         </button>
                       )}
-                    </div>
-                    {/* Source Badge & Confidence Label */}
-                    <div className="flex items-center gap-2 mt-2">
-                      {baseResult.source === 'malaysian_db' || baseResult.is_verified ? (
-                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold ${image ? 'bg-green-500/90 text-white' : 'bg-green-100 text-green-700'}`}>
-                          🇲🇾 Verified DB
-                        </span>
-                      ) : (
-                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold ${image ? 'bg-amber-500/90 text-white' : 'bg-amber-100 text-amber-700'}`}>
-                          Estimated
-                        </span>
-                      )}
-                      {(() => {
-                        const { label, color } = getConfidenceLabel(confidenceScore);
-                        return (
-                          <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold ${image ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'}`}>
-                            Confidence: {label}
-                          </span>
-                        );
-                      })()}
                     </div>
                   </div>
                 )}
