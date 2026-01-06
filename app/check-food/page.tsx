@@ -145,6 +145,14 @@ export default function CheckFoodPage() {
   // 📸 PHOTO ENRICHMENT FEEDBACK
   const [photoEnrichToast, setPhotoEnrichToast] = useState(false);
   
+  // 🤖 INTELLIGENT PHOTO ANALYSIS
+  const [photoAnalyzing, setPhotoAnalyzing] = useState(false);
+  const [photoSuggestion, setPhotoSuggestion] = useState<{
+    foodName: string;
+    confidence: number;
+    rawData?: any;
+  } | null>(null);
+  
   // 🍽️ MEAL TYPE SELECTOR (for Nutrition Reports)
   // Auto-select based on current time OR Ramadan mode
   const getDefaultMealType = (): 'Breakfast' | 'Lunch' | 'Dinner' | 'Snack' | 'Sahur' | 'Iftar' => {
@@ -386,26 +394,26 @@ export default function CheckFoodPage() {
     }
   };
 
-  // 📸 INSTANT PHOTO HANDLING (No confirmation modal)
+  // 📸 INTELLIGENT PHOTO HANDLING
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) {
+      setImage(null);
+      setPhotoSuggestion(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
-    // 📍 SILENT CAPTURE: Request geolocation on image capture
+    
     await captureGeolocation();
     
     const reader = new FileReader();
     reader.onloadend = async () => {
       const rawImage = reader.result as string;
-      if (fileInputRef.current) fileInputRef.current.value = '';
       
-      // If a meal is already identified via text/search, enrich with photo (keep identity)
+      // CASE 1: Food already identified → Enrich with photo
       if (baseResult) {
-        setLoading(true);
-        setResultLocked(true);
         setImage(rawImage);
+        setLoading(true);
         const compressedImage = await compressImage(rawImage, 512, 0.6);
         await analyzeFood('enrich', {
           image: compressedImage,
@@ -421,10 +429,79 @@ export default function CheckFoodPage() {
         return;
       }
       
-      // No food selected yet - just store the image
+      // CASE 2: No food yet → Run AI vision analysis
       setImage(rawImage);
+      setPhotoAnalyzing(true);
+      setPhotoSuggestion(null);
+      
+      try {
+        const compressedImage = await compressImage(rawImage, 512, 0.6);
+        
+        // Call existing smart-analyze API with image
+        const response = await fetch('/api/smart-analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            type: 'image', 
+            data: compressedImage,
+            healthConditions: userProfile?.healthConditions || []
+          }),
+        });
+
+        const result = await response.json();
+        
+        if (result.success && result.data) {
+          setPhotoSuggestion({
+            foodName: result.data.food_name,
+            confidence: result.confidence || result.data.confidence_score || 0.7,
+            rawData: result.data
+          });
+        } else {
+          // Fallback to manual input if AI fails
+          openSmartSearch('');
+        }
+      } catch (err) {
+        console.error('Photo analysis failed:', err);
+        openSmartSearch('');
+      } finally {
+        setPhotoAnalyzing(false);
+      }
     };
     reader.readAsDataURL(file);
+    
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  // ✅ ACCEPT PHOTO SUGGESTION
+  const handleAcceptPhotoSuggestion = async () => {
+    if (!photoSuggestion) return;
+    
+    setLoading(true);
+    setResultLocked(false);
+    
+    try {
+      // If we have raw data from analysis, use it directly
+      if (photoSuggestion.rawData) {
+        setBaseResult({
+          data: photoSuggestion.rawData,
+          is_verified: false,
+          source: 'vision_estimate'
+        });
+        setEditedName(photoSuggestion.foodName);
+        setAiSuggestedName(photoSuggestion.foodName);
+        setConfidenceScore(photoSuggestion.confidence);
+      } else {
+        // Otherwise, re-analyze with the confirmed name
+        await analyzeFood('text', photoSuggestion.foodName);
+      }
+      
+      setPhotoSuggestion(null);
+      setResultLocked(true);
+    } catch (err) {
+      console.error('Failed to accept suggestion:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   // 📝 TEXT INPUT ANALYSIS
@@ -1055,10 +1132,10 @@ export default function CheckFoodPage() {
         </div>
       )}
 
-      {/* ========== PHOTO WITHOUT IDENTITY PROMPT ========== */}
-      {!loading && image && !baseResult && (
+      {/* ========== INTELLIGENT PHOTO ANALYSIS ========== */}
+      {!loading && image && !baseResult && !photoAnalyzing && photoSuggestion && (
         <div className="px-6 pt-4 animate-fade-in">
-          <div className="bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-300 rounded-3xl overflow-hidden shadow-xl">
+          <div className="bg-gradient-to-br from-teal-50 to-cyan-50 border-2 border-teal-300 rounded-3xl overflow-hidden shadow-xl">
             {/* Photo Thumbnail */}
             <div className="relative h-48">
               <img src={image} alt="Your meal" className="w-full h-full object-cover" />
@@ -1066,7 +1143,10 @@ export default function CheckFoodPage() {
               
               {/* Remove Photo Button */}
               <button
-                onClick={() => setImage(null)}
+                onClick={() => {
+                  setImage(null);
+                  setPhotoSuggestion(null);
+                }}
                 className="absolute top-3 right-3 bg-black/50 text-white p-2 rounded-full backdrop-blur-sm hover:bg-black/70 transition-colors"
                 aria-label="Remove photo"
               >
@@ -1075,46 +1155,79 @@ export default function CheckFoodPage() {
                 </svg>
               </button>
               
-              {/* Photo Label */}
+              {/* Confidence Badge */}
               <div className="absolute bottom-3 left-3">
-                <span className="bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-bold text-slate-700">
-                  📸 Photo for reference
+                <span className={`backdrop-blur-sm px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 ${
+                  photoSuggestion.confidence >= 0.85 ? 'bg-green-500/90 text-white' :
+                  photoSuggestion.confidence >= 0.70 ? 'bg-amber-500/90 text-white' :
+                  'bg-orange-500/90 text-white'
+                }`}>
+                  {photoSuggestion.confidence >= 0.85 ? '🟢 High' :
+                   photoSuggestion.confidence >= 0.70 ? '🟡 Medium' :
+                   '🟠 Low'} Confidence
                 </span>
               </div>
             </div>
             
-            {/* Prompt */}
+            {/* AI Suggestion */}
             <div className="p-5">
               <div className="flex items-center gap-3 mb-3">
                 <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-white shadow-lg flex-shrink-0">
-                  <Image src="/assets/avatar-header-thinking.png" alt="Dr. Reza" width={48} height={48} className="object-cover" />
+                  <Image src="/assets/avatar-header.png" alt="Dr. Reza" width={48} height={48} className="object-cover" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-amber-800 font-bold text-lg">Gambar diterima!</p>
-                  <p className="text-amber-600 text-sm">Sekarang, makanan apa ini?</p>
+                  <p className="text-teal-700 text-sm font-semibold">Dr. Reza thinks this is:</p>
+                  <p className="text-teal-900 font-bold text-xl">{photoSuggestion.foodName}</p>
                 </div>
               </div>
               
-              <button
-                onClick={() => openSmartSearch('')}
-                className="w-full bg-gradient-to-r from-amber-500 to-orange-500 text-white py-4 rounded-2xl font-bold text-lg shadow-lg hover:shadow-xl active:scale-[0.98] transition-all flex items-center justify-center gap-2"
-              >
-                <span>✏️</span>
-                <span>Taip Nama Makanan</span>
-                <span>→</span>
-              </button>
+              <div className="space-y-2">
+                <button
+                  onClick={() => handleAcceptPhotoSuggestion()}
+                  className="w-full bg-gradient-to-r from-teal-500 to-cyan-500 text-white py-4 rounded-2xl font-bold text-lg shadow-lg hover:shadow-xl active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                >
+                  <span>✓</span>
+                  <span>Correct, Proceed</span>
+                </button>
+                
+                <button
+                  onClick={() => openSmartSearch(photoSuggestion.foodName)}
+                  className="w-full bg-white text-teal-700 border-2 border-teal-300 py-3 rounded-2xl font-bold text-sm hover:bg-teal-50 transition-colors flex items-center justify-center gap-2"
+                >
+                  <span>✏️</span>
+                  <span>Let Me Correct This</span>
+                </button>
+              </div>
               
-              <button 
-                onClick={handleBuangSemua}
-                className="w-full mt-3 bg-white text-slate-400 py-3 rounded-2xl font-bold text-sm border border-slate-200 hover:bg-red-50 hover:text-red-500 hover:border-red-200 transition-colors"
-              >
-                Buang Semua & Mula Semula
-              </button>
-              
-              <p className="text-xs text-amber-600 mt-3 text-center">
-                Gambar hanya untuk rujukan. Sila taip nama makanan untuk identiti tepat.
+              <p className="text-xs text-teal-600 mt-3 text-center">
+                {photoSuggestion.confidence >= 0.85 
+                  ? "I'm quite confident about this identification!" 
+                  : "Not 100% sure? Feel free to correct me."}
               </p>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Loading state for photo analysis */}
+      {photoAnalyzing && image && (
+        <div className="px-6 pt-8">
+          <div className="flex flex-col items-center">
+            <div className="relative mb-6">
+              <div className="w-28 h-28 rounded-full border-4 border-teal-200 overflow-hidden bg-white shadow-xl animate-pulse">
+                <Image src="/assets/avatar-header-thinking.png" alt="Dr. Reza analyzing" width={112} height={112} className="object-cover" />
+              </div>
+              <div className="absolute inset-0 rounded-full border-4 border-teal-400 border-t-transparent animate-spin"></div>
+            </div>
+            
+            <p className="text-slate-600 font-bold text-lg mb-2">Analyzing your photo...</p>
+            <p className="text-slate-400 text-sm">Dr. Reza is identifying the food</p>
+            
+            {image && (
+              <div className="mt-6 w-full max-w-xs rounded-2xl overflow-hidden shadow-lg">
+                <img src={image} alt="Analyzing" className="w-full h-48 object-cover" />
+              </div>
+            )}
           </div>
         </div>
       )}
