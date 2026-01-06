@@ -160,7 +160,7 @@ export function SmartFoodSearch({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={placeholder}
-          className="w-full px-4 py-3 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+          className="w-full px-4 py-3 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-slate-900 placeholder:text-slate-400"
         />
         {isLoading && (
           <div className="absolute right-3 top-3.5">
@@ -172,7 +172,7 @@ export function SmartFoodSearch({
       {/* Applied Filters */}
       {showFilters && result && result.appliedFilters.length > 0 && (
         <div className="flex flex-wrap gap-2">
-          <span className="text-sm text-gray-600">Filters:</span>
+          <span className="text-sm text-slate-700">Filters:</span>
           {result.appliedFilters.map((filter, idx) => (
             <span
               key={idx}
@@ -189,7 +189,7 @@ export function SmartFoodSearch({
         <div className="space-y-2">
           {/* Results Header */}
           {result.results.length > 0 && (
-            <div className="text-sm text-gray-600">
+            <div className="text-sm text-slate-700">
               Found {result.totalCount} result{result.totalCount !== 1 ? 's' : ''} 
               {result.searchTime && ` in ${result.searchTime}ms`}
             </div>
@@ -240,28 +240,28 @@ export function SmartFoodSearch({
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     {/* Food Name */}
-                    <h3 className="font-semibold text-gray-900">
+                    <h3 className="font-bold text-slate-900">
                       {food.nameEn}
                     </h3>
-                    <p className="text-sm text-gray-600">
+                    <p className="text-sm text-slate-600">
                       {food.nameBm}
                     </p>
 
                     {/* Serving Info */}
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-xs text-slate-600 mt-1">
                       {food.servingDescription} ({food.servingGrams}g)
                     </p>
 
                     {/* Nutrition Summary */}
                     <div className="flex gap-3 mt-2 text-xs">
-                      <span className="font-medium text-gray-700">
+                      <span className="font-medium text-slate-800">
                         {food.caloriesKcal} kcal
                       </span>
-                      <span className="text-gray-600">
+                      <span className="text-slate-600">
                         {food.carbsG}g carbs
                       </span>
                       {food.proteinG && (
-                        <span className="text-gray-600">
+                        <span className="text-slate-600">
                           {food.proteinG}g protein
                         </span>
                       )}
@@ -305,8 +305,8 @@ export function SmartFoodSearch({
 
       {/* Search Tips */}
       {!query && !result && (
-        <div className="text-sm text-gray-500 space-y-2 p-4 bg-gray-50 rounded-lg">
-          <p className="font-medium">💡 Search Tips:</p>
+        <div className="text-sm text-slate-600 space-y-2 p-4 bg-slate-50 rounded-lg">
+          <p className="font-medium text-slate-700">💡 Search Tips:</p>
           <ul className="list-disc list-inside space-y-1 text-xs">
             <li>Try "low gi nasi" for low glycemic index rice dishes</li>
             <li>Search "diabetic friendly kuih" for safe desserts</li>
