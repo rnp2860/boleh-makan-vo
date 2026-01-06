@@ -152,7 +152,8 @@ export default function CheckFoodPage() {
     confidence: number;
     rawData?: any;
   } | null>(null);
-  
+  const [userAcceptedAISuggestion, setUserAcceptedAISuggestion] = useState(false);
+
   // 🍽️ MEAL TYPE SELECTOR (for Nutrition Reports)
   // Auto-select based on current time OR Ramadan mode
   const getDefaultMealType = (): 'Breakfast' | 'Lunch' | 'Dinner' | 'Snack' | 'Sahur' | 'Iftar' => {
@@ -346,6 +347,7 @@ export default function CheckFoodPage() {
     setMealContext('hawker_stall');
     setSmartSearchInitialQuery('');
     setPreparationStyle('unknown');
+    setUserAcceptedAISuggestion(false);
     // Don't clear: image, geolocation
   };
 
@@ -367,6 +369,7 @@ export default function CheckFoodPage() {
     setPreparationStyle('unknown');
     setGeolocation(null);
     setLocationToast('');
+    setUserAcceptedAISuggestion(false);
   };
 
   // 🔍 Check if result is low confidence (Unknown OR < 60%)
@@ -478,14 +481,15 @@ export default function CheckFoodPage() {
     
     setLoading(true);
     setResultLocked(false);
+    setUserAcceptedAISuggestion(true); // Mark as user-verified
     
     try {
       // If we have raw data from analysis, use it directly
       if (photoSuggestion.rawData) {
         setBaseResult({
           data: photoSuggestion.rawData,
-          is_verified: false,
-          source: 'vision_estimate'
+          is_verified: true, // Change to true since user verified
+          source: 'user_verified_vision' // New source type to indicate user acceptance
         });
         setEditedName(photoSuggestion.foodName);
         setAiSuggestedName(photoSuggestion.foodName);
@@ -1668,8 +1672,8 @@ export default function CheckFoodPage() {
             </div>
           )}
 
-          {/* 🔍 VERIFICATION PROMPT - Show for AI estimates */}
-          {!isLowConfidence() && baseResult.source === 'vision_estimate' && (
+          {/* 🔍 VERIFICATION PROMPT - Show for AI estimates that haven't been explicitly accepted */}
+          {!isLowConfidence() && baseResult.source === 'vision_estimate' && !userAcceptedAISuggestion && (
             <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 mb-4">
               <div className="flex items-center gap-3 mb-2">
                 <AlertTriangle className="w-6 h-6 text-amber-600 flex-shrink-0" />
