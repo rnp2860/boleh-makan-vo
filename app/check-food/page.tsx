@@ -142,6 +142,9 @@ export default function CheckFoodPage() {
   const [correctionInput, setCorrectionInput] = useState('');
   const [isReanalyzing, setIsReanalyzing] = useState(false);
   
+  // 📸 PHOTO ENRICHMENT FEEDBACK
+  const [photoEnrichToast, setPhotoEnrichToast] = useState(false);
+  
   // 🍽️ MEAL TYPE SELECTOR (for Nutrition Reports)
   // Auto-select based on current time OR Ramadan mode
   const getDefaultMealType = (): 'Breakfast' | 'Lunch' | 'Dinner' | 'Snack' | 'Sahur' | 'Iftar' => {
@@ -411,6 +414,10 @@ export default function CheckFoodPage() {
           lockedCategory: baseResult.data?.category,
           lockedMacros: baseResult.data?.macros
         }, { allowWhenLocked: true });
+        
+        // Show success toast
+        setPhotoEnrichToast(true);
+        setTimeout(() => setPhotoEnrichToast(false), 3000);
         return;
       }
       
@@ -1191,6 +1198,17 @@ export default function CheckFoodPage() {
                 <div className="h-44 w-full">
                   <img src={image} alt={finalData.food_name} className="w-full h-full object-cover" />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
+                  
+                  {/* Photo Badge - Show when image is attached */}
+                  <div className="absolute top-3 left-3">
+                    <span className="bg-teal-500 text-white text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-lg">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3.5 h-3.5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM18.75 10.5h.008v.008h-.008V10.5z" />
+                      </svg>
+                      Photo attached
+                    </span>
+                  </div>
                 </div>
               ) : (
                 /* 📝 TEXT INPUT PLACEHOLDER - Gradient background with food emoji */
@@ -2121,6 +2139,18 @@ export default function CheckFoodPage() {
             <p className="text-sm text-white/90">{locationToast}</p>
           </div>
           <button onClick={() => setLocationToast('')} className="ml-2 font-bold text-white/70 hover:text-white">✕</button>
+        </div>
+      )}
+
+      {/* ========== PHOTO ENRICHMENT TOAST ========== */}
+      {photoEnrichToast && (
+        <div className="fixed bottom-24 left-4 right-4 p-4 bg-gradient-to-r from-teal-500 to-cyan-500 text-white rounded-xl shadow-xl animate-slideUp flex items-center gap-3 z-40">
+          <span className="text-2xl">📸</span>
+          <div className="flex-1">
+            <p className="font-bold">Photo Attached!</p>
+            <p className="text-sm text-teal-100">Used for portion estimation</p>
+          </div>
+          <button onClick={() => setPhotoEnrichToast(false)} className="ml-2 font-bold text-white/70 hover:text-white">✕</button>
         </div>
       )}
     </div>
