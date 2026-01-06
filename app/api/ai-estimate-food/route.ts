@@ -74,7 +74,7 @@ Examples of good analysis_content:
 - "Nasi Lemak for breakfast is classic, but 60g carbs can spike glucose. Try the 'Tanpa Nasi' version with extra lauk, or eat half portion with more vegetables. Your diabetes needs careful carb timing. 🍚"`;
 
     const message = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20241022',
+      model: 'claude-3-5-haiku-20241022',
       max_tokens: 2048,
       temperature: 0.3,
       messages: [{
