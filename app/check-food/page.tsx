@@ -943,7 +943,7 @@ export default function CheckFoodPage() {
       </button>
       
       {/* ========== DESCRIBE MEAL ENTRY ========== */}
-      {!loading && (
+      {!loading && !image && (
         <div className="px-6 pt-8 animate-fade-in space-y-5">
           <div className="flex items-start gap-3">
             <div className="relative w-14 h-14 rounded-full border-4 border-white shadow-xl overflow-hidden bg-gradient-to-br from-teal-400 to-cyan-500">
@@ -1024,6 +1024,63 @@ export default function CheckFoodPage() {
                   Carian teks gunakan database Malaysia kami untuk identiti tepat. Gambar adalah pilihan tambahan untuk rujukan atau portion.
                 </p>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========== PHOTO WITHOUT IDENTITY PROMPT ========== */}
+      {!loading && image && !baseResult && (
+        <div className="px-6 pt-4 animate-fade-in">
+          <div className="bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-300 rounded-3xl overflow-hidden shadow-xl">
+            {/* Photo Thumbnail */}
+            <div className="relative h-48">
+              <img src={image} alt="Your meal" className="w-full h-full object-cover" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
+              
+              {/* Remove Photo Button */}
+              <button
+                onClick={() => setImage(null)}
+                className="absolute top-3 right-3 bg-black/50 text-white p-2 rounded-full backdrop-blur-sm hover:bg-black/70 transition-colors"
+                aria-label="Remove photo"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+              
+              {/* Photo Label */}
+              <div className="absolute bottom-3 left-3">
+                <span className="bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-bold text-slate-700">
+                  📸 Photo for reference
+                </span>
+              </div>
+            </div>
+            
+            {/* Prompt */}
+            <div className="p-5">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-white shadow-lg flex-shrink-0">
+                  <Image src="/assets/avatar-header-thinking.png" alt="Dr. Reza" width={48} height={48} className="object-cover" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-amber-800 font-bold text-lg">Gambar diterima!</p>
+                  <p className="text-amber-600 text-sm">Sekarang, makanan apa ini?</p>
+                </div>
+              </div>
+              
+              <button
+                onClick={() => openSmartSearch('')}
+                className="w-full bg-gradient-to-r from-amber-500 to-orange-500 text-white py-4 rounded-2xl font-bold text-lg shadow-lg hover:shadow-xl active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+              >
+                <span>✏️</span>
+                <span>Taip Nama Makanan</span>
+                <span>→</span>
+              </button>
+              
+              <p className="text-xs text-amber-600 mt-3 text-center">
+                Gambar hanya untuk rujukan. Sila taip nama makanan untuk identiti tepat.
+              </p>
             </div>
           </div>
         </div>
